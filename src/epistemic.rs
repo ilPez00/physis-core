@@ -122,7 +122,6 @@ impl EpistemicAuditTrail {
         self.events.iter().filter(|e| e.subject_id == subject_id).collect()
     }
 
-    /// Reconstruct what was believed about a subject at time `when`.
     pub fn reconstruct_status_at(
         &self,
         subject_id: &str,
@@ -131,8 +130,11 @@ impl EpistemicAuditTrail {
         let mut last_status: Option<HypothesisStatus> = None;
         for ev in &self.events {
             if ev.subject_id == subject_id && ev.timestamp <= when {
+                if ev.event_type == EpistemicEventType::HypothesisGenerated {
+                    last_status = Some(HypothesisStatus::Candidate);
+                }
                 if let Some(ref post) = ev.posterior_state {
-                    match post.as_str() {
+                    match post.to_lowercase().as_str() {
                         "candidate" => last_status = Some(HypothesisStatus::Candidate),
                         "supported" => last_status = Some(HypothesisStatus::Supported),
                         "contradicted" => last_status = Some(HypothesisStatus::Contradicted),

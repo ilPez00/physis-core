@@ -160,6 +160,76 @@ impl PhysisCore {
         self.search_nodes(&embedder.embed(query), max)
     }
 
+    /// Look up a node by its exact label string.
+    pub fn node_by_label(&self, label: &str) -> Option<&CoherenceNode> {
+        let id = self.label_index.get(label)?;
+        self.nodes.get(id)
+    }
+
+    /// Modify an existing node's content in place while preserving its id,
+    /// asserted verdict, edges, and provenance.
+    pub fn edit_node(
+        &mut self,
+        id: &str,
+        new_label: &str,
+        new_embedding: Vec<f32>,
+        pin: PinEdit,
+        embedder_id: Option<&str>,
+    ) -> anyhow::Result<NodeEditOutcome> {
+        let node = self.nodes.get_mut(id).ok_or_else(|| anyhow::anyhow!("unknown node {id}"))?;
+        if let Some(old) = node.label.take() {
+            if self.label_index.get(&old).map(String::as_str) == Some(id) {
+                self.label_index.remove(&old);
+            }
+        }
+        node.label = Some(new_label.to_string());
+        node.embedding = new_embedding;
+        node.embedder = embedder_id.map(str::to_string);
+        match pin {
+            PinEdit::Keep => {}
+            PinEdit::Set(domain, mode) => node.cell_pin = Some((domain, mode)),
+            PinEdit::Clear => node.cell_pin = None,
+        }
+        self.label_index.insert(new_label.to_string(), id.to_string());
+        self.update_coherence(id);
+        let node = &self.nodes[id];
+        Ok(NodeEditOutcome {
+            node_id: id.to_string(),
+            label: node.label.clone().unwrap_or_default(),
+            pinned_cell: node.cell_pin.clone(),
+            asserted: node.asserted,
+            coherence_score: node.coherence_score,
+        })
+    }
+
+    /// Remove a node and its label index entry. Returns false when the id is unknown.
+    pub fn delete_node(&mut self, id: &str) -> bool {
+        let Some(node) = self.nodes.remove(id) else { return false };
+        if let Some(label) = node.label {
+            if self.label_index.get(&label).map(String::as_str) == Some(id) {
+                self.label_index.remove(&label);
+            }
+        }
+        true
+    }
+
+    /// Delete every node whose label is `label` or begins with `label → `.
+    pub fn delete_nodes_by_label_prefix(&mut self, label: &str) -> Vec<String> {
+        let prefix = format!("{label} → ");
+        let ids: Vec<String> = self
+            .nodes
+            .iter()
+            .filter(|(_, n)| {
+                n.label.as_deref().is_some_and(|l| l == label || l.starts_with(&prefix))
+            })
+            .map(|(id, _)| id.clone())
+            .collect();
+        for id in &ids {
+            self.delete_node(id);
+        }
+        ids
+    }
+
     /// Update coherence score for a node (mean cosine to k nearest neighbors).
     fn update_coherence(&mut self, node_id: &str) {
         if self.nodes.len() <= 1 {
@@ -728,7 +798,7 @@ mod tests {
     use super::*;
     use crate::embed::RandomProjectionEmbedder;
     use crate::hypothesis::{Evidence, EvidencePolarity, Hypothesis, HypothesisStatus};
-    use crate::contradiction::{Contradiction, ContradictionParty, ResolutionStatus};
+    use crate::contradiction::ResolutionStatus;
     use crate::provenance::ProvenanceLink;
 
     fn fixture_embedder() -> RandomProjectionEmbedder {

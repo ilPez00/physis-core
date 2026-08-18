@@ -136,6 +136,27 @@ pub async fn run_with_model(port: u16, model_dir: Option<String>) -> anyhow::Res
         .route("/api/core/search", post(core_search))
         .route("/api/core/assert", post(core_assert))
         .route("/api/core/dream", post(core_dream))
+        // MVP Node & Importers API
+        .route("/api/v1/coherence/edit", post(api_node_edit))
+        .route("/api/v1/coherence/delete", post(api_node_delete))
+        .route("/api/v1/search/nodes", post(api_node_search))
+        .route("/api/v1/vault/import", post(api_vault_import))
+        .route("/api/v1/history/import", post(api_history_import))
+        .route("/api/v1/praxis/backfill", post(api_praxis_backfill))
+        // Epistemic Hypotheses & Explanations API
+        .route("/api/v1/hypotheses", get(api_hypotheses_list).post(api_hypothesis_create))
+        .route("/api/v1/hypotheses/:id", get(api_hypothesis_get))
+        .route("/api/v1/hypotheses/:id/evidence", post(api_hypothesis_evidence))
+        .route("/api/v1/hypotheses/:id/prediction", post(api_hypothesis_prediction))
+        .route("/api/v1/hypotheses/:id/transition", post(api_hypothesis_transition))
+        .route("/api/v1/explanation/:id", get(api_explanation_get))
+        // Contradictions API
+        .route("/api/v1/contradictions", get(api_contradictions_list).post(api_contradiction_create))
+        .route("/api/v1/contradictions/:id/resolve", post(api_contradiction_resolve))
+        // Epistemic Audit & Replay API
+        .route("/api/v1/epistemic/audit", get(api_epistemic_audit))
+        .route("/api/v1/epistemic/replay", get(api_epistemic_replay))
+        .route("/api/v1/ontology/discover", post(api_ontology_discover))
         .with_state(state);
 
     // Loopback by default: every ingest/scan route reads arbitrary local paths,
@@ -1009,6 +1030,480 @@ fn save_custom_entries(data_dir: &std::path::Path, entries: &HashMap<String, Dom
     let json = serde_json::to_string_pretty(entries)?;
     std::fs::write(custom_ontology_file(data_dir), json)?;
     Ok(())
+}
+
+// ── Additional MVP & Epistemic Handlers ─────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct ApiNodeEditReq {
+    id: String,
+    label: String,
+    domain: Option<String>,
+    mode: Option<String>,
+    #[serde(default)]
+    clear_pin: bool,
+}
+
+async fn api_node_edit(State(state): State<Shared>, Json(req): Json<ApiNodeEditReq>) -> Response {
+    let mut s = state.write().unwrap();
+    let new_emb = s.embedder.embed(&req.label);
+    let pin = if req.clear_pin {
+        PinEdit::Clear
+    } else if let (Some(d), Some(m)) = (req.domain, req.mode) {
+        PinEdit::Set(d, m)
+    } else {
+        PinEdit::Keep
+    };
+    let kind = s.embedder_kind.clone();
+    match s.core.edit_node(&req.id, &req.label, new_emb, pin, Some(&kind)) {
+        Ok(outcome) => {
+            s.save_core();
+            Json(outcome).into_response()
+        }
+        Err(e) => (StatusCode::NOT_FOUND, e.to_string()).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ApiNodeDeleteReq {
+    id: String,
+}
+
+async fn api_node_delete(State(state): State<Shared>, Json(req): Json<ApiNodeDeleteReq>) -> Response {
+    let mut s = state.write().unwrap();
+    if s.core.delete_node(&req.id) {
+        s.save_core();
+        Json(serde_json::json!({ "ok": true, "deleted": req.id })).into_response()
+    } else {
+        (StatusCode::NOT_FOUND, format!("node {} not found", req.id)).into_response()
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ApiNodeSearchReq {
+    query: String,
+    #[serde(default = "default_token_budget")]
+    budget: usize,
+    #[serde(default = "default_search_max")]
+    top: usize,
+}
+
+fn default_token_budget() -> usize {
+    600
+}
+
+async fn api_node_search(State(state): State<Shared>, Json(req): Json<ApiNodeSearchReq>) -> Response {
+    let s = state.read().unwrap();
+    let q_emb = s.embedder.embed(&req.query);
+    let candidates: Vec<(usize, String, Vec<f32>)> = s
+        .core
+        .nodes
+        .values()
+        .filter_map(|n| {
+            let l = n.label.as_deref()?;
+            if l.trim().is_empty() { return None; }
+            Some((l.to_string(), n.embedding.clone()))
+        })
+        .enumerate()
+        .map(|(i, (l, e))| (i, l, e))
+        .collect();
+
+    let corpus = crate::rag::RagCorpus {
+        chunks: candidates
+            .iter()
+            .map(|(i, l, e)| crate::rag::RagChunk {
+                id: *i,
+                text: l.clone(),
+                tokens: crate::rag::count_tokens(l),
+                embedding: e.clone(),
+            })
+            .collect(),
+    };
+    let result = crate::rag::TokenFixedRetriever::new(req.budget, req.top).retrieve(&q_emb, &corpus);
+    Json(result).into_response()
+}
+
+#[derive(serde::Deserialize)]
+struct ApiVaultImportReq {
+    dir: String,
+    #[serde(default = "default_git_max")]
+    git: usize,
+}
+
+fn default_git_max() -> usize {
+    50
+}
+
+async fn api_vault_import(State(state): State<Shared>, Json(req): Json<ApiVaultImportReq>) -> Response {
+    let path = PathBuf::from(&req.dir);
+    if !path.is_dir() {
+        return (StatusCode::BAD_REQUEST, format!("dir {} not found", req.dir)).into_response();
+    }
+    let mut docs = crate::vault::scan_vault(&path);
+    if req.git > 0 {
+        let commits = crate::vault::scan_git_log(&path, req.git);
+        docs.extend(commits);
+    }
+    let pairs = crate::vault::collect_labels(&docs);
+    let mut s = state.write().unwrap();
+    let before = s.core.nodes.len();
+    for (label, text) in &pairs {
+        let emb = s.embedder.embed(text);
+        s.core.register_node_vec_labeled(emb, Some(label.clone()));
+    }
+    let registered = s.core.nodes.len() - before;
+    s.save_core();
+    Json(serde_json::json!({
+        "status": "ok",
+        "docs": docs.len(),
+        "registered": registered,
+        "deduped": pairs.len().saturating_sub(registered),
+    })).into_response()
+}
+
+#[derive(serde::Deserialize)]
+struct ApiHistoryImportReq {
+    file: String,
+}
+
+async fn api_history_import(State(state): State<Shared>, Json(req): Json<ApiHistoryImportReq>) -> Response {
+    let path = PathBuf::from(&req.file);
+    let (docs, name) = match crate::history::import_file(&path) {
+        Ok(res) => res,
+        Err(e) => return (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    };
+    let mut s = state.write().unwrap();
+    let before = s.core.nodes.len();
+    for doc in &docs {
+        let emb = s.embedder.embed(&doc.body);
+        s.core.register_node_vec_labeled(emb, Some(doc.title.clone()));
+    }
+    let registered = s.core.nodes.len() - before;
+    s.save_core();
+    Json(serde_json::json!({
+        "status": "ok",
+        "name": name,
+        "imported": docs.len(),
+        "registered": registered,
+    })).into_response()
+}
+
+#[derive(serde::Deserialize)]
+struct ApiPraxisBackfillReq {
+    json: Option<String>,
+    file: Option<String>,
+}
+
+async fn api_praxis_backfill(State(state): State<Shared>, Json(req): Json<ApiPraxisBackfillReq>) -> Response {
+    let text = if let Some(j) = req.json {
+        j
+    } else if let Some(f) = req.file {
+        match std::fs::read_to_string(&f) {
+            Ok(s) => s,
+            Err(e) => return (StatusCode::BAD_REQUEST, format!("failed reading {f}: {e}")).into_response(),
+        }
+    } else {
+        return (StatusCode::BAD_REQUEST, "either json or file is required").into_response();
+    };
+    let records = crate::praxis::parse_export(&text);
+    let mut s = state.write().unwrap();
+    let before = s.core.nodes.len();
+    for r in &records {
+        let emb = s.embedder.embed(&r.body);
+        let id = s.core.register_node_vec_labeled(emb, Some(format!("praxis:{}:{}", r.kind, r.title)));
+        s.core.assert_coherence(&id, r.status.as_score());
+    }
+    let registered = s.core.nodes.len() - before;
+    s.save_core();
+    Json(serde_json::json!({
+        "status": "ok",
+        "records": records.len(),
+        "registered": registered,
+    })).into_response()
+}
+
+#[derive(serde::Deserialize)]
+struct ApiCreateHypothesisReq {
+    statement: String,
+    #[serde(default)]
+    assumptions: Option<Vec<String>>,
+    #[serde(default)]
+    confidence: Option<f32>,
+}
+
+async fn api_hypotheses_list(State(state): State<Shared>) -> Response {
+    let s = state.read().unwrap();
+    let list: Vec<_> = s.core.hypotheses.values().cloned().collect();
+    Json(list).into_response()
+}
+
+async fn api_hypothesis_create(State(state): State<Shared>, Json(req): Json<ApiCreateHypothesisReq>) -> Response {
+    let mut s = state.write().unwrap();
+    let emb = s.embedder.embed(&req.statement);
+    let mut hyp = crate::hypothesis::Hypothesis::new(&req.statement, emb);
+    if let Some(assumptions) = req.assumptions {
+        hyp.assumptions = assumptions;
+    }
+    if let Some(conf) = req.confidence {
+        hyp.confidence = conf;
+    }
+    let id = s.core.register_hypothesis(hyp.clone());
+    s.save_core();
+    let created = s.core.hypothesis(&id).cloned().unwrap_or(hyp);
+    (StatusCode::CREATED, Json(created)).into_response()
+}
+
+async fn api_hypothesis_get(State(state): State<Shared>, axum::extract::Path(id): axum::extract::Path<String>) -> Response {
+    let s = state.read().unwrap();
+    match s.core.hypothesis(&id) {
+        Some(h) => Json(h.clone()).into_response(),
+        None => (StatusCode::NOT_FOUND, format!("hypothesis {id} not found")).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ApiHypothesisEvidenceReq {
+    claim: String,
+    source: String,
+    #[serde(default)]
+    polarity: Option<String>,
+    #[serde(default)]
+    weight: Option<f32>,
+}
+
+async fn api_hypothesis_evidence(
+    State(state): State<Shared>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    Json(req): Json<ApiHypothesisEvidenceReq>,
+) -> Response {
+    let mut s = state.write().unwrap();
+    let pol = match req.polarity.as_deref().unwrap_or("supporting").to_lowercase().as_str() {
+        "contradicting" | "contra" | "refuting" => crate::hypothesis::EvidencePolarity::Contradicts,
+        _ => crate::hypothesis::EvidencePolarity::Supports,
+    };
+    let mut ev = crate::hypothesis::Evidence::new(req.claim, req.source);
+    if let Some(w) = req.weight {
+        ev = ev.with_weight(w);
+    }
+    let res = if let Some(hyp) = s.core.hypotheses.get_mut(&id) {
+        match pol {
+            crate::hypothesis::EvidencePolarity::Supports => hyp.add_supporting(ev),
+            crate::hypothesis::EvidencePolarity::Contradicts => hyp.add_contradicting(ev),
+        }
+        Some(hyp.clone())
+    } else {
+        None
+    };
+    match res {
+        Some(h) => {
+            s.save_core();
+            Json(h).into_response()
+        }
+        None => (StatusCode::NOT_FOUND, format!("hypothesis {id} not found")).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ApiHypothesisPredictionReq {
+    statement: String,
+    expected_outcome: Option<String>,
+    actual_outcome: Option<String>,
+    correct: Option<bool>,
+    confidence: Option<f32>,
+}
+
+async fn api_hypothesis_prediction(
+    State(state): State<Shared>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    Json(req): Json<ApiHypothesisPredictionReq>,
+) -> Response {
+    let mut s = state.write().unwrap();
+    let mut pred = crate::hypothesis::Prediction::new(req.statement);
+    if let Some(exp) = req.expected_outcome {
+        pred.expected_outcome = Some(exp);
+    }
+    if let Some(act) = req.actual_outcome {
+        pred.actual_outcome = Some(act);
+    }
+    if let Some(cor) = req.correct {
+        pred.correct = Some(cor);
+    }
+    if let Some(conf) = req.confidence {
+        pred.confidence = conf;
+    }
+    let res = if let Some(hyp) = s.core.hypotheses.get_mut(&id) {
+        hyp.add_prediction(pred);
+        Some(hyp.clone())
+    } else {
+        None
+    };
+    match res {
+        Some(h) => {
+            s.save_core();
+            Json(h).into_response()
+        }
+        None => (StatusCode::NOT_FOUND, format!("hypothesis {id} not found")).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ApiHypothesisTransitionReq {
+    status: String,
+    reason: String,
+    trigger_id: Option<String>,
+}
+
+async fn api_hypothesis_transition(
+    State(state): State<Shared>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    Json(req): Json<ApiHypothesisTransitionReq>,
+) -> Response {
+    let target_status = match req.status.to_lowercase().as_str() {
+        "candidate" => crate::hypothesis::HypothesisStatus::Candidate,
+        "supported" => crate::hypothesis::HypothesisStatus::Supported,
+        "contradicted" => crate::hypothesis::HypothesisStatus::Contradicted,
+        "confirmed" => crate::hypothesis::HypothesisStatus::Confirmed,
+        "inert" => crate::hypothesis::HypothesisStatus::Inert,
+        "failed" => crate::hypothesis::HypothesisStatus::Failed,
+        "superseded" => crate::hypothesis::HypothesisStatus::Superseded,
+        "isolated" => crate::hypothesis::HypothesisStatus::Isolated,
+        "certified" => crate::hypothesis::HypothesisStatus::Certified,
+        other => return (StatusCode::BAD_REQUEST, format!("unknown status '{other}'")).into_response(),
+    };
+    let mut s = state.write().unwrap();
+    let res = if s.core.transition_hypothesis(&id, target_status, &req.reason, req.trigger_id) {
+        s.core.hypothesis(&id).cloned()
+    } else {
+        None
+    };
+    match res {
+        Some(h) => {
+            s.save_core();
+            Json(h).into_response()
+        }
+        None => (StatusCode::NOT_FOUND, format!("hypothesis {id} not found")).into_response(),
+    }
+}
+
+async fn api_explanation_get(
+    State(state): State<Shared>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    let s = state.read().unwrap();
+    match s.core.full_explanation_report(&id) {
+        Some(report) => Json(report).into_response(),
+        None => (StatusCode::NOT_FOUND, format!("hypothesis {id} not found")).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ApiCreateContradictionReq {
+    claim_a: crate::contradiction::ContradictionParty,
+    claim_b: crate::contradiction::ContradictionParty,
+    resolution: Option<crate::contradiction::ResolutionStatus>,
+    explanation: Option<String>,
+}
+
+async fn api_contradictions_list(State(state): State<Shared>) -> Response {
+    let s = state.read().unwrap();
+    let list = s.core.contradictions.clone();
+    Json(list).into_response()
+}
+
+async fn api_contradiction_create(
+    State(state): State<Shared>,
+    Json(req): Json<ApiCreateContradictionReq>,
+) -> Response {
+    let mut s = state.write().unwrap();
+    let mut contra = crate::contradiction::Contradiction::new(req.claim_a, req.claim_b);
+    if let Some(res) = req.resolution {
+        contra.resolution = res;
+    }
+    if let Some(exp) = req.explanation {
+        contra.explanation = Some(exp);
+    }
+    let id = s.core.record_contradiction(contra.clone());
+    s.save_core();
+    let created = s.core.contradictions.iter().find(|c| c.id == id).cloned().unwrap_or(contra);
+    (StatusCode::CREATED, Json(created)).into_response()
+}
+
+#[derive(serde::Deserialize)]
+struct ApiResolveContradictionReq {
+    resolution: crate::contradiction::ResolutionStatus,
+    explanation: Option<String>,
+}
+
+async fn api_contradiction_resolve(
+    State(state): State<Shared>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    Json(req): Json<ApiResolveContradictionReq>,
+) -> Response {
+    let mut s = state.write().unwrap();
+    let updated = if let Some(c) = s.core.contradictions.iter_mut().find(|c| c.id == id) {
+        c.resolution = req.resolution;
+        if let Some(exp) = req.explanation {
+            c.explanation = Some(exp);
+        }
+        Some(c.clone())
+    } else {
+        None
+    };
+    match updated {
+        Some(c) => {
+            s.save_core();
+            Json(c).into_response()
+        }
+        None => (StatusCode::NOT_FOUND, format!("contradiction {id} not found")).into_response(),
+    }
+}
+
+async fn api_epistemic_audit(State(state): State<Shared>) -> Response {
+    let s = state.read().unwrap();
+    Json(s.core.epistemic_audit.events.clone()).into_response()
+}
+
+#[derive(serde::Deserialize)]
+struct ApiReplayReq {
+    subject_id: String,
+    at: String,
+}
+
+async fn api_epistemic_replay(
+    State(state): State<Shared>,
+    axum::extract::Query(params): axum::extract::Query<ApiReplayReq>,
+) -> Response {
+    let s = state.read().unwrap();
+    let when = match chrono::DateTime::parse_from_rfc3339(&params.at) {
+        Ok(dt) => dt.with_timezone(&chrono::Utc),
+        Err(e) => return (StatusCode::BAD_REQUEST, format!("invalid timestamp '{}': {e}", params.at)).into_response(),
+    };
+    let belief = s.core.reconstruct_belief_at(&params.subject_id, when);
+    Json(serde_json::json!({
+        "subject_id": params.subject_id,
+        "at": params.at,
+        "belief": belief,
+    })).into_response()
+}
+
+#[derive(serde::Deserialize)]
+struct ApiOntologyDiscoverReq {
+    texts: Vec<String>,
+    #[serde(default)]
+    min_cluster_size: Option<usize>,
+}
+
+async fn api_ontology_discover(
+    State(state): State<Shared>,
+    Json(req): Json<ApiOntologyDiscoverReq>,
+) -> Response {
+    let s = state.read().unwrap();
+    let mut config = crate::discovery::DiscoveryConfig::default();
+    if let Some(m) = req.min_cluster_size {
+        config.min_cluster = m;
+    }
+    let report = crate::discovery::discover(&req.texts, &s.classifier, s.embedder.as_ref(), &config);
+    Json(report).into_response()
 }
 
 #[cfg(test)]

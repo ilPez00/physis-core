@@ -12,7 +12,7 @@ use crate::embed::VectorEmbed;
 /// Which pooling strategy the model export expects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PoolingStrategy {
-    /// Use the [CLS] token (first token) as the sentence vector.
+    /// Use the `[CLS]` token (first token) as the sentence vector.
     Cls,
     /// Mean of all non-padded token vectors.
     Mean,

@@ -2,8 +2,14 @@
 name = "physis-core"
 version = "0.1.0"
 edition = "2021"
-description = "Physis core engine — embed, classify, cohere, quality-feedback. Lean, dependency-light MVP."
+description = "Physis core engine — competing interpretations, multidimensional coherence, contradiction tracking, epistemic audit, and quality feedback."
 license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/ilPez00/physis-pro"
+homepage = "https://github.com/ilPez00/physis-pro"
+documentation = "https://docs.rs/physis-core"
+keywords = ["knowledge-graph", "epistemic-engine", "truth-maintenance", "coherence", "embeddings"]
+categories = ["data-structures", "algorithms", "science", "text-processing"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

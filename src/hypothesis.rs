@@ -80,6 +80,41 @@ pub struct Evidence {
     pub context: Vec<String>,
 }
 
+impl Evidence {
+    pub fn new(claim: impl Into<String>, source: impl Into<String>) -> Self {
+        Self::supports(source, claim)
+    }
+
+    pub fn supports(source: impl Into<String>, claim: impl Into<String>) -> Self {
+        Self {
+            source: source.into(),
+            polarity: EvidencePolarity::Supports,
+            confidence: 1.0,
+            claim: claim.into(),
+            observed_at: Some(chrono::Utc::now()),
+            embedding: Vec::new(),
+            context: Vec::new(),
+        }
+    }
+
+    pub fn contradicts(source: impl Into<String>, claim: impl Into<String>) -> Self {
+        Self {
+            source: source.into(),
+            polarity: EvidencePolarity::Contradicts,
+            confidence: 1.0,
+            claim: claim.into(),
+            observed_at: Some(chrono::Utc::now()),
+            embedding: Vec::new(),
+            context: Vec::new(),
+        }
+    }
+
+    pub fn with_weight(mut self, weight: Score) -> Self {
+        self.confidence = weight;
+        self
+    }
+}
+
 /// Whether evidence supports or contradicts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvidencePolarity {
@@ -106,6 +141,20 @@ pub struct Prediction {
     /// Confidence in this prediction.
     #[serde(default = "default_one")]
     pub confidence: Score,
+}
+
+impl Prediction {
+    pub fn new(statement: impl Into<String>) -> Self {
+        Self {
+            statement: statement.into(),
+            expected_outcome: None,
+            made_at: chrono::Utc::now(),
+            observed_at: None,
+            actual_outcome: None,
+            correct: None,
+            confidence: 1.0,
+        }
+    }
 }
 
 fn default_one() -> Score {
@@ -269,12 +318,20 @@ impl Hypothesis {
         self.revise("Added supporting evidence", None);
     }
 
+    pub fn add_supporting(&mut self, evidence: Evidence) {
+        self.add_supporting_evidence(evidence);
+    }
+
     /// Add contradicting evidence and update status and fitness.
     pub fn add_contradicting_evidence(&mut self, evidence: Evidence) {
         self.contradicting_evidence.push(evidence);
         self.status = HypothesisStatus::Contradicted;
         self.recompute_fitness();
         self.revise("Added contradicting evidence", None);
+    }
+
+    pub fn add_contradicting(&mut self, evidence: Evidence) {
+        self.add_contradicting_evidence(evidence);
     }
 
     /// Record a prediction and its outcome.
@@ -285,6 +342,10 @@ impl Hypothesis {
         self.predictions.push(prediction);
         self.recompute_fitness();
         self.revise("Recorded prediction outcome", None);
+    }
+
+    pub fn add_prediction(&mut self, prediction: Prediction) {
+        self.record_prediction(prediction);
     }
 
     /// Transition to a new status, recording the revision.

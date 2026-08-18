@@ -55,9 +55,30 @@ pub struct CoherenceNode {
     pub asserted: Option<Score>,
     #[serde(default)]
     pub label: Option<String>,
+    /// Semiotic cell pinned to this node: (domain, mode).
+    #[serde(default)]
+    pub cell_pin: Option<(String, String)>,
     /// Which embedder produced `embedding` (provenance).
     #[serde(default)]
     pub embedder: Option<String>,
+}
+
+/// A request to modify a node's cell pin during a semiotic edit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PinEdit {
+    Keep,
+    Set(String, String),
+    Clear,
+}
+
+/// The result of modifying a coherence node.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeEditOutcome {
+    pub node_id: String,
+    pub label: String,
+    pub pinned_cell: Option<(String, String)>,
+    pub asserted: Option<Score>,
+    pub coherence_score: Score,
 }
 
 impl CoherenceNode {
@@ -68,6 +89,7 @@ impl CoherenceNode {
             coherence_score: 0.0,
             asserted: None,
             label: None,
+            cell_pin: None,
             embedder: None,
         }
     }
@@ -184,8 +206,24 @@ impl LifecyclePhase {
             LifecyclePhase::Retire => "RETIRE",
         }
     }
+    pub fn parse_facet(s: &str) -> Option<Self> {
+        s.parse().ok()
+    }
     pub fn all() -> [LifecyclePhase; 4] {
         [LifecyclePhase::Design, LifecyclePhase::Build, LifecyclePhase::Operate, LifecyclePhase::Retire]
+    }
+}
+
+impl std::str::FromStr for LifecyclePhase {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_uppercase().as_str() {
+            "DESIGN" => Ok(LifecyclePhase::Design),
+            "BUILD" | "FABRICATE" => Ok(LifecyclePhase::Build),
+            "OPERATE" => Ok(LifecyclePhase::Operate),
+            "RETIRE" | "MAINTAIN" => Ok(LifecyclePhase::Retire),
+            _ => Err(()),
+        }
     }
 }
 
@@ -207,8 +245,24 @@ impl Agency {
             Agency::Collective => "COLLECTIVE",
         }
     }
+    pub fn parse_facet(s: &str) -> Option<Self> {
+        s.parse().ok()
+    }
     pub fn all() -> [Agency; 4] {
         [Agency::SelfActor, Agency::Other, Agency::Automated, Agency::Collective]
+    }
+}
+
+impl std::str::FromStr for Agency {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_uppercase().as_str() {
+            "SELF" | "SELFACTOR" => Ok(Agency::SelfActor),
+            "OTHER" => Ok(Agency::Other),
+            "AUTOMATED" => Ok(Agency::Automated),
+            "COLLECTIVE" => Ok(Agency::Collective),
+            _ => Err(()),
+        }
     }
 }
 
@@ -230,8 +284,24 @@ impl Scale {
             Scale::Civil => "CIVIL",
         }
     }
+    pub fn parse_facet(s: &str) -> Option<Self> {
+        s.parse().ok()
+    }
     pub fn all() -> [Scale; 4] {
         [Scale::Personal, Scale::Interpersonal, Scale::Organizational, Scale::Civil]
+    }
+}
+
+impl std::str::FromStr for Scale {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_uppercase().as_str() {
+            "PERSONAL" => Ok(Scale::Personal),
+            "INTERPERSONAL" => Ok(Scale::Interpersonal),
+            "ORGANIZATIONAL" => Ok(Scale::Organizational),
+            "CIVIL" => Ok(Scale::Civil),
+            _ => Err(()),
+        }
     }
 }
 
@@ -247,6 +317,20 @@ impl Abstraction {
         match self {
             Abstraction::Concrete => "CONCRETE",
             Abstraction::Abstract => "ABSTRACT",
+        }
+    }
+    pub fn parse_facet(s: &str) -> Option<Self> {
+        s.parse().ok()
+    }
+}
+
+impl std::str::FromStr for Abstraction {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_uppercase().as_str() {
+            "CONCRETE" => Ok(Abstraction::Concrete),
+            "ABSTRACT" => Ok(Abstraction::Abstract),
+            _ => Err(()),
         }
     }
 }
@@ -306,6 +390,55 @@ impl Facets {
         }
         parts.join(" · ")
     }
+
+    /// Check if these facets match a given filter.
+    pub fn matches(&self, filter: &FacetFilter) -> bool {
+        if let Some(ref l) = filter.lifecycle {
+            if self.lifecycle.as_ref() != Some(l) {
+                return false;
+            }
+        }
+        if let Some(ref a) = filter.agency {
+            if self.agency.as_ref() != Some(a) {
+                return false;
+            }
+        }
+        if let Some(ref s) = filter.scale {
+            if self.scale.as_ref() != Some(s) {
+                return false;
+            }
+        }
+        if let Some(ref ab) = filter.abstraction {
+            if self.abstraction.as_ref() != Some(ab) {
+                return false;
+            }
+        }
+        if let Some(ref sd) = filter.sub_domain {
+            if self.sub_domain.as_ref() != Some(sd) {
+                return false;
+            }
+        }
+        if let Some(ref sm) = filter.sub_mode {
+            if self.sub_mode.as_ref() != Some(sm) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+/// Filter criteria for querying ontology entries by orthogonal facets.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FacetFilter {
+    pub sub_domain: Option<String>,
+    pub sub_mode: Option<String>,
+    pub lifecycle: Option<LifecyclePhase>,
+    pub agency: Option<Agency>,
+    pub scale: Option<Scale>,
+    pub abstraction: Option<Abstraction>,
+    pub kind: Option<String>,
+    pub domain: Option<String>,
+    pub mode: Option<String>,
 }
 
 /// Most common element of a slice, or `None` if empty.

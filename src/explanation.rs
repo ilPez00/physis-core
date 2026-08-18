@@ -60,6 +60,11 @@ pub struct ExplanationReport {
 }
 
 impl ExplanationReport {
+    /// Alias for render_ascii.
+    pub fn ascii_summary(&self) -> String {
+        self.render_ascii()
+    }
+
     /// Generate a structured human-readable representation of the explanation.
     pub fn render_ascii(&self) -> String {
         let mut out = String::new();

@@ -70,10 +70,13 @@ pub struct ContradictionParty {
     /// Source of this claim (file, sensor, operator, etc.).
     pub source: String,
     /// Authority level of this source (0.0 = low, 1.0 = high).
+    #[serde(default = "default_half")]
     pub authority: Score,
     /// Confidence in this specific claim.
+    #[serde(default = "default_half")]
     pub confidence: Score,
     /// When this claim was made.
+    #[serde(default = "chrono::Utc::now")]
     pub timestamp: chrono::DateTime<chrono::Utc>,
     /// Optional embedding for similarity.
     #[serde(default)]
@@ -81,6 +84,10 @@ pub struct ContradictionParty {
     /// Context tags (machine, process, operator, etc.).
     #[serde(default)]
     pub context: Vec<String>,
+}
+
+fn default_half() -> f32 {
+    0.5
 }
 
 impl ContradictionParty {
