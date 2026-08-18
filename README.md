@@ -14,6 +14,7 @@
 
 - [Overview & Core Epistemic Thesis](#overview--core-epistemic-thesis)
 - [Key Capabilities & Innovations](#key-capabilities--innovations)
+- [Architectural Boundary: Core vs. Pro](#architectural-boundary-core-vs-pro)
 - [Architecture & Epistemic Pipeline](#architecture--epistemic-pipeline)
 - [The Semiotic Grid](#the-semiotic-grid)
 - [Module Catalog](#module-catalog)
@@ -49,6 +50,8 @@ Mainstream AI knowledge graphs, retrieval pipelines, and vector databases operat
 
 ---
 
+---
+
 ## Key Capabilities & Innovations
 
 | Feature | Description | Implementation |
@@ -62,6 +65,24 @@ Mainstream AI knowledge graphs, retrieval pipelines, and vector databases operat
 | **Fixed-Token Budget RAG** | Strict token-budget bounded recall with Maximal Marginal Relevance (MMR) diversity discounting. | `physis_core::rag` |
 | **Vault & History Ingest** | Extract structured knowledge nodes from Markdown vaults, Git history, Netscape bookmarks, browser history, and OPML feeds. | `physis_core::vault`, `physis_core::history` |
 | **Exchange-Parts Node Editing** | Swap node content while preserving ID, verdict, edges, and provenance (`cell_pin` hybrid semantics). | `physis_core::core` |
+
+---
+
+## Architectural Boundary: Core vs. Pro
+
+> **Guiding Principle**: *Core stays Core (the pure, dependency-light epistemic reasoning engine), and Pro stays Pro (the enterprise industrial monitoring and operational intelligence suite).*
+
+| Dimension | `physis-core` (Open Source Engine) | `physis-pro` (Industrial Suite) |
+|---|---|---|
+| **Primary Focus** | Epistemic truth maintenance, coherence evaluation, competing hypotheses | Industrial shop-floor telemetry, backoffice automation, multi-tenant deployment |
+| **Ontology Engine** | 70 canonical semiotic grid cells (5 Domains × 14 Modes) + 33 domain ontologies | Extended 370+ industrial, machine process, and agent workflow domains |
+| **Conflict & Truth** | First-class `Contradiction` tracking, non-destructive polarity, temporal replay | Shop-floor anomaly escalation, quality failure loop, automated arbitration |
+| **State Persistence** | Lean, dependency-light in-memory or single JSON snapshot (`~/.physis-core/`) | High-performance durable Sled DB + Cloud Spanner Graph mirror |
+| **Multi-Tenancy** | Single session / embedded in-process | Isolated per-tenant `RuntimeState` mapped via `X-Physis-User` header |
+| **Hardware & IoT** | Model-agnostic text and vector embeddings | MQTT, Modbus TCP/RTU, Serial, OPC-UA machine adapters |
+| **Multimodal Sensory** | Extensible `VectorEmbed` trait (RandomProjection, ONNX) | Real-time `AuraFrame` sensory bus, Whisper-large voice, CLIP visual features |
+| **LLM Integration** | Token-fixed budget retriever (MMR RAG) | Dynamic LLM Coherence Harness, multi-provider cascade, auto-revision loops |
+| **User Interface** | Lightweight embedded Axum studio (`physis-core studio`) | Full glassmorphic Operations Console, Gantt scheduler, OEE dashboards |
 
 ---
 
