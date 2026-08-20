@@ -631,7 +631,7 @@ async fn promote_proposal(State(state): State<Shared>, Json(req): Json<PromoteRe
 struct QualityJson {
     failures: Vec<serde_json::Value>,
     penalties: HashMap<String, f32>,
-    boosts: HashMap<String, f32>,
+    boosts: HashMap<String, f32>,  // Will be computed from BoostInfo below
 }
 
 async fn quality_json(State(state): State<Shared>) -> Response {
@@ -653,10 +653,16 @@ async fn quality_json(State(state): State<Shared>) -> Response {
             })
         })
         .collect();
+    let boosts_map: HashMap<String, f32> = s
+        .quality
+        .cell_boosts
+        .iter()
+        .map(|(k, b)| (k.clone(), b.current_value()))
+        .collect();
     Json(QualityJson {
         failures,
         penalties: s.quality.cell_penalties.clone(),
-        boosts: s.quality.cell_boosts.clone(),
+        boosts: boosts_map,
     })
     .into_response()
 }

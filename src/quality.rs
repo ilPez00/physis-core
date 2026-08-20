@@ -10,6 +10,21 @@ use serde::{Deserialize, Serialize};
 use crate::embed::VectorEmbed;
 use crate::models::{cosine_sim, Score};
 
+/// Penalty reason codes for auditability and automatic boost triggers.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum PenaltyReason {
+    /// Generic failure, no specific pattern identified
+    Generic,
+    /// Repeated failure in same cell type (pattern learning)
+    RepeatFailure,
+    /// Adjacent cell should have been chosen instead (cross-cell learning)
+    RelatedCellBetter,
+    /// Domain criticality makes this failure more significant
+    DomainCritical,
+    /// Quality threshold exceeded, auto-boost needed
+    ThresholdExceeded,
+}
+
 /// A recorded quality failure — what was wrong, where in the grid it landed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QualityFailure {
@@ -43,14 +58,37 @@ impl QualityFailure {
     }
 }
 
+/// Time-based boost decay — boosts fade over time if not reinforced.
+pub struct BoostInfo {
+    amount: f32,
+    decay_rate: f32,    // per second
+    last_reinforced: std::time::Instant,
+}
+
+impl BoostInfo {
+    pub fn current_value(&self) -> f32 {
+        let elapsed = self.last_reinforced.elapsed().as_secs_f32();
+        self.amount * (-self.decay_rate * elapsed).max(0.0).exp()
+    }
+
+    fn reinforce(&mut self, amount: f32) {
+        self.amount = (self.amount + amount).min(1.0);
+        self.last_reinforced = std::time::Instant::now();
+    }
+}
+
 /// Tracks quality feedback and applies penalty/gain to semiotic cells.
 pub struct QualityTracker {
     pub failures: Vec<QualityFailure>,
     /// Per-cell negative weight (cell_key → penalty 0.0–1.0).
     pub cell_penalties: HashMap<String, f32>,
-    /// Per-cell positive weight (corrections).
-    pub cell_boosts: HashMap<String, f32>,
+    /// Per-cell positive weight with decay (cell_key → BoostInfo).
+    pub cell_boosts: HashMap<String, BoostInfo>,
     embedder: Box<dyn VectorEmbed>,
+    /// Decay rate for boosts (per second)
+    boost_decay_rate: f32,
+    /// Penalty scaling factor: how much confidence × criticality matters
+    penalty_scale: f32,
 }
 
 impl QualityTracker {
@@ -60,6 +98,8 @@ impl QualityTracker {
             cell_penalties: HashMap::new(),
             cell_boosts: HashMap::new(),
             embedder,
+            boost_decay_rate: 0.001,
+            penalty_scale: 1.0,
         }
     }
 
@@ -96,8 +136,13 @@ impl QualityTracker {
             let correct_emb = self.embedder.embed(correct);
             for (key, centroid) in cell_centroids {
                 if cosine_sim(&correct_emb, centroid) > 0.6 {
-                    let boost = self.cell_boosts.entry(key.clone()).or_insert(0.0);
-                    *boost = (*boost + 0.1).min(1.0);
+                    let boost = self.cell_boosts.entry(key.clone()).or_insert(BoostInfo {
+                        amount: 0.5,
+                        decay_rate: self.boost_decay_rate,
+                        last_reinforced: std::time::Instant::now(),
+                    });
+                    // Reinforce the boost if the correct domain was found
+                    boost.amount = (boost.amount + 0.1).min(1.0);
                 }
             }
         }
@@ -136,8 +181,14 @@ impl QualityTracker {
 
     /// Report positive feedback — user confirmed the output is good.
     pub fn report_success(&mut self, cell: &str) {
-        let boost = self.cell_boosts.entry(cell.to_string()).or_insert(0.0);
-        *boost = (*boost + 0.15).min(1.0);
+        let boost = self.cell_boosts.entry(cell.to_string()).or_insert(BoostInfo {
+            amount: 0.5,
+            decay_rate: self.boost_decay_rate,
+            last_reinforced: std::time::Instant::now(),
+        });
+        boost.reinforce(0.15);  // Reinforce existing or add new boost (modifies in place)
+        
+        // Reduce penalty if the cell was previously penalized
         if let Some(p) = self.cell_penalties.get_mut(cell) {
             *p = (*p - 0.1).max(0.0);
         }
@@ -152,7 +203,7 @@ impl QualityTracker {
     /// the display can say "healthy" about a cell the engine is demoting.
     pub fn cell_standing(&self, cell: &str) -> f32 {
         let penalty = self.cell_penalties.get(cell).copied().unwrap_or(0.0);
-        let boost = self.cell_boosts.get(cell).copied().unwrap_or(0.0);
+        let boost = self.cell_boosts.get(cell).map(|b| b.current_value()).unwrap_or(0.0);
         1.0 - penalty + boost
     }
 
@@ -401,7 +452,11 @@ mod tests {
     #[test]
     fn adjust_score_with_boost_increases() {
         let mut t = make_tracker();
-        t.cell_boosts.insert("WORK\x00LIFT".to_string(), 0.5);
+        t.cell_boosts.insert("WORK\x00LIFT".to_string(), BoostInfo {
+            amount: 0.5,
+            decay_rate: t.boost_decay_rate,
+            last_reinforced: std::time::Instant::now(),
+        });
         assert!(t.adjust_score("WORK\x00LIFT", 0.8) > 0.8);
     }
 
