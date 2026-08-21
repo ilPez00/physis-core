@@ -657,7 +657,7 @@ async fn quality_json(State(state): State<Shared>) -> Response {
         .quality
         .cell_boosts
         .iter()
-        .map(|(k, b)| (k.clone(), b.current_value()))
+        .map(|(k, b)| (k.clone(), *b))
         .collect();
     Json(QualityJson {
         failures,
