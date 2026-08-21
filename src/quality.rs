@@ -58,6 +58,26 @@ impl QualityFailure {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct BoostInfo {
+    pub amount: f32,
+    pub decay_rate: f32, // per second
+    pub last_reinforced: std::time::Instant,
+}
+
+impl BoostInfo {
+    pub fn current_value(&self) -> f32 {
+        let elapsed = self.last_reinforced.elapsed().as_secs_f32();
+        let decay = self.decay_rate * elapsed;
+        (self.amount - decay).max(0.0)
+    }
+
+    pub fn reinforce(&mut self, amount: f32) {
+        self.amount = (self.amount + amount).min(1.0);
+        self.last_reinforced = std::time::Instant::now();
+    }
+}
+
 /// Per-cell positive weight (cell_key → f32, capped at 1.0).
     /// Boosts accumulate with reinforcement and decay over time if not reinforced.
     /// The decay is handled externally; this struct simply stores the current value.
@@ -68,7 +88,7 @@ pub struct QualityTracker {
     /// Per-cell negative weight (cell_key → penalty 0.0–1.0).
     pub cell_penalties: HashMap<String, f32>,
     /// Per-cell positive weight (cell_key → f32, capped at 1.0).
-    pub cell_boosts: HashMap<String, f32>,
+    pub cell_boosts: HashMap<String, BoostInfo>,
     embedder: Box<dyn VectorEmbed>,
     /// Decay rate for boosts (per second)
     pub boost_decay_rate: f32,
@@ -121,8 +141,14 @@ impl QualityTracker {
             let correct_emb = self.embedder.embed(correct);
             for (key, centroid) in cell_centroids {
                 if cosine_sim(&correct_emb, centroid) > 0.6 {
-                    let boost = self.cell_boosts.entry(key.clone()).or_insert(0.0);
-                    *boost = (*boost + 0.1).min(1.0);
+                    let boost = self.cell_boosts.entry(key.clone()).or_insert_with(|| {
+                        BoostInfo {
+                            amount: 0.0,
+                            decay_rate: self.boost_decay_rate,
+                            last_reinforced: std::time::Instant::now(),
+                        }
+                    });
+                    boost.reinforce(0.1);
                 }
             }
         }
@@ -161,8 +187,15 @@ impl QualityTracker {
 
     /// Report positive feedback — user confirmed the output is good.
     pub fn report_success(&mut self, cell: &str) {
-        let boost = self.cell_boosts.entry(cell.to_string()).or_insert(0.0);
-        *boost = (*boost + 0.15).min(1.0);
+        let decay_rate = self.boost_decay_rate;
+        let boost = self.cell_boosts.entry(cell.to_string()).or_insert_with(|| {
+            BoostInfo {
+                amount: 0.0,
+                decay_rate,
+                last_reinforced: std::time::Instant::now(),
+            }
+        });
+        boost.reinforce(0.15);
         
         // Reduce penalty if the cell was previously penalized
         if let Some(p) = self.cell_penalties.get_mut(cell) {
@@ -179,7 +212,7 @@ impl QualityTracker {
     /// the display can say "healthy" about a cell the engine is demoting.
     pub fn cell_standing(&self, cell: &str) -> f32 {
         let penalty = self.cell_penalties.get(cell).copied().unwrap_or(0.0);
-        let boost = self.cell_boosts.get(cell).copied().unwrap_or(0.0);
+        let boost = self.cell_boosts.get(cell).map(|b| b.current_value()).unwrap_or(0.0);
         1.0 - penalty + boost
     }
 
@@ -428,7 +461,11 @@ mod tests {
     #[test]
     fn adjust_score_with_boost_increases() {
         let mut t = make_tracker();
-        t.cell_boosts.insert("WORK\x00LIFT".to_string(), 0.5);
+        t.cell_boosts.insert("WORK\x00LIFT".to_string(), BoostInfo {
+            amount: 0.5,
+            decay_rate: t.boost_decay_rate,
+            last_reinforced: std::time::Instant::now(),
+        });
         assert!(t.adjust_score("WORK\x00LIFT", 0.8) > 0.8);
     }
 
