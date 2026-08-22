@@ -78,22 +78,17 @@ impl BoostInfo {
     }
 }
 
-/// Per-cell positive weight (cell_key → f32, capped at 1.0).
-    /// Boosts accumulate with reinforcement and decay over time if not reinforced.
-    /// The decay is handled externally; this struct simply stores the current value.
-
 /// Tracks quality feedback and applies penalty/gain to semiotic cells.
 pub struct QualityTracker {
     pub failures: Vec<QualityFailure>,
     /// Per-cell negative weight (cell_key → penalty 0.0–1.0).
     pub cell_penalties: HashMap<String, f32>,
-    /// Per-cell positive weight (cell_key → f32, capped at 1.0).
+    /// Per-cell positive weight (cell_key → f32, capped at 1.0). Boosts
+    /// accumulate with reinforcement and decay over time if not reinforced.
     pub cell_boosts: HashMap<String, BoostInfo>,
     embedder: Box<dyn VectorEmbed>,
     /// Decay rate for boosts (per second)
     pub boost_decay_rate: f32,
-    /// Penalty scaling factor: how much confidence × criticality matters
-    penalty_scale: f32,
 }
 
 impl QualityTracker {
@@ -104,7 +99,6 @@ impl QualityTracker {
             cell_boosts: HashMap::new(),
             embedder,
             boost_decay_rate: 0.001,
-            penalty_scale: 1.0,
         }
     }
 

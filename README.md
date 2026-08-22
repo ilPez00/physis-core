@@ -399,6 +399,14 @@ Launch the studio with `physis-core studio --port 3000`:
 - **Gap Discovery Studio**: Run clustering over unmapped document collections and promote discovered domain clusters into first-class ontology nodes with a single click.
 - **Quality & Feedback Matrix**: View active penalties, inspect failure records, and apply boosts to undo historical penalties.
 
+### Environment
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `PHYSIS_CORE_DIR` | `$HOME/.physis-core` | State directory for `nodes.json`, `quality.json` and `custom_ontology.json`. The studio and the CLI both resolve the graph through it, which is why `physis-core scan` and the studio see the same nodes; set it to work on a per-project graph, mount a volume in a container, or keep a test run away from your real graph. |
+| `PHYSIS_STUDIO_HOST` | `127.0.0.1` | Bind address. Loopback by default because the ingest and scan routes read arbitrary local paths — only widen it (e.g. `0.0.0.0`) where the port is not publicly reachable. |
+| `PHYSIS_EMBEDDER` | auto-detect | `random-projection` selects the deterministic offline embedder: reproducible and coarse, reported as `semantic: false` but *not* as degraded, since it was asked for rather than fallen back to. |
+
 ---
 
 ## Publishing to Crates.io & Integration

@@ -502,9 +502,18 @@ struct EntryReq {
     category: Option<String>,
     domain: String,
     mode: String,
+    // The editor always posts these four, but the endpoint is also the scripting
+    // surface for the ontology. Without `default` an omitted `unit` rejected the
+    // whole request with a deserialize error, so the minimum useful payload was
+    // seven fields wide when only name/domain/mode carry meaning. They default to
+    // empty, which is exactly what the editor sends for "not set".
+    #[serde(default)]
     axis_kind: String,
+    #[serde(default)]
     axis_name: String,
+    #[serde(default)]
     unit: String,
+    #[serde(default)]
     hints: String,
     /// Orthogonal facets, deserialized by the same `Facets` impl the ontology
     /// JSON loader uses — so the studio and the config files cannot drift on
@@ -1580,6 +1589,34 @@ mod tests {
         assert_eq!(req.facets.sub_domain.as_deref(), Some("Repair"));
         // Unset facets stay None rather than becoming a bogus default.
         assert_eq!(req.facets.scale, None);
+    }
+
+    /// `/api/ontology/upsert` is the scripting surface for the grid, not just
+    /// the editor's private endpoint. Name/domain/mode are the entry and its two
+    /// coordinates; everything else is decoration and must be omittable, or a
+    /// curl one-liner fails with a deserialize error on a field it left blank.
+    #[test]
+    fn an_upsert_needs_only_the_name_and_its_two_coordinates() {
+        let req: EntryReq = serde_json::from_value(serde_json::json!({
+            "name": "soldering a joint",
+            "domain": "FORGE",
+            "mode": "TEMPER",
+        }))
+        .expect("minimal entry deserializes");
+        assert_eq!(req.domain, "FORGE");
+        assert_eq!(req.mode, "TEMPER");
+        assert_eq!(req.unit, "");
+        assert_eq!(req.hints, "");
+        assert_eq!(req.axis_kind, "");
+        assert_eq!(req.axis_name, "");
+
+        // domain and mode stay REQUIRED on purpose: they are the cell key, and
+        // defaulting them to "" would mint a nameless ""×"" cell that then shows
+        // up as a real axis in the dynamic grid.
+        assert!(
+            serde_json::from_value::<EntryReq>(serde_json::json!({ "name": "orphan" })).is_err(),
+            "an entry with no cell coordinates must be rejected, not defaulted"
+        );
     }
 
     /// The shell only works if it actually pulls in the split assets; a rename
