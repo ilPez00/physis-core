@@ -74,9 +74,7 @@
 //!
 //! ```rust
 //! use physis_core::{
-//!     PhysisCore, RandomProjectionEmbedder, OntologyLoader, CellClassifier,
-//!     Hypothesis, HypothesisStatus, Evidence, EvidencePolarity, VectorEmbed,
-//!     CoherenceProfile, EpistemicEvent, EpistemicEventType,
+//!     PhysisCore, RandomProjectionEmbedder, Hypothesis, HypothesisStatus, Evidence, VectorEmbed,
 //! };
 //!
 //! // 1. Initialize Embedder and Engine Core
@@ -87,40 +85,28 @@
 //! let emb_a = embedder.embed("Spindle bearing lubrication breakdown causing friction");
 //! let mut hyp_a = Hypothesis::new("Spindle bearing lubrication breakdown", emb_a);
 //! hyp_a.assumptions.push("Coolant pump flow is nominal".to_string());
+//! // 3. Attach Empirical Observations to the hypothesis before registering
+//! hyp_a.supporting_evidence.push(Evidence::supports(
+//!     "vibration_sensor_accelerometer",
+//!     "High frequency harmonics match bearing ball-pass frequency",
+//! ));
 //! let id_a = core.register_hypothesis(hyp_a);
 //!
 //! let emb_b = embedder.embed("Thermal sensor telemetry calibration drift");
 //! let hyp_b = Hypothesis::new("Thermal sensor telemetry calibration drift", emb_b);
 //! let id_b = core.register_hypothesis(hyp_b);
 //!
-//! // 3. Attach Empirical Observations
-//! let evidence = Evidence {
-//!     source: "vibration_sensor_accelerometer".to_string(),
-//!     polarity: EvidencePolarity::Supports,
-//!     confidence: 0.92,
-//!     claim: "High frequency harmonics match bearing ball-pass frequency".to_string(),
-//!     observed_at: Some(chrono::Utc::now()),
-//!     embedding: vec![],
-//!     context: vec!["spindle_speed_rpm: 12000".to_string()],
-//! };
-//! core.attach_evidence(&id_a, evidence);
-//!
 //! // 4. Evaluate Fitness and Resolve Preferred Interpretation
-//! if let Some(h) = core.hypotheses.get_mut(&id_a) {
-//!     h.status = HypothesisStatus::Supported;
-//!     h.fitness = 0.88;
-//! }
-//!
-//! // 5. Epistemic Audit Trail Records the Decision
-//! let event = EpistemicEvent::new(
-//!     EpistemicEventType::HypothesisSupported,
+//! core.transition_hypothesis(
 //!     &id_a,
+//!     HypothesisStatus::Supported,
 //!     "Vibration telemetry corroborated bearing breakdown",
-//! ).with_metric(0.88);
-//! core.epistemic_audit.record(event);
+//!     Some("vibration_sensor_accelerometer".to_string()),
+//! );
 //!
+//! // 5. Epistemic Audit Trail records registration + status transitions
 //! assert_eq!(core.hypotheses.len(), 2);
-//! assert_eq!(core.epistemic_audit.events.len(), 1);
+//! assert_eq!(core.epistemic_audit.events.len(), 3);
 //! ```
 //!
 //! ---
