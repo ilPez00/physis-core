@@ -1,6 +1,6 @@
 [package]
 name = "physis-core"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 description = "Physis core engine — competing interpretations, multidimensional coherence, contradiction tracking, epistemic audit, and quality feedback."
 license = "Apache-2.0"
