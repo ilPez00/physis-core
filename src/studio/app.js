@@ -82,15 +82,30 @@ document.querySelectorAll('nav button[data-tab]').forEach(b => {
 async function loadHealth() {
   try {
     const h = await api('/api/health');
+    // Whether the embedder is semantic decides how much every number below is
+    // worth, so say it on the chip itself. A tooltip does not count: nobody
+    // hovers a header before trusting a score they can already read.
     const emb = $('chEmbedder');
-    emb.innerHTML = 'embedder <b>' + esc(h.embedder) + '</b>';
-    emb.className = 'chip' + (h.semantic ? ' good' : '');
-    emb.title = (h.semantic ? 'semantic ONNX model' : 'deterministic fallback — pass --model for real semantics')
-      + ' · ' + h.dimension + 'd';
+    emb.innerHTML = 'embedder <b>' + esc(h.embedder) + '</b>'
+      + (h.semantic ? '' : ' <span class="qual">· not semantic</span>');
+    emb.className = 'chip' + (h.semantic ? ' good' : ' warn');
+    emb.title = (h.semantic
+      ? 'trained semantic model · ' + h.dimension + 'd'
+      : 'deterministic feature hashing at ' + h.dimension + 'd — reproducible, but '
+        + 'similarity is coarse and not meaning-based. Pass --model for real semantics.');
     $('chEntries').innerHTML = 'entries <b>' + h.entries + '</b>' + (h.custom ? ' <span class="muted">+' + h.custom + '</span>' : '');
     $('chCells').innerHTML = 'cells <b>' + h.cells + '</b>';
     $('chNodes').innerHTML = 'corpus <b>' + h.nodes + '</b>';
-    $('chCoherence').innerHTML = 'coherence <b>' + h.coherence_index.toFixed(2) + '</b>';
+    // Coherence is a mean cosine over the corpus. Under a non-semantic embedder
+    // it trends high for reasons that have nothing to do with meaning, so a bare
+    // "0.99" reads as a great score when it is really an artifact of the model.
+    const coh = $('chCoherence');
+    coh.innerHTML = 'coherence <b>' + h.coherence_index.toFixed(2) + '</b>'
+      + (h.semantic ? '' : ' <span class="qual">·&nbsp;?</span>');
+    coh.className = 'chip' + (h.semantic ? '' : ' warn');
+    coh.title = h.semantic
+      ? 'mean pairwise cosine across the corpus'
+      : 'mean pairwise cosine — inflated and not meaningful under a non-semantic embedder';
     $('chFailures').innerHTML = 'failures <b>' + h.failures + '</b>';
     $('helpPaths').innerHTML = 'ontology edits, corpus nodes and quality history are JSON files under <code>'
       + esc(h.data_dir) + '</code>';
@@ -273,17 +288,35 @@ const loadOntology = guard('ontology', async () => {
 $('search').addEventListener('input', loadOntology);
 
 /* ── corpus ───────────────────────────────────────────────────── */
-function tile(v, l) {
-  return '<div class="tile"><div class="v">' + v + '</div><div class="l">' + l + '</div></div>';
+function tile(v, l, title) {
+  return '<div class="tile"' + (title ? ' title="' + esc(title) + '"' : '') + '>'
+    + '<div class="v">' + v + '</div><div class="l">' + l + '</div></div>';
 }
 
 function renderSnapshot(s) {
+  // asserted_index is a mean over the JUDGED nodes only. One failed verdict out
+  // of 83 nodes renders as "-1.00", which reads as "the whole corpus is
+  // failing" unless the denominator is on screen next to it. Same for the
+  // coherence tiles, which say nothing about meaning under a coarse embedder.
+  const judged = s.asserted_success + s.asserted_inert + s.asserted_failure;
+  const idx = s.asserted_index === null || s.asserted_index === undefined
+    ? '—'
+    : s.asserted_index.toFixed(2);
+
   $('snapTiles').innerHTML =
     tile(s.total_nodes, 'nodes')
-    + tile(s.coherence_index.toFixed(3), 'coherence index')
-    + tile(s.high_coherence + ' / ' + s.mid_coherence + ' / ' + s.low_coherence, 'high / mid / low')
-    + tile(s.asserted_success + ' / ' + s.asserted_inert + ' / ' + s.asserted_failure, 'worked / inert / failed')
-    + tile(s.asserted_index === null || s.asserted_index === undefined ? '—' : s.asserted_index.toFixed(2), 'asserted index')
+    + tile(s.coherence_index.toFixed(3), 'coherence index',
+        'mean pairwise cosine across the corpus')
+    + tile(s.high_coherence + ' / ' + s.mid_coherence + ' / ' + s.low_coherence, 'high / mid / low',
+        'how densely each node sits among its neighbours — derived, not judged')
+    + tile(s.asserted_success + ' / ' + s.asserted_inert + ' / ' + s.asserted_failure, 'worked / inert / failed',
+        'your verdicts — the axis dreaming replays')
+    + tile(
+        judged === 0 ? '—' : idx + ' <span class="of">n=' + judged + '</span>',
+        judged === 0 ? 'asserted index · none judged'
+                     : 'asserted index · ' + judged + ' of ' + s.total_nodes + ' judged',
+        'Mean of your verdicts, over judged nodes only. Unjudged nodes are not counted, '
+          + 'so a single verdict swings this to its extreme.')
     + tile(s.dream_cycle_count, 'dreams');
 }
 

@@ -22,6 +22,52 @@ use crate::process::ProcessCycle;
 use crate::provenance::ProvenanceChain;
 use crate::relation::{RelationType, TypedEdge};
 
+/// Bumped when the on-disk shape changes. v1 was a bare array of nodes and is
+/// still readable; v2 is the object below, which carries the whole engine state.
+const PERSIST_VERSION: u32 = 2;
+
+/// Borrowed view used for writing, so saving never clones the graph.
+#[derive(serde::Serialize)]
+struct PersistedCore<'a> {
+    version: u32,
+    nodes: Vec<&'a CoherenceNode>,
+    hypotheses: &'a HashMap<String, Hypothesis>,
+    contradictions: &'a Vec<Contradiction>,
+    provenance_chains: &'a HashMap<String, ProvenanceChain>,
+    edges: &'a Vec<TypedEdge>,
+    epistemic_audit: &'a EpistemicAuditTrail,
+    process_cycles: &'a Vec<ProcessCycle>,
+    certified_branches: &'a Vec<CertifiedBranch>,
+    isolated_branches: &'a Vec<IsolatedBranch>,
+    dream_archive: &'a Vec<DreamResult>,
+}
+
+/// Owned counterpart used for reading. Every collection defaults, so a file
+/// written by an older build (or a newer one missing a field) still loads.
+#[derive(serde::Deserialize)]
+struct PersistedCoreOwned {
+    #[serde(default)]
+    nodes: Vec<CoherenceNode>,
+    #[serde(default)]
+    hypotheses: HashMap<String, Hypothesis>,
+    #[serde(default)]
+    contradictions: Vec<Contradiction>,
+    #[serde(default)]
+    provenance_chains: HashMap<String, ProvenanceChain>,
+    #[serde(default)]
+    edges: Vec<TypedEdge>,
+    #[serde(default)]
+    epistemic_audit: EpistemicAuditTrail,
+    #[serde(default)]
+    process_cycles: Vec<ProcessCycle>,
+    #[serde(default)]
+    certified_branches: Vec<CertifiedBranch>,
+    #[serde(default)]
+    isolated_branches: Vec<IsolatedBranch>,
+    #[serde(default)]
+    dream_archive: Vec<DreamResult>,
+}
+
 /// Central engine state.
 #[derive(Debug, Default)]
 pub struct PhysisCore {
@@ -372,14 +418,51 @@ impl PhysisCore {
 
     /// Serialize all nodes to JSON.
     pub fn to_json(&self) -> anyhow::Result<String> {
-        let nodes: Vec<&CoherenceNode> = self.nodes.values().collect();
-        Ok(serde_json::to_string_pretty(&nodes)?)
+        Ok(serde_json::to_string_pretty(&PersistedCore {
+            version: PERSIST_VERSION,
+            nodes: self.nodes.values().collect(),
+            hypotheses: &self.hypotheses,
+            contradictions: &self.contradictions,
+            provenance_chains: &self.provenance_chains,
+            edges: &self.edges,
+            epistemic_audit: &self.epistemic_audit,
+            process_cycles: &self.process_cycles,
+            certified_branches: &self.certified_branches,
+            isolated_branches: &self.isolated_branches,
+            dream_archive: &self.dream_archive,
+        })?)
     }
 
-    /// Replace all nodes from JSON.
+    /// Restore a core from JSON, in either persistence format.
+    ///
+    /// The original format was a bare array of nodes, which meant every other
+    /// field — hypotheses, contradictions, the epistemic audit trail — was
+    /// dropped on every save. `physis-core hypothesis create` printed
+    /// "Registered hypothesis [id]" and the next `hypothesis list` reported
+    /// zero; `audit` and `contradiction list` were empty for the same reason.
+    ///
+    /// A bare array is still accepted so existing `nodes.json` files load
+    /// unchanged; they simply start with the other collections empty.
     pub fn from_json(json: &str) -> anyhow::Result<Self> {
-        let nodes: Vec<CoherenceNode> = serde_json::from_str(json)?;
-        let mut core = Self::new();
+        let value: serde_json::Value = serde_json::from_str(json)?;
+
+        let (nodes, mut core) = if value.is_array() {
+            (serde_json::from_value::<Vec<CoherenceNode>>(value)?, Self::new())
+        } else {
+            let p: PersistedCoreOwned = serde_json::from_value(value)?;
+            let mut core = Self::new();
+            core.hypotheses = p.hypotheses;
+            core.contradictions = p.contradictions;
+            core.provenance_chains = p.provenance_chains;
+            core.edges = p.edges;
+            core.epistemic_audit = p.epistemic_audit;
+            core.process_cycles = p.process_cycles;
+            core.certified_branches = p.certified_branches;
+            core.isolated_branches = p.isolated_branches;
+            core.dream_archive = p.dream_archive;
+            (p.nodes, core)
+        };
+
         for n in nodes {
             if let Some(ref label) = n.label {
                 core.label_index.insert(label.clone(), n.id.clone());
@@ -916,6 +999,57 @@ mod tests {
         let mut again = restored;
         let id2 = again.register_node_from_text("morning yoga completed", &emb);
         assert_eq!(id2, id);
+        assert_eq!(again.nodes.len(), 1);
+    }
+
+    /// `to_json` serialized ONLY `nodes`, so every save silently discarded the
+    /// hypotheses, contradictions and audit trail. The CLI printed "Registered
+    /// hypothesis [id]" and the next `hypothesis list` said zero — the headline
+    /// truth-maintenance and audit features could not survive a process exit.
+    #[test]
+    fn hypotheses_contradictions_and_audit_survive_a_save() {
+        let emb = fixture_embedder();
+        let mut g = PhysisCore::new();
+        let node = g.register_node_from_text("nozzle clogged mid-print", &emb);
+
+        let hyp = Hypothesis::new("clogs correlate with humidity", emb.embed("humidity"));
+        let hid = g.register_hypothesis(hyp);
+        let audit_len = g.epistemic_audit.events.len();
+        assert!(audit_len > 0, "registering must record an epistemic event");
+
+        let restored = PhysisCore::from_json(&g.to_json().unwrap()).unwrap();
+        assert_eq!(restored.nodes.len(), 1, "nodes still round-trip");
+        assert!(restored.nodes.contains_key(&node));
+        assert_eq!(restored.hypotheses.len(), 1, "hypotheses must survive the save");
+        assert_eq!(
+            restored.hypotheses[&hid].statement,
+            "clogs correlate with humidity",
+        );
+        assert_eq!(
+            restored.epistemic_audit.events.len(),
+            audit_len,
+            "the audit trail is the replay source and must persist in full",
+        );
+    }
+
+    /// Existing `~/.physis-core/nodes.json` files are a bare array. Reading one
+    /// must keep working, or upgrading silently wipes a user's corpus.
+    #[test]
+    fn the_legacy_bare_array_format_still_loads() {
+        let emb = fixture_embedder();
+        let mut g = PhysisCore::new();
+        let id = g.register_node_from_text("legacy node", &emb);
+        let legacy = serde_json::to_string(&g.nodes.values().collect::<Vec<_>>()).unwrap();
+        assert!(legacy.trim_start().starts_with('['), "fixture must be the old shape");
+
+        let restored = PhysisCore::from_json(&legacy).unwrap();
+        assert_eq!(restored.nodes.len(), 1);
+        assert!(restored.nodes.contains_key(&id));
+        assert!(restored.hypotheses.is_empty(), "legacy files carry no hypotheses");
+
+        // And a legacy file re-saved comes back in the new format with its
+        // labels still deduping, so the upgrade is a one-way ratchet.
+        let again = PhysisCore::from_json(&restored.to_json().unwrap()).unwrap();
         assert_eq!(again.nodes.len(), 1);
     }
 

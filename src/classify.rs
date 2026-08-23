@@ -350,6 +350,24 @@ pub fn classify(&self, embedding: &[f32]) -> Vec<CellScore> {
         })
         .collect();
     results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
+    // `pop_weight` multiplies a blend of two cosines, so a well-populated cell
+    // can score above 1.0 — outside the range every consumer assumes. Callers
+    // then clamp (`QualityTracker::adjust_score` does), and since the overflow
+    // is common, the top handful of cells all flattened to exactly 1.000 and the
+    // CLI printed a ten-way tie with full bars over scores that were in fact
+    // distinct and correctly ordered.
+    //
+    // Rescale by the maximum instead of clipping at it. Division by a positive
+    // constant is strictly order-preserving, so the ranking and the argmax are
+    // untouched — only the ceiling moves back to 1.0 and the spread survives.
+    if let Some(max) = results.first().map(|r| r.score) {
+        if max > 1.0 {
+            for r in &mut results {
+                r.score /= max;
+            }
+        }
+    }
     results
 }
 
@@ -462,6 +480,41 @@ mod tests {
         let entries = (0..embeddings.len()).map(|i| format!("{domain}/{mode}#{i}")).collect();
         let facets = vec![Facets::default(); embeddings.len()];
         Cell::new(domain.to_string(), mode.to_string(), embeddings, entries, facets)
+    }
+
+    /// A populated cell gets `pop_weight` > 1.0 applied on top of a blend of
+    /// cosines, which used to push scores past 1.0. Consumers clamp there, so
+    /// the leaders all collapsed onto exactly 1.000 and the CLI printed a tie
+    /// with identical full bars over scores that were genuinely ordered.
+    #[test]
+    fn scores_stay_within_range_without_flattening_the_ranking() {
+        // 12 embeddings puts the cell over the >=10 threshold for pop_weight.
+        let many = |axis: usize| vec![basis(4, axis); 12];
+        let clf = CellClassifier {
+            cells: vec![
+                cell("A", "X", many(0)),
+                cell("A", "Y", many(0)),
+                cell("B", "Z", many(1)),
+            ],
+        };
+        let out = clf.classify(&basis(4, 0));
+
+        for r in &out {
+            assert!(
+                r.score <= 1.0 + f32::EPSILON,
+                "{}x{} scored {} — above the range every consumer clamps to",
+                r.domain, r.mode, r.score
+            );
+            assert!(r.score >= 0.0, "scores must not go negative: {}", r.score);
+        }
+        // Rescaling is order-preserving: still sorted, and the winner is intact.
+        assert!(out.windows(2).all(|w| w[0].score >= w[1].score), "must stay sorted");
+        assert_eq!(out[0].domain, "A");
+        // And the losing cell is still visibly worse rather than tied at 1.000.
+        assert!(
+            out.last().unwrap().score < out[0].score,
+            "a non-matching cell must not tie with the winner"
+        );
     }
 
     #[test]

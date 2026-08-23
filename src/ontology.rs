@@ -203,6 +203,33 @@ mod tests {
         assert!(loader.custom_domains.len() > 50, "expected extra domains");
     }
 
+    /// Any surface reporting an "entries" total is telling the user how much
+    /// vocabulary the classifier has. `all_domains()` is a different, larger set
+    /// — it folds in `machine_domains`, which `classification_domains()` never
+    /// yields — so reporting its length claimed 730 entries where only 623 could
+    /// ever be scored. Keep the count tied to what actually feeds the grid.
+    #[test]
+    fn entry_count_matches_what_the_classifier_is_built_from() {
+        let loader = OntologyLoader::load_all();
+        assert_eq!(
+            loader.entry_count(),
+            loader.classification_domains().count(),
+            "entry_count must count exactly the entries the classifier receives",
+        );
+    }
+
+    #[test]
+    fn all_domains_is_a_superset_and_not_an_entry_count() {
+        // Guards the substitution that caused the mismatch: these two are not
+        // interchangeable, and a future edit swapping one for the other should
+        // have to delete this test on purpose.
+        let loader = OntologyLoader::load_all();
+        assert!(
+            loader.all_domains().len() >= loader.entry_count(),
+            "all_domains folds in machine domains on top of the classified set",
+        );
+    }
+
     #[test]
     fn load_from_str_parses_entry() {
         let json = r#"{"kind":"test","domains":[{"name":"logic","category":"reasoning","domain":"STUDY","mode":"WORK","axis_kind":"epistemic","axis_name":"formal","unit":"tokens","hints":["therefore","implies"]}]}"#;

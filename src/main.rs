@@ -359,20 +359,58 @@ fn run_classify(text: &str) -> anyhow::Result<()> {
 
     println!("Query: {text}");
     println!("Cells populated: {}", classifier.cell_count());
-    for r in adjusted.iter().take(8) {
-        let bar = (r.score * 20.0).round() as usize;
+
+    // Scores cluster in the top few percent, so a bar drawn against an absolute
+    // 0..1 scale saturates and paints every row a full block — the strongest and
+    // the eighth-best look equally certain. Draw the bar over the spread of the
+    // rows actually shown, which is where the discriminating information is.
+    let shown: Vec<&CellScore> = adjusted.iter().take(8).collect();
+    let hi = shown.first().map(|r| r.score).unwrap_or(0.0);
+    let lo = shown.last().map(|r| r.score).unwrap_or(0.0);
+    let span = hi - lo;
+    for r in &shown {
+        let filled = if span > f32::EPSILON {
+            (((r.score - lo) / span) * 20.0).round() as usize
+        } else {
+            20
+        };
         println!(
             "  {:<11} × {:<10} {:5.3} {}{}",
             r.domain,
             r.mode,
             r.score,
-            "█".repeat(bar),
-            "░".repeat(20 - bar)
+            "█".repeat(filled),
+            "░".repeat(20 - filled)
         );
     }
+    println!("  (bars are relative to the {} shown, not absolute)", shown.len());
+
+    // The gap to the runner-up is the confidence signal. Without it a reader has
+    // to subtract two numbers to notice the engine effectively did not choose.
+    if let (Some(first), Some(second)) = (adjusted.first(), adjusted.get(1)) {
+        let margin = first.score - second.score;
+        let verdict = if margin < 0.02 {
+            "  ⚠ effectively a tie — treat the top cell as unresolved"
+        } else if margin < 0.08 {
+            "  · weak separation"
+        } else {
+            ""
+        };
+        println!("Margin over runner-up: {margin:.3}{verdict}");
+    }
+
     if let Some((sim, domain, mode)) = classifier.best_entry_sim(&embedder.embed(text)) {
         println!("Best entry cosine: {sim:.3} ({domain}×{mode})");
     }
+    // The CLI builds a RandomProjectionEmbedder unconditionally (see
+    // `load_embedder`), so these scores are never meaning-based. The web
+    // surfaces say so on screen; saying nothing here made the CLI the only
+    // surface that presents feature-hashing output as if it were semantic.
+    println!(
+        "Embedder: random-projection ({}d) — deterministic feature hashing, \
+         reproducible but NOT semantic.",
+        embedder.dimension()
+    );
     Ok(())
 }
 
@@ -484,11 +522,52 @@ fn run_search(query: &str, max: usize) -> anyhow::Result<()> {
         println!("No recalled nodes. Try `physis-core scan <dir>` first.");
         return Ok(());
     }
-    println!("Top {max} matches for: {query}");
+    // `max` is the cap asked for, not what was found — printing it as the count
+    // claimed "Top 10 matches" over three results.
+    println!("{} match(es) for: {}", hits.len(), query);
     for (i, (_, label, score)) in hits.iter().enumerate() {
-        println!("  {}. {:.3}  {}", i + 1, score, label.chars().take(100).collect::<String>());
+        println!("  {}. {:.3}  {}", i + 1, score, elide_middle(&single_line(label), 110));
     }
     Ok(())
+}
+
+/// Collapse a node label onto one line so a list stays a list.
+///
+/// Labels carry file content verbatim, newlines and all, and printing them raw
+/// made a numbered row spill across lines with no indentation — the rows after
+/// the first read as separate results.
+fn single_line(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Shorten `s` to `max` characters by dropping the MIDDLE, not the tail.
+///
+/// Node labels are `"<absolute path>: <content>"`, so truncating from the front
+/// spends the whole budget on the shared leading directory and every hit prints
+/// as the same string. Keeping both ends preserves the two parts that actually
+/// identify a node — the file name and the start of its text.
+fn elide_middle(s: &str, max: usize) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() <= max {
+        return s.to_string();
+    }
+    let head = max / 3;
+    let tail_budget = max.saturating_sub(head + 1);
+
+    // Resume at the last path separator when the file name still fits, so the
+    // cut never lands inside it — "…port_049.txt" and "…port_050.txt" are two
+    // characters apart and read as the same node at a glance. Content is cut at
+    // its end instead, which loses nothing that identifies the node.
+    let resume = chars.iter().rposition(|c| *c == '/').map(|i| i + 1);
+    let tail: String = match resume {
+        Some(i) if chars.len() - i > tail_budget => chars[i..i + tail_budget].iter().collect(),
+        _ => chars[chars.len() - tail_budget..].iter().collect(),
+    };
+
+    let mut out: String = chars[..head].iter().collect();
+    out.push('…');
+    out.push_str(&tail);
+    out
 }
 
 fn run_node_edit(
@@ -899,12 +978,49 @@ fn run_replay(subject: &str, at: Option<&str>) -> anyhow::Result<()> {
         Some(t) => chrono::DateTime::parse_from_rfc3339(t)?.with_timezone(&chrono::Utc),
         None => chrono::Utc::now(),
     };
-    let belief = core.reconstruct_belief_at(subject, timestamp);
-    match belief {
+    // `hypothesis list` prints ids truncated to 8 characters, which is what a
+    // reader copies into this flag. Matching only on the full UUID answered
+    // "No recorded belief" — indistinguishable from a subject that really has
+    // none — so resolve a prefix against the known hypotheses first.
+    let subject = match resolve_hypothesis_id(&core, subject) {
+        IdMatch::Exact(id) => id,
+        IdMatch::Ambiguous(n) => {
+            println!("'{subject}' matches {n} hypotheses — use more characters of the id.");
+            return Ok(());
+        }
+        IdMatch::Unknown => subject.to_string(),
+    };
+
+    match core.reconstruct_belief_at(&subject, timestamp) {
         Some(status) => println!("Belief at {timestamp} for [{subject}]: {:?}", status),
-        None => println!("No recorded belief for [{subject}] at {timestamp}"),
+        None if core.hypotheses.contains_key(&subject) => {
+            println!("[{subject}] is known but had no recorded belief at {timestamp}")
+        }
+        None => println!("No subject [{subject}] in the audit trail (try `physis-core audit`)"),
     }
     Ok(())
+}
+
+/// Outcome of matching a possibly-abbreviated id against the known hypotheses.
+enum IdMatch {
+    Exact(String),
+    Ambiguous(usize),
+    Unknown,
+}
+
+/// Resolve a full id, or an unambiguous prefix of one, to a hypothesis id.
+fn resolve_hypothesis_id(core: &PhysisCore, needle: &str) -> IdMatch {
+    if core.hypotheses.contains_key(needle) {
+        return IdMatch::Exact(needle.to_string());
+    }
+    let mut hits = core.hypotheses.keys().filter(|id| id.starts_with(needle));
+    match (hits.next(), hits.next()) {
+        (Some(id), None) => IdMatch::Exact(id.clone()),
+        (Some(_), Some(_)) => {
+            IdMatch::Ambiguous(core.hypotheses.keys().filter(|id| id.starts_with(needle)).count())
+        }
+        _ => IdMatch::Unknown,
+    }
 }
 
 fn run_discover(dir: Option<&std::path::Path>, min_cluster: usize) -> anyhow::Result<()> {
@@ -955,8 +1071,18 @@ fn run_discover(dir: Option<&std::path::Path>, min_cluster: usize) -> anyhow::Re
             prop.name, prop.domain, prop.mode, prop.samples.len()
         );
         println!("    Hints: {}", prop.hints.join(", "));
-        for s in prop.samples.iter().take(2) {
-            println!("    - {}", s);
+        const SHOWN: usize = 2;
+        for s in prop.samples.iter().take(SHOWN) {
+            // Samples are free text and may be multi-line; one line each keeps
+            // the list readable and the indentation intact. Collapse rather than
+            // take the first line, so a sample whose head is a markdown title
+            // still shows the body that put it in this cluster.
+            println!("    - {}", elide_middle(&single_line(s), 100));
+        }
+        // The header advertises the cluster size, so a silently truncated list
+        // reads as a miscount rather than as an elision.
+        if let Some(rest) = prop.samples.len().checked_sub(SHOWN).filter(|n| *n > 0) {
+            println!("    … and {rest} more");
         }
     }
     Ok(())
@@ -1011,5 +1137,57 @@ impl PersistCore for PhysisCore {
         let json = self.to_json()?;
         std::fs::write(store::nodes_path(), json)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::elide_middle;
+
+    #[test]
+    fn single_line_collapses_embedded_newlines() {
+        // A label carries file content verbatim. Printed raw inside a numbered
+        // list, its later lines lose the indentation and read as extra results.
+        let label = "/corpus/c.md: # Training notes\nSquat stalled at 120kg.\n\nSleep 6.2h.";
+        let out = super::single_line(label);
+        assert!(!out.contains('\n'), "must be one line: {out}");
+        assert_eq!(
+            out,
+            "/corpus/c.md: # Training notes Squat stalled at 120kg. Sleep 6.2h.",
+            "runs of whitespace collapse to exactly one space",
+        );
+    }
+
+    #[test]
+    fn short_labels_pass_through_untouched() {
+        assert_eq!(elide_middle("a.txt: hello", 110), "a.txt: hello");
+    }
+
+    #[test]
+    fn long_labels_keep_the_file_name_and_the_start_of_the_content() {
+        // The bug: `label.chars().take(100)` spent the whole budget on the
+        // shared leading directory, so every search hit printed identically.
+        let label = format!(
+            "/home/someone/very/deeply/nested/project/directory/that/goes/on/corpus/{}: {}",
+            "report_049.txt", "Nozzle temperature dropped below the glass transition point"
+        );
+        let out = elide_middle(&label, 110);
+        assert!(out.chars().count() <= 110, "must respect the budget: {out}");
+        assert!(out.contains('…'), "must mark the elision");
+        assert!(out.contains("report_049.txt"), "file name identifies the node: {out}");
+        assert!(out.contains("Nozzle temperature"), "content identifies the node: {out}");
+
+        // Two nodes under the same long directory must not render the same.
+        let other = label.replace("report_049.txt", "report_050.txt");
+        assert_ne!(elide_middle(&other, 110), out);
+    }
+
+    #[test]
+    fn multi_byte_labels_do_not_panic_or_split_a_character() {
+        // Byte slicing here would panic; the label is counted in chars.
+        let label = "café/über/naïve/".repeat(20) + "fine.txt: caffè corretto";
+        let out = elide_middle(&label, 60);
+        assert!(out.chars().count() <= 60);
+        assert!(out.contains("caffè corretto"));
     }
 }

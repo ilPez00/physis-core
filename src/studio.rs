@@ -194,7 +194,12 @@ async fn health_json(State(state): State<Shared>) -> Response {
         "embedder": s.embedder_kind,
         "semantic": s.semantic,
         "dimension": s.embedder.dimension(),
-        "entries": s.ontology.all_domains().len(),
+        // Count what the classifier is actually built from. `all_domains()`
+        // additionally folds in `machine_domains`, which `classification_domains()`
+        // never yields — so the header advertised 730 "entries" against the CLI's
+        // 623, and the 107-entry difference could never be scored or reached from
+        // any cell in the grid below it.
+        "entries": s.ontology.entry_count(),
         "custom": s.custom_entries.len(),
         "cells": s.classifier.cell_count(),
         "nodes": s.core.nodes.len(),

@@ -61,6 +61,11 @@ header h1 span{color:var(--accent);font-weight:500}
 .chip b{color:var(--accent);font-weight:600}
 .chip.good{border-color:rgba(114,240,178,.45)}
 .chip.good b{color:var(--green)}
+/* A non-semantic embedder makes every score on screen coarse. That has to be
+   legible without hovering for a tooltip, so it gets its own amber state. */
+.chip.warn{border-color:rgba(255,198,109,.5);background:rgba(60,42,16,.5)}
+.chip.warn b{color:var(--amber)}
+.chip .qual{color:var(--amber);font-weight:600}
 #status{margin-left:auto;font:10px var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:7px 11px;border:1px solid var(--line);border-radius:999px;background:rgba(13,19,35,.75)}
 
 /* ── controls ───────────────────────────────────────────────────── */
@@ -128,6 +133,8 @@ nav button:hover{color:var(--fg)}
 .tile{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--panel2)}
 .tile .v{font:20px/1.1 var(--mono);color:var(--accent)}
 .tile .l{font:9px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:5px}
+/* Sample size rides alongside a mean so the figure is never read without it. */
+.tile .v .of{font-size:11px;color:var(--muted);letter-spacing:.06em}
 .scroll{max-height:340px;overflow:auto}
 
 /* ── classify results ───────────────────────────────────────────── */
