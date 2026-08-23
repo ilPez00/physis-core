@@ -50,3 +50,10 @@ path = "src/lib.rs"
 name = "physis-core"
 path = "src/main.rs"
 required-features = ["cli"]
+
+# The front door. Deliberately dependency-light and feature-free: it parses no
+# subcommands of its own, it only decides which installed executable should
+# receive them, so it must build and run even where `cli` is off.
+[[bin]]
+name = "physis"
+path = "src/bin/physis.rs"

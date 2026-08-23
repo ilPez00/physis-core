@@ -140,6 +140,7 @@ pub mod coherence_query;
 pub mod contradiction;
 pub mod core;
 pub mod discovery;
+pub mod edition;
 pub mod embed;
 pub mod epistemic;
 pub mod explanation;
