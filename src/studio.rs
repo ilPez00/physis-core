@@ -119,6 +119,7 @@ pub async fn run_with_model(port: u16, model_dir: Option<String>) -> anyhow::Res
         .route("/app.css", get(app_css))
         .route("/app.js", get(app_js))
         .route("/api/health", get(health_json))
+        .route("/api/edition", get(edition_json))
         .route("/api/ontology", get(ontology_json))
         .route("/api/grid", get(grid_json))
         .route("/api/classify", post(classify))
@@ -207,6 +208,31 @@ async fn health_json(State(state): State<Shared>) -> Response {
         "failures": s.quality.failures.len(),
         "penalties": s.quality.cell_penalties.len(),
         "data_dir": s.data_dir.display().to_string(),
+    }))
+    .into_response()
+}
+
+/// GET /api/edition — what is installed on this machine, and what Pro adds.
+///
+/// The studio is Core's UI, but a Core user has no way to find out that Pro
+/// exists, or that they already have it, without leaving the app. This answers
+/// both from the same detection the `physis` front door uses, so the CLI banner
+/// and the studio's upgrade panel can never disagree.
+///
+/// Core links nothing from Pro — it reports paths on disk. Whether a licence is
+/// valid stays Pro's business; Core does not hold the verifying key.
+async fn edition_json() -> Response {
+    let e = crate::edition::Edition::detect();
+    Json(serde_json::json!({
+        "name": e.name(),
+        "has_pro": e.has_pro(),
+        "pro_cli": e.pro_cli.as_ref().map(|p| p.display().to_string()),
+        "pro_web": e.pro_web.as_ref().map(|p| p.display().to_string()),
+        "upgrade_url": crate::edition::UPGRADE_URL,
+        "adds": crate::edition::PRO_SUMMARY
+            .iter()
+            .map(|(title, detail)| serde_json::json!({ "title": title, "detail": detail }))
+            .collect::<Vec<_>>(),
     }))
     .into_response()
 }
@@ -1631,10 +1657,44 @@ mod tests {
         assert!(APP_HTML.contains("href=\"app.css\""), "app.html must link app.css");
         assert!(APP_HTML.contains("src=\"app.js\""), "app.html must load app.js");
         // Every nav target must have a matching section, or the tab is dead.
-        for tab in ["classify", "grid", "ontology", "corpus", "discover", "quality"] {
+        // `edition` is the upgrade surface — the only place a Core user can
+        // learn Pro exists, so a missing section would silently remove it.
+        for tab in ["classify", "grid", "ontology", "corpus", "discover", "quality", "edition"] {
             assert!(APP_HTML.contains(&format!("data-tab=\"{tab}\"")), "nav button for {tab}");
             assert!(APP_HTML.contains(&format!("id=\"tab-{tab}\"")), "section for {tab}");
         }
+    }
+
+    /// `app.js` keeps its own `TABS` array, which drives lazy loading and the
+    /// 1..n number shortcuts. If it falls out of step with the markup, a tab
+    /// still renders but never loads its data and its hotkey targets the wrong
+    /// pane — neither of which throws, so nothing would report it.
+    #[test]
+    fn the_js_tab_list_matches_the_nav_buttons() {
+        let nav: Vec<&str> = APP_HTML
+            .match_indices("data-tab=\"")
+            .map(|(i, pat)| {
+                let rest = &APP_HTML[i + pat.len()..];
+                &rest[..rest.find('"').expect("unterminated data-tab")]
+            })
+            .collect();
+        assert!(!nav.is_empty(), "app.html must declare nav tabs");
+
+        let line = APP_JS
+            .lines()
+            .find(|l| l.trim_start().starts_with("const TABS"))
+            .expect("app.js must declare TABS");
+        for tab in &nav {
+            assert!(
+                line.contains(&format!("'{tab}'")),
+                "app.js TABS is missing {tab:?}: {line}",
+            );
+        }
+        assert_eq!(
+            line.matches('\'').count() / 2,
+            nav.len(),
+            "TABS and the nav must list the same tabs: {line}",
+        );
     }
 
     /// The quality tracker keys cells on `DOMAIN\0MODE`, so the UI has to send

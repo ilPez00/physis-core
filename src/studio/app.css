@@ -33,6 +33,11 @@ body{
   flex-direction:column;
   overflow:hidden;
 }
+/* No page had a link until the upgrade panel; the UA default blue is close to
+   unreadable on this background. */
+a{color:var(--accent);text-decoration-color:rgba(104,231,255,.45)}
+a:hover{color:var(--fg)}
+code{font:11px var(--mono);color:var(--muted)}
 body:before{
   content:"";position:fixed;inset:0;pointer-events:none;opacity:.28;
   background-image:linear-gradient(rgba(111,135,204,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(111,135,204,.055) 1px,transparent 1px);
@@ -111,6 +116,10 @@ nav button.active{
   box-shadow:inset 3px 0 0 var(--accent),0 8px 28px rgba(41,112,160,.12);
 }
 nav button:hover{color:var(--fg)}
+/* Marks the nav entry when Pro is NOT installed, so the one item that is an
+   offer rather than a tool reads differently from the six that are tools. */
+nav button.accent{color:var(--accent2)}
+nav button.accent.active{color:var(--fg)}
 .tab{flex:1;min-width:0;display:none;overflow:auto;padding:26px clamp(18px,3vw,42px);position:relative;z-index:1}
 .tab.active{display:flex;flex-direction:column;gap:16px}
 

@@ -355,6 +355,36 @@ fn main() {
 
 ## CLI Reference
 
+### `physis` — the front door
+
+Installing this crate gives you two executables: `physis-core`, the engine CLI,
+and `physis`, a thin front door over whichever Physis edition is present.
+
+```sh
+cargo install physis-core     # installs `physis-core` and `physis`
+physis -h                     # one help screen covering both editions
+```
+
+`physis -h` lists Core's commands and Pro's, marks which side is installed, and
+forwards everything else unchanged — `physis classify …` runs `physis-core`,
+`physis doctor …` runs `physis-pro`. Subcommand `--help`, exit codes and stdio
+are untouched, because the front door `exec`s the target rather than wrapping it.
+Names that exist on both sides (`classify`, `scan`, `discover`, `quality`,
+`facet`) resolve to Core, so they mean the same thing whether or not Pro is
+installed.
+
+```sh
+physis upgrade                # what Pro adds, and where to get it
+physis web                    # serve the Pro dashboards (needs Pro)
+```
+
+Pro is a separate, licensed product. Core does not link it — the two are joined
+at runtime by locating the Pro executable on disk — so Core keeps working, and
+keeps its Apache-2.0 licence, whether or not Pro is there. The studio shows the
+same information under its **Pro / Upgrade** tab, served from `/api/edition`.
+
+### `physis-core`
+
 The `physis-core` CLI exposes full engine capabilities directly to the terminal:
 
 ```sh

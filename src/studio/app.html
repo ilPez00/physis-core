@@ -30,6 +30,7 @@
     <button data-tab="corpus">Corpus <span class="k">4</span></button>
     <button data-tab="discover">Discover <span class="k">5</span></button>
     <button data-tab="quality">Quality <span class="k">6</span></button>
+    <button data-tab="edition" id="navEdition">Pro <span class="k">7</span></button>
     <button class="ghost" id="btnHelp" style="margin-top:auto">Shortcuts <span class="k">?</span></button>
   </nav>
 
@@ -213,6 +214,23 @@
         <h3>Recent failures</h3>
         <div id="qlist" class="scroll"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- ── EDITION / PRO ────────────────────────────────────────── -->
+  <section class="tab" id="tab-edition">
+    <div class="hero">
+      <div>
+        <h2 id="editionTitle">Edition</h2>
+        <p id="editionLead">Checking what is installed on this machine…</p>
+      </div>
+    </div>
+    <div class="panel">
+      <div id="editionState" class="muted">…</div>
+    </div>
+    <div class="panel">
+      <h3>What Pro adds</h3>
+      <div id="editionAdds"></div>
     </div>
   </section>
 </main>

@@ -59,7 +59,7 @@ function typing() {
 }
 
 /* ── tabs ─────────────────────────────────────────────────────── */
-const TABS = ['classify', 'grid', 'ontology', 'corpus', 'discover', 'quality'];
+const TABS = ['classify', 'grid', 'ontology', 'corpus', 'discover', 'quality', 'edition'];
 
 function showTab(name) {
   state.tab = name;
@@ -73,6 +73,7 @@ function showTab(name) {
   if (name === 'ontology') loadOntology();
   if (name === 'corpus') { loadSnapshot(); loadNodes(); }
   if (name === 'quality') loadQuality();
+  if (name === 'edition') loadEdition();
 }
 document.querySelectorAll('nav button[data-tab]').forEach(b => {
   b.onclick = () => showTab(b.dataset.tab);
@@ -704,6 +705,60 @@ document.addEventListener('keydown', e => {
   if (e.key === 's' || e.key === 'S') { e.preventDefault(); loadSample(); return; }
   const n = parseInt(e.key, 10);
   if (n >= 1 && n <= TABS.length) showTab(TABS[n - 1]);
+});
+
+/* ── edition / pro ────────────────────────────────────────────── */
+// Core's UI is the only place a Core user is looking, so it is the only place
+// that can tell them Pro exists — or that they already have it installed. The
+// server answers from the same detection the `physis` front door uses, so this
+// panel and the CLI banner cannot disagree.
+const loadEdition = guard('edition', async () => {
+  const e = await api('/api/edition');
+
+  $('editionTitle').textContent = e.has_pro ? 'Core + Pro' : 'Upgrade to Pro';
+  $('editionLead').textContent = e.has_pro
+    ? 'Both editions are installed. Core keeps the graph; Pro adds the operations layer on top of it.'
+    : 'You are running the open Core engine. Pro is a separate, licensed product that '
+      + 'builds on this same graph — nothing you have made here needs migrating.';
+
+  // The nav label doubles as the signal, so the state is legible without
+  // opening the tab.
+  const nav = $('navEdition');
+  nav.innerHTML = (e.has_pro ? 'Pro' : 'Upgrade') + ' <span class="k">7</span>';
+  nav.classList.toggle('accent', !e.has_pro);
+
+  // Not `state`: that name is the module-wide UI state object.
+  const box = $('editionState');
+  if (e.has_pro) {
+    const rows = [];
+    if (e.pro_cli) rows.push(['physis-pro', e.pro_cli, 'CLI — doctor, timeline, report, connectors']);
+    if (e.pro_web) rows.push(['physis-pro-web', e.pro_web, 'Operations Console, Demo and Study dashboards']);
+    box.innerHTML = rows.map(([name, path, what]) =>
+      '<div class="item good">'
+      + '<div class="l1"><span class="cell">' + esc(name) + '</span>'
+      + '<span class="tag">installed</span></div>'
+      + '<div class="txt">' + esc(what) + '</div>'
+      + '<div class="txt"><code>' + esc(path) + '</code></div>'
+      + '</div>').join('')
+      + '<div class="muted" style="margin-top:10px">Start the dashboards with '
+      + '<code>physis web</code>, then open <code>/ui</code>.</div>';
+  } else {
+    box.innerHTML =
+      '<div class="item warn">'
+      + '<div class="l1"><span class="cell">physis-pro</span>'
+      + '<span class="tag">not installed</span></div>'
+      + '<div class="txt">Core stays open and keeps working without it.</div>'
+      + '</div>'
+      + '<div class="muted" style="margin-top:10px">Where to get it: '
+      + '<a href="' + esc(e.upgrade_url) + '" target="_blank" rel="noopener noreferrer">'
+      + esc(e.upgrade_url) + '</a></div>';
+  }
+
+  $('editionAdds').innerHTML = (e.adds || []).map(a =>
+    '<div class="item">'
+    + '<div class="l1"><span class="cell">' + esc(a.title) + '</span></div>'
+    + '<div class="txt">' + esc(a.detail) + '</div>'
+    + '</div>').join('');
 });
 
 /* ── boot ─────────────────────────────────────────────────────── */
