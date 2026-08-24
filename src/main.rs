@@ -8,10 +8,10 @@ use physis_core::contradiction::{Contradiction, ContradictionParty, ResolutionSt
 use physis_core::core::PhysisCore;
 use physis_core::embed::{RandomProjectionEmbedder, VectorEmbed};
 use physis_core::history::import_file as import_history_file;
-use physis_core::hypothesis::{Evidence, EvidencePolarity, Hypothesis, HypothesisStatus, Prediction};
-use physis_core::models::{
-    Abstraction, Agency, FacetFilter, LifecyclePhase, PinEdit, Scale,
+use physis_core::hypothesis::{
+    Evidence, EvidencePolarity, Hypothesis, HypothesisStatus, Prediction,
 };
+use physis_core::models::{Abstraction, Agency, FacetFilter, LifecyclePhase, PinEdit, Scale};
 use physis_core::ontology::OntologyLoader;
 use physis_core::praxis::parse_export as parse_praxis_export;
 use physis_core::quality::QualityTracker;
@@ -383,7 +383,10 @@ fn run_classify(text: &str) -> anyhow::Result<()> {
             "░".repeat(20 - filled)
         );
     }
-    println!("  (bars are relative to the {} shown, not absolute)", shown.len());
+    println!(
+        "  (bars are relative to the {} shown, not absolute)",
+        shown.len()
+    );
 
     // The gap to the runner-up is the confidence signal. Without it a reader has
     // to subtract two numbers to notice the engine effectively did not choose.
@@ -416,9 +419,15 @@ fn run_classify(text: &str) -> anyhow::Result<()> {
 
 fn run_ontology() -> anyhow::Result<()> {
     let ontology = OntologyLoader::load_all();
-    println!("Ontology: {} classification entries", ontology.entry_count());
+    println!(
+        "Ontology: {} classification entries",
+        ontology.entry_count()
+    );
     println!("  human (grid) domains: {}", ontology.human_domains.len());
-    println!("  custom (extra) domains: {}", ontology.custom_domains.len());
+    println!(
+        "  custom (extra) domains: {}",
+        ontology.custom_domains.len()
+    );
     println!("Categories:");
     for cat in ontology.categories() {
         let n = ontology
@@ -464,12 +473,22 @@ fn run_facet(
             }
         }
         if let Some(ref d) = filter.domain {
-            if !entry.domain.as_deref().unwrap_or_default().eq_ignore_ascii_case(d) {
+            if !entry
+                .domain
+                .as_deref()
+                .unwrap_or_default()
+                .eq_ignore_ascii_case(d)
+            {
                 continue;
             }
         }
         if let Some(ref m) = filter.mode {
-            if !entry.mode.as_deref().unwrap_or_default().eq_ignore_ascii_case(m) {
+            if !entry
+                .mode
+                .as_deref()
+                .unwrap_or_default()
+                .eq_ignore_ascii_case(m)
+            {
                 continue;
             }
         }
@@ -499,7 +518,9 @@ fn run_scan(dir: &std::path::Path) -> anyhow::Result<()> {
     let mut core = load_core();
     let mut count = 0usize;
     for entry in walk(dir)? {
-        let Ok(text) = std::fs::read_to_string(&entry) else { continue };
+        let Ok(text) = std::fs::read_to_string(&entry) else {
+            continue;
+        };
         let trimmed = text.trim();
         if trimmed.is_empty() || trimmed.chars().count() > 5000 {
             continue;
@@ -526,7 +547,12 @@ fn run_search(query: &str, max: usize) -> anyhow::Result<()> {
     // claimed "Top 10 matches" over three results.
     println!("{} match(es) for: {}", hits.len(), query);
     for (i, (_, label, score)) in hits.iter().enumerate() {
-        println!("  {}. {:.3}  {}", i + 1, score, elide_middle(&single_line(label), 110));
+        println!(
+            "  {}. {:.3}  {}",
+            i + 1,
+            score,
+            elide_middle(&single_line(label), 110)
+        );
     }
     Ok(())
 }
@@ -647,7 +673,13 @@ fn run_node_search(query: &str, budget: usize, max: usize) -> anyhow::Result<()>
         result.budget
     );
     for (i, c) in result.chunks.iter().enumerate() {
-        println!("  {}. {:.3}  {} ({} tokens)", i + 1, c.score, c.text, c.tokens);
+        println!(
+            "  {}. {:.3}  {} ({} tokens)",
+            i + 1,
+            c.score,
+            c.text,
+            c.tokens
+        );
     }
     Ok(())
 }
@@ -710,7 +742,8 @@ fn run_praxis(file: &std::path::Path) -> anyhow::Result<()> {
     let before = core.nodes.len();
     for r in &records {
         let emb = embedder.embed(&r.body);
-        let id = core.register_node_vec_labeled(emb, Some(format!("praxis:{}:{}", r.kind, r.title)));
+        let id =
+            core.register_node_vec_labeled(emb, Some(format!("praxis:{}:{}", r.kind, r.title)));
         core.assert_coherence(&id, r.status.as_score());
     }
     let added = core.nodes.len().saturating_sub(before);
@@ -730,10 +763,16 @@ fn run_snapshot() -> anyhow::Result<()> {
     println!("Coherence snapshot:");
     println!("  nodes:            {}", snap.total_nodes);
     println!("  coherence index:  {:.3}", snap.coherence_index);
-    println!("  high/mid/low:     {}/{}/{}", snap.high_coherence, snap.mid_coherence, snap.low_coherence);
+    println!(
+        "  high/mid/low:     {}/{}/{}",
+        snap.high_coherence, snap.mid_coherence, snap.low_coherence
+    );
     println!("  certified branches: {}", snap.certified_branches_count);
     println!("  isolated branches:  {}", snap.isolated_branches_count);
-    println!("  asserted s/i/f:   {}/{}/{}", snap.asserted_success, snap.asserted_inert, snap.asserted_failure);
+    println!(
+        "  asserted s/i/f:   {}/{}/{}",
+        snap.asserted_success, snap.asserted_inert, snap.asserted_failure
+    );
     println!("  asserted index:   {:?}", snap.asserted_index);
     Ok(())
 }
@@ -839,7 +878,10 @@ fn run_hypothesis(cmd: HypothesisCmd) -> anyhow::Result<()> {
                 );
             }
         }
-        HypothesisCmd::Create { statement, confidence } => {
+        HypothesisCmd::Create {
+            statement,
+            confidence,
+        } => {
             let emb = embedder.embed(&statement);
             let mut hyp = Hypothesis::new(&statement, emb);
             hyp.confidence = confidence;
@@ -870,7 +912,11 @@ fn run_hypothesis(cmd: HypothesisCmd) -> anyhow::Result<()> {
             core.persist()?;
             println!("Added evidence to hypothesis [{id}]");
         }
-        HypothesisCmd::Predict { id, statement, expected } => {
+        HypothesisCmd::Predict {
+            id,
+            statement,
+            expected,
+        } => {
             let hyp = core
                 .hypotheses
                 .get_mut(&id)
@@ -943,7 +989,11 @@ fn run_contradiction(cmd: ContradictionCmd) -> anyhow::Result<()> {
             core.persist()?;
             println!("Recorded contradiction [{id}]");
         }
-        ContradictionCmd::Resolve { id, status, explanation } => {
+        ContradictionCmd::Resolve {
+            id,
+            status,
+            explanation,
+        } => {
             let c = core
                 .contradictions
                 .iter_mut()
@@ -967,7 +1017,10 @@ fn run_contradiction(cmd: ContradictionCmd) -> anyhow::Result<()> {
 
 fn run_audit() -> anyhow::Result<()> {
     let core = load_core();
-    println!("Epistemic audit trail: {} events", core.epistemic_audit.events.len());
+    println!(
+        "Epistemic audit trail: {} events",
+        core.epistemic_audit.events.len()
+    );
     println!("{}", core.epistemic_audit.summary());
     Ok(())
 }
@@ -1016,9 +1069,12 @@ fn resolve_hypothesis_id(core: &PhysisCore, needle: &str) -> IdMatch {
     let mut hits = core.hypotheses.keys().filter(|id| id.starts_with(needle));
     match (hits.next(), hits.next()) {
         (Some(id), None) => IdMatch::Exact(id.clone()),
-        (Some(_), Some(_)) => {
-            IdMatch::Ambiguous(core.hypotheses.keys().filter(|id| id.starts_with(needle)).count())
-        }
+        (Some(_), Some(_)) => IdMatch::Ambiguous(
+            core.hypotheses
+                .keys()
+                .filter(|id| id.starts_with(needle))
+                .count(),
+        ),
         _ => IdMatch::Unknown,
     }
 }
@@ -1062,13 +1118,15 @@ fn run_discover(dir: Option<&std::path::Path>, min_cluster: usize) -> anyhow::Re
 
     println!(
         "Ontology Gap Discovery: evaluated {} texts ({} unmapped)",
-        report.total,
-        report.unmapped
+        report.total, report.unmapped
     );
     for prop in &report.proposals {
         println!(
             "\n  Proposed Domain: {} ({} × {}) — {} texts",
-            prop.name, prop.domain, prop.mode, prop.samples.len()
+            prop.name,
+            prop.domain,
+            prop.mode,
+            prop.samples.len()
         );
         println!("    Hints: {}", prop.hints.join(", "));
         const SHOWN: usize = 2;
@@ -1152,8 +1210,7 @@ mod tests {
         let out = super::single_line(label);
         assert!(!out.contains('\n'), "must be one line: {out}");
         assert_eq!(
-            out,
-            "/corpus/c.md: # Training notes Squat stalled at 120kg. Sleep 6.2h.",
+            out, "/corpus/c.md: # Training notes Squat stalled at 120kg. Sleep 6.2h.",
             "runs of whitespace collapse to exactly one space",
         );
     }
@@ -1174,8 +1231,14 @@ mod tests {
         let out = elide_middle(&label, 110);
         assert!(out.chars().count() <= 110, "must respect the budget: {out}");
         assert!(out.contains('…'), "must mark the elision");
-        assert!(out.contains("report_049.txt"), "file name identifies the node: {out}");
-        assert!(out.contains("Nozzle temperature"), "content identifies the node: {out}");
+        assert!(
+            out.contains("report_049.txt"),
+            "file name identifies the node: {out}"
+        );
+        assert!(
+            out.contains("Nozzle temperature"),
+            "content identifies the node: {out}"
+        );
 
         // Two nodes under the same long directory must not render the same.
         let other = label.replace("report_049.txt", "report_050.txt");

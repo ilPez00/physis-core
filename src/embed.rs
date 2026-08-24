@@ -5,8 +5,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use sha2::{Digest, Sha256};
 
 /// Trait for embedding text into fixed-dimension vectors.
@@ -74,12 +74,19 @@ pub struct RandomProjectionEmbedder {
 
 impl RandomProjectionEmbedder {
     pub fn new(dim: usize) -> Self {
-        Self { dim, seed: 42, basis: Mutex::new(HashMap::new()) }
+        Self {
+            dim,
+            seed: 42,
+            basis: Mutex::new(HashMap::new()),
+        }
     }
 
     fn get_basis(&self, key: u64) -> Vec<f32> {
         let mut cache = self.basis.lock().unwrap();
-        cache.entry(key).or_insert_with(|| random_vector(self.dim, key ^ self.seed)).clone()
+        cache
+            .entry(key)
+            .or_insert_with(|| random_vector(self.dim, key ^ self.seed))
+            .clone()
     }
 }
 
@@ -135,7 +142,10 @@ mod tests {
         let v2 = e.embed("hello world");
         assert_eq!(v1, v2, "same input must produce same vector");
         let norm: f32 = v1.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!((norm - 1.0).abs() < 1e-5, "must be unit normalized, got {norm}");
+        assert!(
+            (norm - 1.0).abs() < 1e-5,
+            "must be unit normalized, got {norm}"
+        );
         assert_eq!(e.embed("").len(), 64);
     }
 

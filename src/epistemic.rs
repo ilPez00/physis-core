@@ -119,7 +119,10 @@ impl EpistemicAuditTrail {
 
     /// Retrieve all events relevant to a specific entity ID in chronological order.
     pub fn history_for(&self, subject_id: &str) -> Vec<&EpistemicEvent> {
-        self.events.iter().filter(|e| e.subject_id == subject_id).collect()
+        self.events
+            .iter()
+            .filter(|e| e.subject_id == subject_id)
+            .collect()
     }
 
     pub fn reconstruct_status_at(

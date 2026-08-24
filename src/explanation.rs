@@ -101,7 +101,10 @@ impl ExplanationReport {
             out.push_str("  (none recorded)\n");
         } else {
             for e in &self.supporting_evidence {
-                out.push_str(&format!("  ✓ [{}] {} (conf: {:.2})\n", e.source, e.claim, e.confidence));
+                out.push_str(&format!(
+                    "  ✓ [{}] {} (conf: {:.2})\n",
+                    e.source, e.claim, e.confidence
+                ));
             }
         }
         out.push('\n');
@@ -114,34 +117,56 @@ impl ExplanationReport {
             out.push_str("  (none recorded)\n");
         } else {
             for e in &self.contradicting_evidence {
-                out.push_str(&format!("  ✗ [{}] {} (conf: {:.2})\n", e.source, e.claim, e.confidence));
+                out.push_str(&format!(
+                    "  ✗ [{}] {} (conf: {:.2})\n",
+                    e.source, e.claim, e.confidence
+                ));
             }
         }
         out.push('\n');
 
         if !self.historical_precedents.is_empty() {
-            out.push_str(&format!("HISTORICAL PRECEDENTS ({}):\n", self.historical_precedents.len()));
+            out.push_str(&format!(
+                "HISTORICAL PRECEDENTS ({}):\n",
+                self.historical_precedents.len()
+            ));
             for p in &self.historical_precedents {
-                let res = if p.outcome_worked { "SUCCESS" } else { "FAILURE" };
-                out.push_str(&format!("  • [{}] {} (sim: {:.2}) → {}\n", p.case_id, p.description, p.similarity, res));
+                let res = if p.outcome_worked {
+                    "SUCCESS"
+                } else {
+                    "FAILURE"
+                };
+                out.push_str(&format!(
+                    "  • [{}] {} (sim: {:.2}) → {}\n",
+                    p.case_id, p.description, p.similarity, res
+                ));
             }
             out.push('\n');
         }
 
         if !self.expected_consequences.is_empty() {
-            out.push_str(&format!("PREDICTIONS & OUTCOMES ({}):\n", self.expected_consequences.len()));
+            out.push_str(&format!(
+                "PREDICTIONS & OUTCOMES ({}):\n",
+                self.expected_consequences.len()
+            ));
             for pred in &self.expected_consequences {
                 let status = match pred.correct {
                     Some(true) => "VERIFIED TRUE",
                     Some(false) => "REFUTED FALSE",
                     None => "PENDING OBSERVATION",
                 };
-                out.push_str(&format!("  • Prediction: {}\n    Outcome: {:?} [{}]\n", pred.statement, pred.actual_outcome, status));
+                out.push_str(&format!(
+                    "  • Prediction: {}\n    Outcome: {:?} [{}]\n",
+                    pred.statement, pred.actual_outcome, status
+                ));
             }
             out.push('\n');
         }
 
-        out.push_str(&format!("PROVENANCE:\n  {}\n", self.provenance_chain.summary()));
+        out.push_str(&format!(
+            "PROVENANCE:\n  {}\n",
+            self.provenance_chain.summary()
+        ));
         out
     }
 }

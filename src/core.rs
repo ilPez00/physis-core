@@ -113,7 +113,11 @@ impl PhysisCore {
 
     /// Register a vector, optionally retaining source text as a browsable label.
     /// Labeled registrations are deduped by label (idempotent re-scans).
-    pub fn register_node_vec_labeled(&mut self, embedding: Vec<f32>, label: Option<String>) -> String {
+    pub fn register_node_vec_labeled(
+        &mut self,
+        embedding: Vec<f32>,
+        label: Option<String>,
+    ) -> String {
         if let Some(ref l) = label {
             if let Some(existing) = self.label_index.get(l) {
                 return existing.clone();
@@ -133,7 +137,10 @@ impl PhysisCore {
             EpistemicEvent::new(
                 EpistemicEventType::ObservationIngested,
                 &id,
-                format!("Registered node vector (label: {:?})", self.nodes[&id].label),
+                format!(
+                    "Registered node vector (label: {:?})",
+                    self.nodes[&id].label
+                ),
             )
             .with_source(self.embedder_id.as_deref().unwrap_or("unknown_embedder")),
         );
@@ -174,8 +181,11 @@ impl PhysisCore {
 
     /// Nodes someone reported as not working, worst first.
     pub fn asserted_failures(&self) -> Vec<&CoherenceNode> {
-        let mut out: Vec<&CoherenceNode> =
-            self.nodes.values().filter(|n| n.is_asserted_failure()).collect();
+        let mut out: Vec<&CoherenceNode> = self
+            .nodes
+            .values()
+            .filter(|n| n.is_asserted_failure())
+            .collect();
         out.sort_by(|a, b| {
             a.asserted
                 .unwrap_or(0.0)
@@ -202,7 +212,12 @@ impl PhysisCore {
     }
 
     /// Search by text.
-    pub fn search_text(&self, query: &str, embedder: &dyn VectorEmbed, max: usize) -> Vec<(String, String, Score)> {
+    pub fn search_text(
+        &self,
+        query: &str,
+        embedder: &dyn VectorEmbed,
+        max: usize,
+    ) -> Vec<(String, String, Score)> {
         self.search_nodes(&embedder.embed(query), max)
     }
 
@@ -222,7 +237,10 @@ impl PhysisCore {
         pin: PinEdit,
         embedder_id: Option<&str>,
     ) -> anyhow::Result<NodeEditOutcome> {
-        let node = self.nodes.get_mut(id).ok_or_else(|| anyhow::anyhow!("unknown node {id}"))?;
+        let node = self
+            .nodes
+            .get_mut(id)
+            .ok_or_else(|| anyhow::anyhow!("unknown node {id}"))?;
         if let Some(old) = node.label.take() {
             if self.label_index.get(&old).map(String::as_str) == Some(id) {
                 self.label_index.remove(&old);
@@ -236,7 +254,8 @@ impl PhysisCore {
             PinEdit::Set(domain, mode) => node.cell_pin = Some((domain, mode)),
             PinEdit::Clear => node.cell_pin = None,
         }
-        self.label_index.insert(new_label.to_string(), id.to_string());
+        self.label_index
+            .insert(new_label.to_string(), id.to_string());
         self.update_coherence(id);
         let node = &self.nodes[id];
         Ok(NodeEditOutcome {
@@ -250,7 +269,9 @@ impl PhysisCore {
 
     /// Remove a node and its label index entry. Returns false when the id is unknown.
     pub fn delete_node(&mut self, id: &str) -> bool {
-        let Some(node) = self.nodes.remove(id) else { return false };
+        let Some(node) = self.nodes.remove(id) else {
+            return false;
+        };
         if let Some(label) = node.label {
             if self.label_index.get(&label).map(String::as_str) == Some(id) {
                 self.label_index.remove(&label);
@@ -266,7 +287,9 @@ impl PhysisCore {
             .nodes
             .iter()
             .filter(|(_, n)| {
-                n.label.as_deref().is_some_and(|l| l == label || l.starts_with(&prefix))
+                n.label
+                    .as_deref()
+                    .is_some_and(|l| l == label || l.starts_with(&prefix))
             })
             .map(|(id, _)| id.clone())
             .collect();
@@ -300,7 +323,11 @@ impl PhysisCore {
         sims.sort_by(|a, b| b.partial_cmp(a).unwrap());
         sims.truncate(k);
 
-        let avg = if sims.is_empty() { 1.0 } else { sims.iter().sum::<f32>() / sims.len() as f32 };
+        let avg = if sims.is_empty() {
+            1.0
+        } else {
+            sims.iter().sum::<f32>() / sims.len() as f32
+        };
 
         if let Some(node) = self.nodes.get_mut(node_id) {
             node.coherence_score = avg.max(0.0);
@@ -328,7 +355,11 @@ impl PhysisCore {
     /// Group nodes into certified dense clusters.
     pub fn certify_branches(&mut self) -> Vec<CertifiedBranch> {
         let mut certified = Vec::new();
-        let high_nodes: Vec<&CoherenceNode> = self.nodes.values().filter(|n| n.coherence_score > 0.7).collect();
+        let high_nodes: Vec<&CoherenceNode> = self
+            .nodes
+            .values()
+            .filter(|n| n.coherence_score > 0.7)
+            .collect();
         if !high_nodes.is_empty() {
             let ids: Vec<String> = high_nodes.iter().map(|n| n.id.clone()).collect();
             let branch = CertifiedBranch {
@@ -346,7 +377,11 @@ impl PhysisCore {
     /// Detect isolated outliers.
     pub fn detect_contradictions(&mut self) -> Vec<IsolatedBranch> {
         let mut isolated = Vec::new();
-        let low_nodes: Vec<&CoherenceNode> = self.nodes.values().filter(|n| n.coherence_score < 0.3).collect();
+        let low_nodes: Vec<&CoherenceNode> = self
+            .nodes
+            .values()
+            .filter(|n| n.coherence_score < 0.3)
+            .collect();
         for node in low_nodes {
             let branch = IsolatedBranch {
                 branch_id: uuid::Uuid::new_v4().to_string(),
@@ -392,11 +427,26 @@ impl PhysisCore {
 
     pub fn snapshot(&self) -> CoherenceSnapshot {
         let total = self.nodes.len();
-        let high = self.nodes.values().filter(|n| n.coherence_score > 0.7).count();
-        let mid = self.nodes.values().filter(|n| n.coherence_score > 0.3 && n.coherence_score <= 0.7).count();
-        let low = self.nodes.values().filter(|n| n.coherence_score <= 0.3).count();
+        let high = self
+            .nodes
+            .values()
+            .filter(|n| n.coherence_score > 0.7)
+            .count();
+        let mid = self
+            .nodes
+            .values()
+            .filter(|n| n.coherence_score > 0.3 && n.coherence_score <= 0.7)
+            .count();
+        let low = self
+            .nodes
+            .values()
+            .filter(|n| n.coherence_score <= 0.3)
+            .count();
         let rated = |want: CoherenceRating| {
-            self.nodes.values().filter(|n| n.rating() == Some(want)).count()
+            self.nodes
+                .values()
+                .filter(|n| n.rating() == Some(want))
+                .count()
         };
         CoherenceSnapshot {
             total_nodes: total,
@@ -447,7 +497,10 @@ impl PhysisCore {
         let value: serde_json::Value = serde_json::from_str(json)?;
 
         let (nodes, mut core) = if value.is_array() {
-            (serde_json::from_value::<Vec<CoherenceNode>>(value)?, Self::new())
+            (
+                serde_json::from_value::<Vec<CoherenceNode>>(value)?,
+                Self::new(),
+            )
         } else {
             let p: PersistedCoreOwned = serde_json::from_value(value)?;
             let mut core = Self::new();
@@ -513,13 +566,9 @@ impl PhysisCore {
             let prior = h.status.as_str().to_string();
             h.transition_to(new_status, desc.clone(), trigger.clone());
             self.epistemic_audit.record(
-                EpistemicEvent::new(
-                    EpistemicEventType::StatusTransition,
-                    id,
-                    desc,
-                )
-                .with_transition(prior, new_status.as_str())
-                .with_metric(h.fitness),
+                EpistemicEvent::new(EpistemicEventType::StatusTransition, id, desc)
+                    .with_transition(prior, new_status.as_str())
+                    .with_metric(h.fitness),
             );
             true
         } else {
@@ -616,7 +665,10 @@ impl PhysisCore {
                 if sim > 0.6 {
                     precedents.push(HistoricalPrecedent {
                         case_id: node.id.clone(),
-                        description: node.label.clone().unwrap_or_else(|| "unlabeled case".to_string()),
+                        description: node
+                            .label
+                            .clone()
+                            .unwrap_or_else(|| "unlabeled case".to_string()),
                         outcome_worked: verdict > 0.0,
                         similarity: sim,
                         context_match: None,
@@ -633,7 +685,12 @@ impl PhysisCore {
             contradicting_evidence: h.contradicting_evidence.clone(),
             historical_precedents: precedents,
             expected_consequences: h.predictions.clone(),
-            observed_consequences: h.predictions.iter().filter(|p| p.actual_outcome.is_some()).cloned().collect(),
+            observed_consequences: h
+                .predictions
+                .iter()
+                .filter(|p| p.actual_outcome.is_some())
+                .cloned()
+                .collect(),
             coherence_profile: h.coherence_profile.clone(),
             coherence_score: h.coherence,
             fitness_breakdown: h.fitness_breakdown.clone(),
@@ -651,7 +708,8 @@ impl PhysisCore {
 
     /// String summary explanation of a hypothesis.
     pub fn explain_hypothesis(&self, id: &str) -> Option<String> {
-        self.full_explanation_report(id).map(|r| r.human_readable_summary)
+        self.full_explanation_report(id)
+            .map(|r| r.human_readable_summary)
     }
 
     // ── Upgraded Dream Loop ────────────────────────────────────────────
@@ -663,7 +721,14 @@ impl PhysisCore {
         let failures: Vec<(String, Option<String>, Vec<f32>, Score)> = self
             .asserted_failures()
             .iter()
-            .map(|f| (f.id.clone(), f.label.clone(), f.embedding.clone(), f.coherence_score))
+            .map(|f| {
+                (
+                    f.id.clone(),
+                    f.label.clone(),
+                    f.embedding.clone(),
+                    f.coherence_score,
+                )
+            })
             .collect();
 
         let mut candidates = Vec::new();
@@ -684,7 +749,10 @@ impl PhysisCore {
                 EpistemicEvent::new(
                     EpistemicEventType::HypothesisGenerated,
                     &hyp.id,
-                    format!("Dream loop generated candidate explanation for failure in {}", fid),
+                    format!(
+                        "Dream loop generated candidate explanation for failure in {}",
+                        fid
+                    ),
                 )
                 .with_source("dream_loop")
                 .with_metric(hyp.fitness),
@@ -735,7 +803,10 @@ impl PhysisCore {
                 let conflicting_edges: Vec<TypedEdge> = self
                     .edges
                     .iter()
-                    .filter(|e| (e.source_id == *id || e.target_id == *id) && e.relation_type == RelationType::Contradicts)
+                    .filter(|e| {
+                        (e.source_id == *id || e.target_id == *id)
+                            && e.relation_type == RelationType::Contradicts
+                    })
                     .cloned()
                     .collect();
                 EpistemicQueryResult::Contradictions {
@@ -763,7 +834,11 @@ impl PhysisCore {
                         if let Some(v) = n.asserted {
                             if v > 0.0 {
                                 let sim = cosine_sim(embedding, &n.embedding);
-                                return Some((n.label.clone().unwrap_or_else(|| n.id.clone()), sim, true));
+                                return Some((
+                                    n.label.clone().unwrap_or_else(|| n.id.clone()),
+                                    sim,
+                                    true,
+                                ));
                             }
                         }
                         None
@@ -781,7 +856,11 @@ impl PhysisCore {
                         if let Some(v) = n.asserted {
                             if v < 0.0 {
                                 let sim = cosine_sim(embedding, &n.embedding);
-                                return Some((n.label.clone().unwrap_or_else(|| n.id.clone()), sim, false));
+                                return Some((
+                                    n.label.clone().unwrap_or_else(|| n.id.clone()),
+                                    sim,
+                                    false,
+                                ));
                             }
                         }
                         None
@@ -829,7 +908,11 @@ impl PhysisCore {
                         predictions_count: h.predictions.len(),
                     })
                     .collect();
-                hyps.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal));
+                hyps.sort_by(|a, b| {
+                    b.fitness
+                        .partial_cmp(&a.fitness)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
                 hyps.truncate(*limit);
                 EpistemicQueryResult::RankedHypotheses { hypotheses: hyps }
             }
@@ -851,7 +934,9 @@ impl PhysisCore {
                     }
                 }
                 failed_preds.truncate(*limit);
-                EpistemicQueryResult::FailedPredictionsList { failures: failed_preds }
+                EpistemicQueryResult::FailedPredictionsList {
+                    failures: failed_preds,
+                }
             }
             EpistemicQuery::HighestEmpiricalFitness { limit } => {
                 let mut hyps: Vec<HypothesisSummary> = self
@@ -868,7 +953,11 @@ impl PhysisCore {
                         predictions_count: h.predictions.len(),
                     })
                     .collect();
-                hyps.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal));
+                hyps.sort_by(|a, b| {
+                    b.fitness
+                        .partial_cmp(&a.fitness)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
                 hyps.truncate(*limit);
                 EpistemicQueryResult::RankedHypotheses { hypotheses: hyps }
             }
@@ -879,9 +968,9 @@ impl PhysisCore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contradiction::ResolutionStatus;
     use crate::embed::RandomProjectionEmbedder;
     use crate::hypothesis::{Evidence, EvidencePolarity, Hypothesis, HypothesisStatus};
-    use crate::contradiction::ResolutionStatus;
     use crate::provenance::ProvenanceLink;
 
     fn fixture_embedder() -> RandomProjectionEmbedder {
@@ -1020,7 +1109,11 @@ mod tests {
         let restored = PhysisCore::from_json(&g.to_json().unwrap()).unwrap();
         assert_eq!(restored.nodes.len(), 1, "nodes still round-trip");
         assert!(restored.nodes.contains_key(&node));
-        assert_eq!(restored.hypotheses.len(), 1, "hypotheses must survive the save");
+        assert_eq!(
+            restored.hypotheses.len(),
+            1,
+            "hypotheses must survive the save"
+        );
         assert_eq!(
             restored.hypotheses[&hid].statement,
             "clogs correlate with humidity",
@@ -1040,12 +1133,18 @@ mod tests {
         let mut g = PhysisCore::new();
         let id = g.register_node_from_text("legacy node", &emb);
         let legacy = serde_json::to_string(&g.nodes.values().collect::<Vec<_>>()).unwrap();
-        assert!(legacy.trim_start().starts_with('['), "fixture must be the old shape");
+        assert!(
+            legacy.trim_start().starts_with('['),
+            "fixture must be the old shape"
+        );
 
         let restored = PhysisCore::from_json(&legacy).unwrap();
         assert_eq!(restored.nodes.len(), 1);
         assert!(restored.nodes.contains_key(&id));
-        assert!(restored.hypotheses.is_empty(), "legacy files carry no hypotheses");
+        assert!(
+            restored.hypotheses.is_empty(),
+            "legacy files carry no hypotheses"
+        );
 
         // And a legacy file re-saved comes back in the new format with its
         // labels still deduping, so the upgrade is a one-way ratchet.
@@ -1070,13 +1169,32 @@ mod tests {
         let id = g.register_hypothesis(hyp.clone());
 
         let t0 = chrono::Utc::now();
-        g.transition_hypothesis(&id, HypothesisStatus::Supported, "Sensor reading confirms", None);
+        g.transition_hypothesis(
+            &id,
+            HypothesisStatus::Supported,
+            "Sensor reading confirms",
+            None,
+        );
         let t1 = chrono::Utc::now();
-        g.transition_hypothesis(&id, HypothesisStatus::Contradicted, "Thermal camera indicates freeze", None);
+        g.transition_hypothesis(
+            &id,
+            HypothesisStatus::Contradicted,
+            "Thermal camera indicates freeze",
+            None,
+        );
 
-        assert_eq!(g.reconstruct_belief_at(&id, t0), Some(HypothesisStatus::Candidate));
-        assert_eq!(g.reconstruct_belief_at(&id, t1), Some(HypothesisStatus::Supported));
-        assert_eq!(g.reconstruct_belief_at(&id, chrono::Utc::now()), Some(HypothesisStatus::Contradicted));
+        assert_eq!(
+            g.reconstruct_belief_at(&id, t0),
+            Some(HypothesisStatus::Candidate)
+        );
+        assert_eq!(
+            g.reconstruct_belief_at(&id, t1),
+            Some(HypothesisStatus::Supported)
+        );
+        assert_eq!(
+            g.reconstruct_belief_at(&id, chrono::Utc::now()),
+            Some(HypothesisStatus::Contradicted)
+        );
     }
 
     #[test]
@@ -1106,7 +1224,9 @@ mod tests {
             embedding: Vec::new(),
             context: Vec::new(),
         };
-        core.hypothesis_mut(&id).unwrap().add_supporting_evidence(evidence);
+        core.hypothesis_mut(&id)
+            .unwrap()
+            .add_supporting_evidence(evidence);
         assert_eq!(core.hypotheses[&id].supporting_evidence.len(), 1);
     }
 
@@ -1132,7 +1252,7 @@ mod tests {
         let mut core = PhysisCore::new();
         let h = Hypothesis::new("sensor reads 218.4C", vec![0.1; 64]);
         let id = core.register_hypothesis(h);
-        
+
         let chain = core.provenance_chain(&id);
         chain.add_link(ProvenanceLink::new("sensor_01 reports 218.4C", "sensor_01"));
         chain.add_link(ProvenanceLink::new("threshold is 200C", "spec_sheet"));
@@ -1140,8 +1260,16 @@ mod tests {
         let explanation = core.explain_hypothesis(&id);
         assert!(explanation.is_some(), "explanation should exist");
         let text = explanation.unwrap();
-        assert!(text.contains("spec_sheet"), "provenance should be visible: {}", text);
-        assert!(text.contains("threshold is 200C"), "provenance should be visible: {}", text);
+        assert!(
+            text.contains("spec_sheet"),
+            "provenance should be visible: {}",
+            text
+        );
+        assert!(
+            text.contains("threshold is 200C"),
+            "provenance should be visible: {}",
+            text
+        );
     }
 
     #[test]

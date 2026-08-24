@@ -87,12 +87,18 @@ pub fn parse_notebook_entries(json: &str) -> Vec<BehaviourRecord> {
     };
     let mut out = Vec::new();
     for it in items {
-        let Ok(entry) = serde_json::from_value::<NotebookEntry>(it.clone()) else { continue };
+        let Ok(entry) = serde_json::from_value::<NotebookEntry>(it.clone()) else {
+            continue;
+        };
         let notes = entry.notes.trim().to_string();
         if notes.is_empty() {
             continue;
         }
-        let title = if notes.len() > 80 { notes[..80].to_string() } else { notes.clone() };
+        let title = if notes.len() > 80 {
+            notes[..80].to_string()
+        } else {
+            notes.clone()
+        };
         let out_body = if entry.tags.is_empty() {
             notes
         } else {
@@ -129,12 +135,20 @@ struct DayValue {
     value: Option<f64>,
 }
 
-fn status_from_tracker(value: Option<f64>, target: Option<f64>, progress: Option<f64>) -> BehaviourStatus {
+fn status_from_tracker(
+    value: Option<f64>,
+    target: Option<f64>,
+    progress: Option<f64>,
+) -> BehaviourStatus {
     if value.is_none() && target.is_none() && progress.is_none() {
         return BehaviourStatus::Inert;
     }
     let ratio = progress
-        .or_else(|| value.zip(target).map(|(v, t)| if t > 0.0 { v / t } else { v }))
+        .or_else(|| {
+            value
+                .zip(target)
+                .map(|(v, t)| if t > 0.0 { v / t } else { v })
+        })
         .unwrap_or(0.0);
     if ratio >= 0.7 {
         BehaviourStatus::Success
@@ -161,7 +175,9 @@ pub fn parse_trackers(json: &str) -> Vec<BehaviourRecord> {
     };
     let mut out = Vec::new();
     for it in items {
-        let Ok(t) = serde_json::from_value::<TrackerEntry>(it.clone()) else { continue };
+        let Ok(t) = serde_json::from_value::<TrackerEntry>(it.clone()) else {
+            continue;
+        };
         if t.name.trim().is_empty() {
             continue;
         }
@@ -170,7 +186,9 @@ pub fn parse_trackers(json: &str) -> Vec<BehaviourRecord> {
         let body = format!(
             "tracker {}: {}",
             t.name,
-            value.map(|v| format!("{v:.1}")).unwrap_or_else(|| "no value recorded".to_string()),
+            value
+                .map(|v| format!("{v:.1}"))
+                .unwrap_or_else(|| "no value recorded".to_string()),
         );
         out.push(BehaviourRecord {
             kind: "tracker".to_string(),
@@ -194,15 +212,25 @@ struct PraxisExport {
 
 /// Parse a combined export `{ notebook: [...], trackers: [...] }` into records.
 pub fn parse_export(json: &str) -> Vec<BehaviourRecord> {
-    let Ok(export) = serde_json::from_str::<PraxisExport>(json) else { return vec![] };
+    let Ok(export) = serde_json::from_str::<PraxisExport>(json) else {
+        return vec![];
+    };
     let mut out = Vec::new();
     for e in export.notebook {
         let notes = e.notes.trim().to_string();
         if notes.is_empty() {
             continue;
         }
-        let title = if notes.len() > 80 { notes[..80].to_string() } else { notes.clone() };
-        let body = if e.tags.is_empty() { notes } else { format!("{}\n\ntags: {}", notes, e.tags.join(", ")) };
+        let title = if notes.len() > 80 {
+            notes[..80].to_string()
+        } else {
+            notes.clone()
+        };
+        let body = if e.tags.is_empty() {
+            notes
+        } else {
+            format!("{}\n\ntags: {}", notes, e.tags.join(", "))
+        };
         out.push(BehaviourRecord {
             kind: "notebook".to_string(),
             title,
@@ -219,7 +247,9 @@ pub fn parse_export(json: &str) -> Vec<BehaviourRecord> {
         let body = format!(
             "tracker {}: {}",
             t.name,
-            value.map(|v| format!("{v:.1}")).unwrap_or_else(|| "no value recorded".to_string()),
+            value
+                .map(|v| format!("{v:.1}"))
+                .unwrap_or_else(|| "no value recorded".to_string()),
         );
         out.push(BehaviourRecord {
             kind: "tracker".to_string(),
@@ -262,11 +292,26 @@ mod tests {
 
     #[test]
     fn tracker_ratio_maps_to_status() {
-        assert_eq!(status_from_tracker(Some(9.0), Some(10.0), None), BehaviourStatus::Success);
-        assert_eq!(status_from_tracker(Some(5.0), Some(10.0), None), BehaviourStatus::Inert);
-        assert_eq!(status_from_tracker(Some(1.0), Some(10.0), None), BehaviourStatus::Failure);
-        assert_eq!(status_from_tracker(None, None, Some(0.9)), BehaviourStatus::Success);
-        assert_eq!(status_from_tracker(None, None, None), BehaviourStatus::Inert);
+        assert_eq!(
+            status_from_tracker(Some(9.0), Some(10.0), None),
+            BehaviourStatus::Success
+        );
+        assert_eq!(
+            status_from_tracker(Some(5.0), Some(10.0), None),
+            BehaviourStatus::Inert
+        );
+        assert_eq!(
+            status_from_tracker(Some(1.0), Some(10.0), None),
+            BehaviourStatus::Failure
+        );
+        assert_eq!(
+            status_from_tracker(None, None, Some(0.9)),
+            BehaviourStatus::Success
+        );
+        assert_eq!(
+            status_from_tracker(None, None, None),
+            BehaviourStatus::Inert
+        );
     }
 
     #[test]

@@ -125,7 +125,12 @@ pub struct ConstructiveRefutation {
 }
 
 impl ConstructiveRefutation {
-    pub fn new(query_embedding: Vec<f32>, conflicting_ids: Vec<String>, suggestion: &str, gap: Score) -> Self {
+    pub fn new(
+        query_embedding: Vec<f32>,
+        conflicting_ids: Vec<String>,
+        suggestion: &str,
+        gap: Score,
+    ) -> Self {
         Self {
             conflict_id: uuid::Uuid::new_v4().to_string(),
             query_embedding,
@@ -210,7 +215,12 @@ impl LifecyclePhase {
         s.parse().ok()
     }
     pub fn all() -> [LifecyclePhase; 4] {
-        [LifecyclePhase::Design, LifecyclePhase::Build, LifecyclePhase::Operate, LifecyclePhase::Retire]
+        [
+            LifecyclePhase::Design,
+            LifecyclePhase::Build,
+            LifecyclePhase::Operate,
+            LifecyclePhase::Retire,
+        ]
     }
 }
 
@@ -249,7 +259,12 @@ impl Agency {
         s.parse().ok()
     }
     pub fn all() -> [Agency; 4] {
-        [Agency::SelfActor, Agency::Other, Agency::Automated, Agency::Collective]
+        [
+            Agency::SelfActor,
+            Agency::Other,
+            Agency::Automated,
+            Agency::Collective,
+        ]
     }
 }
 
@@ -288,7 +303,12 @@ impl Scale {
         s.parse().ok()
     }
     pub fn all() -> [Scale; 4] {
-        [Scale::Personal, Scale::Interpersonal, Scale::Organizational, Scale::Civil]
+        [
+            Scale::Personal,
+            Scale::Interpersonal,
+            Scale::Organizational,
+            Scale::Civil,
+        ]
     }
 }
 
@@ -358,8 +378,14 @@ impl Facets {
     /// Aggregate member facets of a cell into one dominant profile: enums take
     /// the most common non-`None` variant; sub-strings take the most common.
     pub fn aggregate(members: &[Facets]) -> Facets {
-        let sub_domain: Vec<&str> = members.iter().filter_map(|f| f.sub_domain.as_deref()).collect();
-        let sub_mode: Vec<&str> = members.iter().filter_map(|f| f.sub_mode.as_deref()).collect();
+        let sub_domain: Vec<&str> = members
+            .iter()
+            .filter_map(|f| f.sub_domain.as_deref())
+            .collect();
+        let sub_mode: Vec<&str> = members
+            .iter()
+            .filter_map(|f| f.sub_mode.as_deref())
+            .collect();
         let lifecycle: Vec<LifecyclePhase> = members.iter().filter_map(|f| f.lifecycle).collect();
         let agency: Vec<Agency> = members.iter().filter_map(|f| f.agency).collect();
         let scale: Vec<Scale> = members.iter().filter_map(|f| f.scale).collect();
@@ -379,12 +405,24 @@ impl Facets {
     /// `sub:VALUE`). Empty (no facets set) → `—`. Used by CLI/table output.
     pub fn simple(&self) -> String {
         let mut parts: Vec<String> = Vec::new();
-        if let Some(l) = &self.lifecycle { parts.push(l.as_str().to_string()); }
-        if let Some(a) = &self.agency { parts.push(a.as_str().to_string()); }
-        if let Some(s) = &self.scale { parts.push(s.as_str().to_string()); }
-        if let Some(ab) = &self.abstraction { parts.push(ab.as_str().to_string()); }
-        if let Some(s) = &self.sub_domain { parts.push(format!("sub:{s}")); }
-        if let Some(s) = &self.sub_mode { parts.push(format!("sub:{s}")); }
+        if let Some(l) = &self.lifecycle {
+            parts.push(l.as_str().to_string());
+        }
+        if let Some(a) = &self.agency {
+            parts.push(a.as_str().to_string());
+        }
+        if let Some(s) = &self.scale {
+            parts.push(s.as_str().to_string());
+        }
+        if let Some(ab) = &self.abstraction {
+            parts.push(ab.as_str().to_string());
+        }
+        if let Some(s) = &self.sub_domain {
+            parts.push(format!("sub:{s}"));
+        }
+        if let Some(s) = &self.sub_mode {
+            parts.push(format!("sub:{s}"));
+        }
         if parts.is_empty() {
             return "—".to_string();
         }
@@ -504,7 +542,13 @@ pub enum HumanDomain {
 
 impl HumanDomain {
     pub fn all() -> [HumanDomain; 5] {
-        [HumanDomain::Heal, HumanDomain::Construct, HumanDomain::Fabricate, HumanDomain::Bond, HumanDomain::Study]
+        [
+            HumanDomain::Heal,
+            HumanDomain::Construct,
+            HumanDomain::Fabricate,
+            HumanDomain::Bond,
+            HumanDomain::Study,
+        ]
     }
 
     pub fn as_str(&self) -> &'static str {
@@ -555,10 +599,20 @@ pub enum HumanMode {
 impl HumanMode {
     pub fn all() -> [HumanMode; 14] {
         [
-            HumanMode::Lift, HumanMode::Rest, HumanMode::Walk, HumanMode::Work,
-            HumanMode::Create, HumanMode::Learn, HumanMode::Destroy, HumanMode::Sense,
-            HumanMode::Guide, HumanMode::Play, HumanMode::Brainstorm, HumanMode::Maintain,
-            HumanMode::Move, HumanMode::Plan,
+            HumanMode::Lift,
+            HumanMode::Rest,
+            HumanMode::Walk,
+            HumanMode::Work,
+            HumanMode::Create,
+            HumanMode::Learn,
+            HumanMode::Destroy,
+            HumanMode::Sense,
+            HumanMode::Guide,
+            HumanMode::Play,
+            HumanMode::Brainstorm,
+            HumanMode::Maintain,
+            HumanMode::Move,
+            HumanMode::Plan,
         ]
     }
 
@@ -632,8 +686,14 @@ impl GridPosition {
     }
 
     pub fn cell_index(&self) -> usize {
-        let d = HumanDomain::all().iter().position(|x| *x == self.domain).unwrap_or(0);
-        let m = HumanMode::all().iter().position(|x| *x == self.mode).unwrap_or(0);
+        let d = HumanDomain::all()
+            .iter()
+            .position(|x| *x == self.domain)
+            .unwrap_or(0);
+        let m = HumanMode::all()
+            .iter()
+            .position(|x| *x == self.mode)
+            .unwrap_or(0);
         d * HumanMode::all().len() + m
     }
 }
@@ -669,11 +729,19 @@ impl SemioticGrid {
     }
 
     pub fn get_cell(&self, domain: HumanDomain, mode: HumanMode) -> Option<&SemioticCell> {
-        self.cells.iter().find(|c| c.domain == domain && c.mode == mode)
+        self.cells
+            .iter()
+            .find(|c| c.domain == domain && c.mode == mode)
     }
 
-    pub fn get_cell_mut(&mut self, domain: HumanDomain, mode: HumanMode) -> Option<&mut SemioticCell> {
-        self.cells.iter_mut().find(|c| c.domain == domain && c.mode == mode)
+    pub fn get_cell_mut(
+        &mut self,
+        domain: HumanDomain,
+        mode: HumanMode,
+    ) -> Option<&mut SemioticCell> {
+        self.cells
+            .iter_mut()
+            .find(|c| c.domain == domain && c.mode == mode)
     }
 
     pub fn classify(&mut self, entry_name: &str, domain: HumanDomain, mode: HumanMode) {
@@ -687,8 +755,14 @@ impl SemioticGrid {
     pub fn heatmap_matrix(&self) -> Vec<Vec<f32>> {
         let mut matrix = vec![vec![0.0_f32; HumanMode::all().len()]; HumanDomain::all().len()];
         for cell in &self.cells {
-            let di = HumanDomain::all().iter().position(|d| *d == cell.domain).unwrap_or(0);
-            let mi = HumanMode::all().iter().position(|m| *m == cell.mode).unwrap_or(0);
+            let di = HumanDomain::all()
+                .iter()
+                .position(|d| *d == cell.domain)
+                .unwrap_or(0);
+            let mi = HumanMode::all()
+                .iter()
+                .position(|m| *m == cell.mode)
+                .unwrap_or(0);
             matrix[di][mi] = cell.activation;
         }
         matrix
@@ -750,7 +824,10 @@ mod tests {
             scale: Some(Scale::Organizational),
             abstraction: Some(Abstraction::Concrete),
         };
-        assert_eq!(f.simple(), "OPERATE · AUTOMATED · ORGANIZATIONAL · CONCRETE · sub:SELL");
+        assert_eq!(
+            f.simple(),
+            "OPERATE · AUTOMATED · ORGANIZATIONAL · CONCRETE · sub:SELL"
+        );
         assert_eq!(Facets::default().simple(), "—");
     }
 
@@ -780,7 +857,10 @@ mod tests {
         let gp = GridPosition::from_ontology_entry(&e).expect("parses");
         assert_eq!(gp.domain, HumanDomain::Heal);
         assert_eq!(gp.mode, HumanMode::Work);
-        let bad = OntologyEntry { domain: "NOPE".into(), ..e };
+        let bad = OntologyEntry {
+            domain: "NOPE".into(),
+            ..e
+        };
         assert!(GridPosition::from_ontology_entry(&bad).is_none());
     }
 
@@ -796,9 +876,21 @@ mod tests {
     #[test]
     fn test_facets_aggregate_majority_and_absent() {
         let members = vec![
-            Facets { lifecycle: Some(LifecyclePhase::Operate), agency: Some(Agency::SelfActor), ..Default::default() },
-            Facets { lifecycle: Some(LifecyclePhase::Operate), agency: Some(Agency::Automated), ..Default::default() },
-            Facets { lifecycle: Some(LifecyclePhase::Design), agency: Some(Agency::SelfActor), ..Default::default() },
+            Facets {
+                lifecycle: Some(LifecyclePhase::Operate),
+                agency: Some(Agency::SelfActor),
+                ..Default::default()
+            },
+            Facets {
+                lifecycle: Some(LifecyclePhase::Operate),
+                agency: Some(Agency::Automated),
+                ..Default::default()
+            },
+            Facets {
+                lifecycle: Some(LifecyclePhase::Design),
+                agency: Some(Agency::SelfActor),
+                ..Default::default()
+            },
         ];
         let agg = Facets::aggregate(&members);
         assert_eq!(agg.lifecycle, Some(LifecyclePhase::Operate));

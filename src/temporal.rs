@@ -25,17 +25,32 @@ pub struct TemporalValidity {
 impl TemporalValidity {
     /// Permanent validity (no time bounds).
     pub fn permanent() -> Self {
-        Self { valid_from: None, valid_until: None, trigger: None }
+        Self {
+            valid_from: None,
+            valid_until: None,
+            trigger: None,
+        }
     }
 
     /// Valid from a specific point onward.
     pub fn from(instant: chrono::DateTime<chrono::Utc>) -> Self {
-        Self { valid_from: Some(instant), valid_until: None, trigger: None }
+        Self {
+            valid_from: Some(instant),
+            valid_until: None,
+            trigger: None,
+        }
     }
 
     /// Valid during an interval.
-    pub fn during(start: chrono::DateTime<chrono::Utc>, end: chrono::DateTime<chrono::Utc>) -> Self {
-        Self { valid_from: Some(start), valid_until: Some(end), trigger: None }
+    pub fn during(
+        start: chrono::DateTime<chrono::Utc>,
+        end: chrono::DateTime<chrono::Utc>,
+    ) -> Self {
+        Self {
+            valid_from: Some(start),
+            valid_until: Some(end),
+            trigger: None,
+        }
     }
 
     /// Is this statement valid at the given instant?
@@ -60,10 +75,18 @@ impl TemporalValidity {
 
     /// Does this overlap with another validity window?
     pub fn overlaps(&self, other: &TemporalValidity) -> bool {
-        let start_a = self.valid_from.unwrap_or_else(|| chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0).unwrap());
-        let end_a = self.valid_until.unwrap_or_else(|| chrono::DateTime::<chrono::Utc>::from_timestamp(i64::MAX, 0).unwrap());
-        let start_b = other.valid_from.unwrap_or_else(|| chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0).unwrap());
-        let end_b = other.valid_until.unwrap_or_else(|| chrono::DateTime::<chrono::Utc>::from_timestamp(i64::MAX, 0).unwrap());
+        let start_a = self
+            .valid_from
+            .unwrap_or_else(|| chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0).unwrap());
+        let end_a = self.valid_until.unwrap_or_else(|| {
+            chrono::DateTime::<chrono::Utc>::from_timestamp(i64::MAX, 0).unwrap()
+        });
+        let start_b = other
+            .valid_from
+            .unwrap_or_else(|| chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0).unwrap());
+        let end_b = other.valid_until.unwrap_or_else(|| {
+            chrono::DateTime::<chrono::Utc>::from_timestamp(i64::MAX, 0).unwrap()
+        });
         start_a < end_b && start_b < end_a
     }
 }

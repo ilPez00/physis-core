@@ -35,7 +35,11 @@ impl Default for CoherenceDimension {
 
 impl CoherenceDimension {
     pub fn new(label: impl Into<String>, score: Score, weight: Score) -> Self {
-        Self { label: label.into(), score: score.clamp(0.0, 1.0), weight: weight.max(0.0) }
+        Self {
+            label: label.into(),
+            score: score.clamp(0.0, 1.0),
+            weight: weight.max(0.0),
+        }
     }
 
     pub fn neutral(label: impl Into<String>) -> Self {

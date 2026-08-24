@@ -23,19 +23,37 @@ const CORE_COMMANDS: &[(&str, &str)] = &[
     ("classify", "Score text against the semiotic grid"),
     ("ontology", "Show ontology stats"),
     ("facet", "Query ontology entries by orthogonal facets"),
-    ("scan", "Register a directory's text files as coherence nodes"),
+    (
+        "scan",
+        "Register a directory's text files as coherence nodes",
+    ),
     ("search", "Search recalled nodes by similarity"),
-    ("node-search", "Fixed-token-budget search over recalled nodes"),
-    ("node-edit", "Swap a node's content, keeping id, verdict and edges"),
+    (
+        "node-search",
+        "Fixed-token-budget search over recalled nodes",
+    ),
+    (
+        "node-edit",
+        "Swap a node's content, keeping id, verdict and edges",
+    ),
     ("node-delete", "Delete a node and its index entry"),
     ("vault", "Import an Obsidian/markdown vault or git log"),
-    ("history", "Import bookmarks, browser history, OPML or chat JSONL"),
+    (
+        "history",
+        "Import bookmarks, browser history, OPML or chat JSONL",
+    ),
     ("praxis", "Backfill verdicts from a Praxis life-log export"),
     ("snapshot", "Coherence snapshot of the persisted graph"),
-    ("assert", "Record a verdict on a node: success | inert | failure"),
+    (
+        "assert",
+        "Record a verdict on a node: success | inert | failure",
+    ),
     ("dream", "Replay low-coherence and failed nodes"),
     ("quality", "Quality feedback loop"),
-    ("hypothesis", "Competing hypotheses with evidence and fitness"),
+    (
+        "hypothesis",
+        "Competing hypotheses with evidence and fitness",
+    ),
     ("contradiction", "Contradictions and truth maintenance"),
     ("audit", "Chronological epistemic audit log"),
     ("replay", "Reconstruct a belief state at a past timestamp"),
@@ -47,12 +65,18 @@ const CORE_COMMANDS: &[(&str, &str)] = &[
 /// `physis-pro --help`, and repeating forty entries here would rot.
 const PRO_COMMANDS: &[(&str, &str)] = &[
     ("doctor", "Diagnose config, data dir, embedder and licence"),
-    ("timeline", "Incident timeline from normalized operational events"),
+    (
+        "timeline",
+        "Incident timeline from normalized operational events",
+    ),
     ("report", "Render the shift report"),
     ("process", "Industrial process health"),
     ("inventory", "Inventory status"),
     ("order", "Human-in-the-loop order suggestion"),
-    ("connect", "Run a live machine connector (MQTT, Modbus, serial, OPC-UA)"),
+    (
+        "connect",
+        "Run a live machine connector (MQTT, Modbus, serial, OPC-UA)",
+    ),
     ("watch", "Auto-ingest a directory as it changes"),
     ("pack", "Pack a directory into a hard token budget"),
     ("rag", "Token-fixed retrieval over a directory"),
@@ -164,18 +188,27 @@ fn print_help(edition: &Edition) {
     println!("  physis <command> [options]      every command's own --help still works");
     println!();
 
-    println!("CORE — the open engine{}", installed_note(edition.core_cli.is_some(), CORE_CLI));
+    println!(
+        "CORE — the open engine{}",
+        installed_note(edition.core_cli.is_some(), CORE_CLI)
+    );
     for (name, about) in CORE_COMMANDS {
         println!("  {name:<14} {about}");
     }
     println!();
 
-    println!("PRO — industrial operations{}", installed_note(edition.has_pro(), PRO_CLI));
+    println!(
+        "PRO — industrial operations{}",
+        installed_note(edition.has_pro(), PRO_CLI)
+    );
     for (name, about) in PRO_COMMANDS {
         println!("  {name:<14} {about}");
     }
     if edition.has_pro() {
-        println!("  {:<14} Serve the Operations Console, Demo and Study dashboards", "web");
+        println!(
+            "  {:<14} Serve the Operations Console, Demo and Study dashboards",
+            "web"
+        );
         println!("  {:<14} full list: physis-pro --help", "…");
     } else {
         println!("                 Not installed — run `physis upgrade` to see what it adds.");

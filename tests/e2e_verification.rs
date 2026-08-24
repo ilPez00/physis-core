@@ -25,9 +25,15 @@ fn test_epistemic_thesis_end_to_end() {
 
     let sample_text = "Spindle bearing thermal runaway caused by lubricant breakdown";
     let scores = classifier.classify_text(sample_text, &embedder);
-    assert!(!scores.is_empty(), "Classification must return populated cells");
+    assert!(
+        !scores.is_empty(),
+        "Classification must return populated cells"
+    );
     let top_cell = &scores[0];
-    println!("Query: '{}'\nTop Cell: {} x {} (Score: {:.4})", sample_text, top_cell.domain, top_cell.mode, top_cell.score);
+    println!(
+        "Query: '{}'\nTop Cell: {} x {} (Score: {:.4})",
+        sample_text, top_cell.domain, top_cell.mode, top_cell.score
+    );
     assert!(top_cell.score > 0.0);
 
     println!("\n=================================================================");
@@ -38,13 +44,17 @@ fn test_epistemic_thesis_end_to_end() {
     // Hypothesis A: Mechanical Bearing Breakdown
     let emb_a = embedder.embed("Spindle bearing ball fatigue failure");
     let mut hyp_a = Hypothesis::new("Mechanical bearing breakdown", emb_a);
-    hyp_a.assumptions.push("Lubricant pump flow rate is nominal".to_string());
+    hyp_a
+        .assumptions
+        .push("Lubricant pump flow rate is nominal".to_string());
     let id_a = core.register_hypothesis(hyp_a);
 
     // Hypothesis B: Sensor Calibration Drift
     let emb_b = embedder.embed("Thermocouple telemetry calibration drift");
     let mut hyp_b = Hypothesis::new("Sensor calibration drift", emb_b);
-    hyp_b.assumptions.push("Machine surface is physically cool".to_string());
+    hyp_b
+        .assumptions
+        .push("Machine surface is physically cool".to_string());
     let id_b = core.register_hypothesis(hyp_b);
 
     println!("Registered 2 competing hypotheses:\n  [Hypothesis A: {}] Mechanical Bearing Breakdown\n  [Hypothesis B: {}] Sensor Calibration Drift", &id_a[..8], &id_b[..8]);
@@ -59,7 +69,10 @@ fn test_epistemic_thesis_end_to_end() {
         embedding: vec![],
         context: vec!["spindle_rpm: 12000".to_string()],
     };
-    core.hypotheses.get_mut(&id_a).unwrap().add_supporting_evidence(ev_a);
+    core.hypotheses
+        .get_mut(&id_a)
+        .unwrap()
+        .add_supporting_evidence(ev_a);
 
     // Attach Contradicting Evidence to B (Physical pyrometer confirms 95C hot zone)
     let ev_b = Evidence {
@@ -71,7 +84,10 @@ fn test_epistemic_thesis_end_to_end() {
         embedding: vec![],
         context: vec!["ambient_temp: 22C".to_string()],
     };
-    core.hypotheses.get_mut(&id_b).unwrap().add_contradicting_evidence(ev_b);
+    core.hypotheses
+        .get_mut(&id_b)
+        .unwrap()
+        .add_contradicting_evidence(ev_b);
 
     // Update survival states based on evidence
     core.hypotheses.get_mut(&id_a).unwrap().status = HypothesisStatus::Supported;
@@ -79,8 +95,14 @@ fn test_epistemic_thesis_end_to_end() {
     core.hypotheses.get_mut(&id_b).unwrap().status = HypothesisStatus::Contradicted;
     core.hypotheses.get_mut(&id_b).unwrap().fitness = 0.15;
 
-    assert_eq!(core.hypotheses.get(&id_a).unwrap().status, HypothesisStatus::Supported);
-    assert_eq!(core.hypotheses.get(&id_b).unwrap().status, HypothesisStatus::Contradicted);
+    assert_eq!(
+        core.hypotheses.get(&id_a).unwrap().status,
+        HypothesisStatus::Supported
+    );
+    assert_eq!(
+        core.hypotheses.get(&id_b).unwrap().status,
+        HypothesisStatus::Contradicted
+    );
     println!("Hypothesis Competition Outcome:\n  -> Hypothesis A retained as Supported (Fitness: 0.92)\n  -> Hypothesis B marked Contradicted (Fitness: 0.15)");
 
     println!("\n=================================================================");
@@ -90,7 +112,8 @@ fn test_epistemic_thesis_end_to_end() {
     party_1.confidence = 0.90;
     party_1.context = vec!["frequency_inverter_feedback".to_string()];
 
-    let mut party_2 = ContradictionParty::new("Spindle speed is 0 RPM (Stalled)", "laser_tachometer");
+    let mut party_2 =
+        ContradictionParty::new("Spindle speed is 0 RPM (Stalled)", "laser_tachometer");
     party_2.confidence = 0.99;
     party_2.context = vec!["direct_optical_reflection".to_string()];
 
@@ -105,9 +128,16 @@ fn test_epistemic_thesis_end_to_end() {
         c.resolution = ResolutionStatus::BPreferred;
         c.explanation = Some("Drive belt snapped: motor is spinning at 12000 RPM but spindle shaft is stalled at 0 RPM".to_string());
     }
-    assert_eq!(core.contradictions[0].resolution, ResolutionStatus::BPreferred);
-    assert!(!core.contradictions[0].claim_a.claim.is_empty(), "Dissenting claim A must NOT be deleted");
-    println!("Contradiction non-destructively resolved:\n  Status: {:?}\n  Context: {}",
+    assert_eq!(
+        core.contradictions[0].resolution,
+        ResolutionStatus::BPreferred
+    );
+    assert!(
+        !core.contradictions[0].claim_a.claim.is_empty(),
+        "Dissenting claim A must NOT be deleted"
+    );
+    println!(
+        "Contradiction non-destructively resolved:\n  Status: {:?}\n  Context: {}",
         core.contradictions[0].resolution,
         core.contradictions[0].explanation.as_ref().unwrap()
     );
@@ -158,11 +188,18 @@ fn test_epistemic_thesis_end_to_end() {
 
     // Report a quality penalty on this cell
     quality.penalize_cell(&cell_key, 0.35);
-    let penalty = quality.cell_penalties.get(&cell_key).copied().unwrap_or(0.0);
+    let penalty = quality
+        .cell_penalties
+        .get(&cell_key)
+        .copied()
+        .unwrap_or(0.0);
     assert!(penalty > 0.0, "Cell must receive quality penalty");
 
     let adjusted_score = quality.adjust_score(&cell_key, initial_score);
-    assert!(adjusted_score < initial_score, "Adjusted score must be penalized");
+    assert!(
+        adjusted_score < initial_score,
+        "Adjusted score must be penalized"
+    );
     println!("Quality Feedback Penalty Verified:\n  Raw Classification Score: {:.4}\n  Penalty Applied: {:.2}\n  Adjusted Score: {:.4}",
         initial_score, penalty, adjusted_score
     );
@@ -181,9 +218,14 @@ fn test_epistemic_thesis_end_to_end() {
     let q_emb = embedder.embed("emergency halt and bearing maintenance");
     let retrieved = retriever.retrieve(&q_emb, &rag_corpus);
     assert!(!retrieved.chunks.is_empty());
-    assert!(retrieved.total_tokens <= 30, "Retrieved content must respect token budget");
-    println!("Token-Fixed RAG Verified: Retrieved {} chunks with total {} tokens (Budget: 30 tokens)",
-        retrieved.chunks.len(), retrieved.total_tokens
+    assert!(
+        retrieved.total_tokens <= 30,
+        "Retrieved content must respect token budget"
+    );
+    println!(
+        "Token-Fixed RAG Verified: Retrieved {} chunks with total {} tokens (Budget: 30 tokens)",
+        retrieved.chunks.len(),
+        retrieved.total_tokens
     );
 
     println!("\n=================================================================");

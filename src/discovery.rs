@@ -61,11 +61,10 @@ pub struct DiscoveryReport {
 
 /// Tiny bilingual stopword list — just enough to keep hints meaningful.
 const STOPWORDS: &[&str] = &[
-    "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "with", "is",
-    "are", "was", "be", "this", "that", "it", "at", "by", "from", "as", "we",
-    "il", "lo", "la", "i", "gli", "le", "un", "uno", "una", "di", "del", "della",
-    "e", "o", "che", "per", "con", "su", "da", "dal", "dalla", "al", "alla",
-    "in", "non", "si", "ha", "sono", "è",
+    "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "with", "is", "are", "was", "be",
+    "this", "that", "it", "at", "by", "from", "as", "we", "il", "lo", "la", "i", "gli", "le", "un",
+    "uno", "una", "di", "del", "della", "e", "o", "che", "per", "con", "su", "da", "dal", "dalla",
+    "al", "alla", "in", "non", "si", "ha", "sono", "è",
 ];
 
 fn terms(text: &str) -> impl Iterator<Item = String> + '_ {
@@ -115,7 +114,11 @@ fn tail_threshold(sorted_sims: &[f32], frac: f32) -> Option<f32> {
 }
 
 /// Split scored texts at `threshold`, cluster the unmapped, draft proposals.
-fn cluster_at(scored: &[Scored], threshold: f32, cfg: &DiscoveryConfig) -> (usize, Vec<ProposedDomain>) {
+fn cluster_at(
+    scored: &[Scored],
+    threshold: f32,
+    cfg: &DiscoveryConfig,
+) -> (usize, Vec<ProposedDomain>) {
     let unmapped: Vec<&Scored> = scored.iter().filter(|s| s.best < threshold).collect();
     let covered = scored.len() - unmapped.len();
 
@@ -128,7 +131,9 @@ fn cluster_at(scored: &[Scored], threshold: f32, cfg: &DiscoveryConfig) -> (usiz
         assigned[i] = true;
         let mut members = vec![i];
         for j in (i + 1)..unmapped.len() {
-            if !assigned[j] && cosine_sim(&unmapped[i].embedding, &unmapped[j].embedding) > cfg.cluster_sim {
+            if !assigned[j]
+                && cosine_sim(&unmapped[i].embedding, &unmapped[j].embedding) > cfg.cluster_sim
+            {
                 assigned[j] = true;
                 members.push(j);
             }
@@ -146,15 +151,24 @@ fn cluster_at(scored: &[Scored], threshold: f32, cfg: &DiscoveryConfig) -> (usiz
                     w.replace_range(0..1, &up);
                 }
             }
-            if words.is_empty() { "Unnamed Cluster".to_string() } else { words.join(" & ") }
+            if words.is_empty() {
+                "Unnamed Cluster".to_string()
+            } else {
+                words.join(" & ")
+            }
         };
-        let coverage = members.iter().map(|&k| unmapped[k].best).sum::<f32>() / members.len() as f32;
+        let coverage =
+            members.iter().map(|&k| unmapped[k].best).sum::<f32>() / members.len() as f32;
         proposals.push(ProposedDomain {
             name,
             domain: unmapped[members[0]].domain.clone(),
             mode: unmapped[members[0]].mode.clone(),
             hints,
-            samples: member_texts.iter().take(3).map(ToString::to_string).collect(),
+            samples: member_texts
+                .iter()
+                .take(3)
+                .map(ToString::to_string)
+                .collect(),
             count: members.len(),
             coverage,
         });
@@ -183,15 +197,27 @@ pub fn discover(
         .iter()
         .zip(embeddings)
         .map(|(text, emb)| {
-            let (best, d, m) = clf.best_entry_sim(&emb).unwrap_or((0.0, String::new(), String::new()));
+            let (best, d, m) =
+                clf.best_entry_sim(&emb)
+                    .unwrap_or((0.0, String::new(), String::new()));
             sim_min = sim_min.min(best);
             sim_max = sim_max.max(best);
             sim_sum += best;
-            Scored { text: text.clone(), embedding: emb, best, domain: d, mode: m }
+            Scored {
+                text: text.clone(),
+                embedding: emb,
+                best,
+                domain: d,
+                mode: m,
+            }
         })
         .collect();
     let n = texts.len().max(1) as f32;
-    let (sim_min, sim_max) = if texts.is_empty() { (0.0, 0.0) } else { (sim_min, sim_max) };
+    let (sim_min, sim_max) = if texts.is_empty() {
+        (0.0, 0.0)
+    } else {
+        (sim_min, sim_max)
+    };
 
     let mut threshold = cfg.coverage_threshold;
     let (mut covered, mut proposals) = cluster_at(&scored, threshold, cfg);
@@ -223,7 +249,10 @@ pub fn discover(
         }
 
         if proposals.is_empty() && scored.len() >= 3 {
-            let loosened = DiscoveryConfig { min_cluster: 1, ..cfg.clone() };
+            let loosened = DiscoveryConfig {
+                min_cluster: 1,
+                ..cfg.clone()
+            };
             if let Some(&worst) = sims.first() {
                 let cand = worst.max(threshold + 1e-3);
                 let (c2, p2) = cluster_at(&scored, cand, &loosened);
@@ -294,7 +323,10 @@ mod tests {
             "zorgon flux capacitor recalibration".to_string(),
             "zorgon flux capacitor recalibration".to_string(),
         ];
-        let cfg = DiscoveryConfig { coverage_threshold: 1.1, ..Default::default() };
+        let cfg = DiscoveryConfig {
+            coverage_threshold: 1.1,
+            ..Default::default()
+        };
         let report = discover(&texts, &clf, &embedder, &cfg);
         assert_eq!(report.unmapped, 3);
         assert_eq!(report.proposals.len(), 1);
@@ -307,7 +339,11 @@ mod tests {
     fn zero_threshold_covers_everything() {
         let (clf, embedder) = clf_and_embedder();
         let texts = vec!["anything at all".to_string(), "another text".to_string()];
-        let cfg = DiscoveryConfig { coverage_threshold: -1.0, auto_retune: false, ..Default::default() };
+        let cfg = DiscoveryConfig {
+            coverage_threshold: -1.0,
+            auto_retune: false,
+            ..Default::default()
+        };
         let report = discover(&texts, &clf, &embedder, &cfg);
         assert_eq!(report.covered, 2);
         assert!(report.proposals.is_empty());
@@ -320,7 +356,10 @@ mod tests {
             "wibble grommet anodizing".to_string(),
             "completely unrelated quasar telemetry".to_string(),
         ];
-        let cfg = DiscoveryConfig { coverage_threshold: 1.1, ..Default::default() };
+        let cfg = DiscoveryConfig {
+            coverage_threshold: 1.1,
+            ..Default::default()
+        };
         let report = discover(&texts, &clf, &embedder, &cfg);
         assert_eq!(report.unmapped, 2);
         assert!(report.proposals.is_empty());
@@ -328,7 +367,10 @@ mod tests {
 
     #[test]
     fn top_terms_skips_stopwords_bilingual() {
-        let t = ["la manutenzione del cuscinetto", "the maintenance of the cuscinetto"];
+        let t = [
+            "la manutenzione del cuscinetto",
+            "the maintenance of the cuscinetto",
+        ];
         let terms = top_terms(&t, 4);
         assert!(terms.contains(&"cuscinetto".to_string()));
         assert!(!terms.contains(&"the".to_string()));
@@ -338,10 +380,19 @@ mod tests {
     #[test]
     fn auto_retune_surfaces_gap_for_diffuse_corpus() {
         let (clf, embedder) = clf_and_embedder();
-        let texts: Vec<String> = (0..5).map(|i| format!("zorgon flux capacitor recalibration variant {i}")).collect();
-        let cfg = DiscoveryConfig { coverage_threshold: 0.55, auto_retune: true, ..Default::default() };
+        let texts: Vec<String> = (0..5)
+            .map(|i| format!("zorgon flux capacitor recalibration variant {i}"))
+            .collect();
+        let cfg = DiscoveryConfig {
+            coverage_threshold: 0.55,
+            auto_retune: true,
+            ..Default::default()
+        };
         let report = discover(&texts, &clf, &embedder, &cfg);
-        assert!(!report.proposals.is_empty(), "P10: diffuse corpus must still surface a gap");
+        assert!(
+            !report.proposals.is_empty(),
+            "P10: diffuse corpus must still surface a gap"
+        );
         assert!(report.auto_retuned);
         assert!(report.covered < report.total);
     }
@@ -370,6 +421,9 @@ mod tests {
         let json = to_ontology_json(&report, "discovered_test");
         let map = OntologyLoader::load_from_str(&json).expect("draft loads via the real loader");
         assert_eq!(map.len(), 1);
-        assert_eq!(map.get("Zorgon & Flux").unwrap().domain.as_deref(), Some("STUDY"));
+        assert_eq!(
+            map.get("Zorgon & Flux").unwrap().domain.as_deref(),
+            Some("STUDY")
+        );
     }
 }

@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::embed::VectorEmbed;
 use crate::models::cosine_sim;
@@ -63,7 +63,13 @@ impl Cell {
         entries: Vec<String>,
         facets: Vec<Facets>,
     ) -> Self {
-        Self { domain, mode, embeddings, entries, facets }
+        Self {
+            domain,
+            mode,
+            embeddings,
+            entries,
+            facets,
+        }
     }
 }
 
@@ -170,8 +176,6 @@ impl MetadataFilter {
     }
 }
 
-
-
 // A caller-supplied facet constraint. Cells whose member facets don't match the
 /// specified dimensions are down-weighted so facet-known queries rank better.
 #[derive(Debug, Clone, Default)]
@@ -188,12 +192,24 @@ impl FacetFilter {
     /// How many dimensions the caller constrained (0 ⇒ no filtering).
     fn weight(&self) -> usize {
         let mut n = 0;
-        if self.lifecycle.is_some() { n += 1; }
-        if self.agency.is_some() { n += 1; }
-        if self.scale.is_some() { n += 1; }
-        if self.abstraction.is_some() { n += 1; }
-        if self.sub_domain.is_some() { n += 1; }
-        if self.sub_mode.is_some() { n += 1; }
+        if self.lifecycle.is_some() {
+            n += 1;
+        }
+        if self.agency.is_some() {
+            n += 1;
+        }
+        if self.scale.is_some() {
+            n += 1;
+        }
+        if self.abstraction.is_some() {
+            n += 1;
+        }
+        if self.sub_domain.is_some() {
+            n += 1;
+        }
+        if self.sub_mode.is_some() {
+            n += 1;
+        }
         n
     }
 
@@ -205,22 +221,34 @@ impl FacetFilter {
         }
         let mut hits = 0;
         if let (Some(want), Some(have)) = (self.lifecycle, cell.lifecycle) {
-            if want == have { hits += 1; }
+            if want == have {
+                hits += 1;
+            }
         }
         if let (Some(want), Some(have)) = (self.agency, cell.agency) {
-            if want == have { hits += 1; }
+            if want == have {
+                hits += 1;
+            }
         }
         if let (Some(want), Some(have)) = (self.scale, cell.scale) {
-            if want == have { hits += 1; }
+            if want == have {
+                hits += 1;
+            }
         }
         if let (Some(want), Some(have)) = (self.abstraction, cell.abstraction) {
-            if want == have { hits += 1; }
+            if want == have {
+                hits += 1;
+            }
         }
         if let (Some(want), Some(have)) = (&self.sub_domain, &cell.sub_domain) {
-            if want.eq_ignore_ascii_case(have) { hits += 1; }
+            if want.eq_ignore_ascii_case(have) {
+                hits += 1;
+            }
         }
         if let (Some(want), Some(have)) = (&self.sub_mode, &cell.sub_mode) {
-            if want.eq_ignore_ascii_case(have) { hits += 1; }
+            if want.eq_ignore_ascii_case(have) {
+                hits += 1;
+            }
         }
         hits as f32 / total as f32
     }
@@ -247,7 +275,13 @@ impl CellClassifier {
         }
         let cells = acc
             .into_iter()
-            .map(|((domain, mode), (embeddings, entries, facets))| Cell { domain, mode, embeddings, entries, facets })
+            .map(|((domain, mode), (embeddings, entries, facets))| Cell {
+                domain,
+                mode,
+                embeddings,
+                entries,
+                facets,
+            })
             .collect();
         Self { cells }
     }
@@ -271,7 +305,13 @@ impl CellClassifier {
                 text.push(' ');
                 text.push_str(hint);
             }
-            Some(EntrySeed { name: def.name.clone(), domain, mode, text, facets: def.facets.clone() })
+            Some(EntrySeed {
+                name: def.name.clone(),
+                domain,
+                mode,
+                text,
+                facets: def.facets.clone(),
+            })
         });
         Self::build_seeds(seeds, |t| embedder.embed(t))
     }
@@ -282,130 +322,141 @@ impl CellClassifier {
     }
 
     /// Adaptive TOP_K based on cell entry count for optimal precision.
-/// Uses `TOP_K` as the medium/default value (4-10 entries → TOP_K=2).
-/// - 1-3 entries: TOP_K=1 (maximize specificity, no averaging noise)
-/// - 4-10 entries: TOP_K=2 (current balanced behavior, via TOP_K constant)
-/// - 11-30 entries: TOP_K=3 (smooth noise while keeping top entries)
-/// - 31+ entries: TOP_K=4 (significant smoothing)
-///
+    /// Uses `TOP_K` as the medium/default value (4-10 entries → TOP_K=2).
+    /// - 1-3 entries: TOP_K=1 (maximize specificity, no averaging noise)
+    /// - 4-10 entries: TOP_K=2 (current balanced behavior, via TOP_K constant)
+    /// - 11-30 entries: TOP_K=3 (smooth noise while keeping top entries)
+    /// - 31+ entries: TOP_K=4 (significant smoothing)
+    ///
     /// Used by [`CellClassifier::classify`](Self::classify) to select the number of
     /// top similarities to average per cell.
     pub fn adaptive_top_k(num_entries: usize) -> usize {
         let base = TOP_K; // = 2, the medium default
         match num_entries {
             1..=3 => 1,
-            4..=10 => base, // = 2
+            4..=10 => base,      // = 2
             11..=30 => base + 1, // = 3
-            _ => base + 2, // = 4
+            _ => base + 2,       // = 4
         }
     }
 
-/// Classify a pre-computed embedding with soft nested (domain→mode) scoring.
-/// Uses adaptive TOP_K per cell size for improved precision:
-/// Small cells preserve specificity, large cells get noise smoothing.
-pub fn classify(&self, embedding: &[f32]) -> Vec<CellScore> {
-    let mut domain_cell_scores: HashMap<&str, Vec<f32>> = HashMap::new();
-    let mut cell_scores: Vec<f32> = Vec::with_capacity(self.cells.len());
-    for cell in &self.cells {
-        let k = Self::adaptive_top_k(cell.embeddings.len());
-        let mut sims: Vec<f32> = cell.embeddings.iter().map(|e| cosine_sim(embedding, e)).collect();
-        sims.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-        let cs = topk_mean(&sims, k);
-        cell_scores.push(cs);
-        domain_cell_scores.entry(cell.domain.as_str()).or_default().push(cs);
-    }
+    /// Classify a pre-computed embedding with soft nested (domain→mode) scoring.
+    /// Uses adaptive TOP_K per cell size for improved precision:
+    /// Small cells preserve specificity, large cells get noise smoothing.
+    pub fn classify(&self, embedding: &[f32]) -> Vec<CellScore> {
+        let mut domain_cell_scores: HashMap<&str, Vec<f32>> = HashMap::new();
+        let mut cell_scores: Vec<f32> = Vec::with_capacity(self.cells.len());
+        for cell in &self.cells {
+            let k = Self::adaptive_top_k(cell.embeddings.len());
+            let mut sims: Vec<f32> = cell
+                .embeddings
+                .iter()
+                .map(|e| cosine_sim(embedding, e))
+                .collect();
+            sims.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+            let cs = topk_mean(&sims, k);
+            cell_scores.push(cs);
+            domain_cell_scores
+                .entry(cell.domain.as_str())
+                .or_default()
+                .push(cs);
+        }
 
-    let domain_score: HashMap<&str, f32> = domain_cell_scores
-        .into_iter()
-        .map(|(d, mut cs)| {
-            cs.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-            (d, topk_mean(&cs, 2))
-        })
-        .collect();
+        let domain_score: HashMap<&str, f32> = domain_cell_scores
+            .into_iter()
+            .map(|(d, mut cs)| {
+                cs.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+                (d, topk_mean(&cs, 2))
+            })
+            .collect();
 
-    let mut results: Vec<CellScore> = self
-        .cells
-        .iter()
-        .zip(cell_scores)
-        .map(|(cell, cell_score)| {
-            let ds = *domain_score.get(cell.domain.as_str()).unwrap_or(&0.0);
-            // Population weight: larger cells have more reliable top entries,
-            // so their scores get a modest boost; small cells get a small boost
-            // to prevent them from being drowned out by big cells.
-            let pop_weight = if cell.embeddings.len() >= 10 {
-                1.0 + (cell.embeddings.len() as f32 / 100.0).min(0.2)
-            } else if cell.embeddings.len() <= 3 {
-                1.0 + (3.0 - cell.embeddings.len() as f32) / 10.0
-            } else {
-                1.0
-            };
-            let score = (ALPHA * ds + (1.0 - ALPHA) * cell_score) * pop_weight;
-            CellScore {
-                domain: cell.domain.clone(),
-                mode: cell.mode.clone(),
-                score,
-                entries: cell.entries.clone(),
-                facets: Facets::aggregate(&cell.facets),
-            }
-        })
-        .collect();
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        let mut results: Vec<CellScore> = self
+            .cells
+            .iter()
+            .zip(cell_scores)
+            .map(|(cell, cell_score)| {
+                let ds = *domain_score.get(cell.domain.as_str()).unwrap_or(&0.0);
+                // Population weight: larger cells have more reliable top entries,
+                // so their scores get a modest boost; small cells get a small boost
+                // to prevent them from being drowned out by big cells.
+                let pop_weight = if cell.embeddings.len() >= 10 {
+                    1.0 + (cell.embeddings.len() as f32 / 100.0).min(0.2)
+                } else if cell.embeddings.len() <= 3 {
+                    1.0 + (3.0 - cell.embeddings.len() as f32) / 10.0
+                } else {
+                    1.0
+                };
+                let score = (ALPHA * ds + (1.0 - ALPHA) * cell_score) * pop_weight;
+                CellScore {
+                    domain: cell.domain.clone(),
+                    mode: cell.mode.clone(),
+                    score,
+                    entries: cell.entries.clone(),
+                    facets: Facets::aggregate(&cell.facets),
+                }
+            })
+            .collect();
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
-    // `pop_weight` multiplies a blend of two cosines, so a well-populated cell
-    // can score above 1.0 — outside the range every consumer assumes. Callers
-    // then clamp (`QualityTracker::adjust_score` does), and since the overflow
-    // is common, the top handful of cells all flattened to exactly 1.000 and the
-    // CLI printed a ten-way tie with full bars over scores that were in fact
-    // distinct and correctly ordered.
-    //
-    // Rescale by the maximum instead of clipping at it. Division by a positive
-    // constant is strictly order-preserving, so the ranking and the argmax are
-    // untouched — only the ceiling moves back to 1.0 and the spread survives.
-    if let Some(max) = results.first().map(|r| r.score) {
-        if max > 1.0 {
-            for r in &mut results {
-                r.score /= max;
+        // `pop_weight` multiplies a blend of two cosines, so a well-populated cell
+        // can score above 1.0 — outside the range every consumer assumes. Callers
+        // then clamp (`QualityTracker::adjust_score` does), and since the overflow
+        // is common, the top handful of cells all flattened to exactly 1.000 and the
+        // CLI printed a ten-way tie with full bars over scores that were in fact
+        // distinct and correctly ordered.
+        //
+        // Rescale by the maximum instead of clipping at it. Division by a positive
+        // constant is strictly order-preserving, so the ranking and the argmax are
+        // untouched — only the ceiling moves back to 1.0 and the spread survives.
+        if let Some(max) = results.first().map(|r| r.score) {
+            if max > 1.0 {
+                for r in &mut results {
+                    r.score /= max;
+                }
             }
         }
-    }
-    results
-}
-
-/// Classify with metadata tracking, returning a `ClassifiedSentence` for the top result.
-/// Uses the top-scoring cell and incorporates metadata for grid slicing.
-/// The `filter` can restrict which texts/metadata are considered; pass `Default::default()`
-/// for no filtering.
-pub fn classify_with_metadata(
-    &self,
-    embedding: &[f32],
-    metadata: &ClassificationMetadata,
-    filter: &MetadataFilter,
-) -> Option<ClassifiedSentence> {
-    let results = self.classify(embedding);
-    if results.is_empty() {
-        return None;
-    }
-    let top = &results[0];
-
-    // Apply metadata filter - if filter is set, ensure the top result's cell matches
-    // In the future, this could weight cells by metadata relevance
-    if !filter.allows(metadata) {
-        // Filter doesn't match; return None
-        return None;
+        results
     }
 
-    Some(ClassifiedSentence {
-        text: "classified text".to_string(), // TODO: pass text in future
-        cell: (top.domain.clone(), top.mode.clone()),
-        metadata: metadata.clone(),
-        confidence: top.score,
-        classified_at: Some(
-            chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3f").to_string(),
-        ),
-    })
-}
+    /// Classify with metadata tracking, returning a `ClassifiedSentence` for the top result.
+    /// Uses the top-scoring cell and incorporates metadata for grid slicing.
+    /// The `filter` can restrict which texts/metadata are considered; pass `Default::default()`
+    /// for no filtering.
+    pub fn classify_with_metadata(
+        &self,
+        embedding: &[f32],
+        metadata: &ClassificationMetadata,
+        filter: &MetadataFilter,
+    ) -> Option<ClassifiedSentence> {
+        let results = self.classify(embedding);
+        if results.is_empty() {
+            return None;
+        }
+        let top = &results[0];
 
+        // Apply metadata filter - if filter is set, ensure the top result's cell matches
+        // In the future, this could weight cells by metadata relevance
+        if !filter.allows(metadata) {
+            // Filter doesn't match; return None
+            return None;
+        }
 
+        Some(ClassifiedSentence {
+            text: "classified text".to_string(), // TODO: pass text in future
+            cell: (top.domain.clone(), top.mode.clone()),
+            metadata: metadata.clone(),
+            confidence: top.score,
+            classified_at: Some(
+                chrono::Utc::now()
+                    .format("%Y-%m-%dT%H:%M:%S%.3f")
+                    .to_string(),
+            ),
+        })
+    }
 
     /// Classify with an optional facet constraint. Cells whose aggregated facets
     /// match the filter are up-weighted; the more dimensions match, the higher
@@ -413,12 +464,20 @@ pub fn classify_with_metadata(
     pub fn classify_filtered(&self, embedding: &[f32], filter: &FacetFilter) -> Vec<CellScore> {
         let mut results = self.classify(embedding);
         for r in &mut results {
-            if let Some(cell) = self.cells.iter().find(|c| c.domain == r.domain && c.mode == r.mode) {
+            if let Some(cell) = self
+                .cells
+                .iter()
+                .find(|c| c.domain == r.domain && c.mode == r.mode)
+            {
                 let ratio = filter.match_ratio(&Facets::aggregate(&cell.facets));
                 r.score *= 0.5 + 0.5 * ratio;
             }
         }
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results
     }
 
@@ -477,9 +536,17 @@ mod tests {
     }
 
     fn cell(domain: &str, mode: &str, embeddings: Vec<Vec<f32>>) -> Cell {
-        let entries = (0..embeddings.len()).map(|i| format!("{domain}/{mode}#{i}")).collect();
+        let entries = (0..embeddings.len())
+            .map(|i| format!("{domain}/{mode}#{i}"))
+            .collect();
         let facets = vec![Facets::default(); embeddings.len()];
-        Cell::new(domain.to_string(), mode.to_string(), embeddings, entries, facets)
+        Cell::new(
+            domain.to_string(),
+            mode.to_string(),
+            embeddings,
+            entries,
+            facets,
+        )
     }
 
     /// A populated cell gets `pop_weight` > 1.0 applied on top of a blend of
@@ -503,12 +570,17 @@ mod tests {
             assert!(
                 r.score <= 1.0 + f32::EPSILON,
                 "{}x{} scored {} — above the range every consumer clamps to",
-                r.domain, r.mode, r.score
+                r.domain,
+                r.mode,
+                r.score
             );
             assert!(r.score >= 0.0, "scores must not go negative: {}", r.score);
         }
         // Rescaling is order-preserving: still sorted, and the winner is intact.
-        assert!(out.windows(2).all(|w| w[0].score >= w[1].score), "must stay sorted");
+        assert!(
+            out.windows(2).all(|w| w[0].score >= w[1].score),
+            "must stay sorted"
+        );
         assert_eq!(out[0].domain, "A");
         // And the losing cell is still visibly worse rather than tied at 1.000.
         assert!(
@@ -528,7 +600,10 @@ mod tests {
         };
         let results = clf.classify(&basis(4, 0));
         assert_eq!(results.len(), 3);
-        assert_eq!((results[0].domain.as_str(), results[0].mode.as_str()), ("A", "X"));
+        assert_eq!(
+            (results[0].domain.as_str(), results[0].mode.as_str()),
+            ("A", "X")
+        );
         for w in results.windows(2) {
             assert!(w[0].score >= w[1].score);
         }
@@ -539,7 +614,9 @@ mod tests {
         let hub = basis(4, 3);
         let dense = cell("B", "X", vec![hub.clone(); 10]);
         let sparse = cell("A", "X", vec![basis(4, 0)]);
-        let clf = CellClassifier { cells: vec![dense, sparse] };
+        let clf = CellClassifier {
+            cells: vec![dense, sparse],
+        };
         let results = clf.classify(&basis(4, 0));
         assert_eq!(results[0].domain, "A");
     }
@@ -563,7 +640,9 @@ mod tests {
             cells: vec![cell("A", "X", vec![vec![1.0, 0.0], vec![0.0, 1.0]])],
         };
         let centroids = clf.cell_centroids();
-        let c = centroids.get("A\x00X").expect("key must be DOMAIN\\x00MODE");
+        let c = centroids
+            .get("A\x00X")
+            .expect("key must be DOMAIN\\x00MODE");
         assert_eq!(c, &vec![0.5, 0.5]);
     }
 
@@ -571,9 +650,21 @@ mod tests {
     fn classify_carries_aggregated_facets() {
         let mut c = cell("A", "X", vec![basis(4, 0), basis(4, 0), basis(4, 0)]);
         c.facets = vec![
-            Facets { lifecycle: Some(LifecyclePhase::Operate), agency: Some(Agency::SelfActor), ..Default::default() },
-            Facets { lifecycle: Some(LifecyclePhase::Operate), agency: Some(Agency::SelfActor), ..Default::default() },
-            Facets { lifecycle: Some(LifecyclePhase::Design), agency: Some(Agency::Automated), ..Default::default() },
+            Facets {
+                lifecycle: Some(LifecyclePhase::Operate),
+                agency: Some(Agency::SelfActor),
+                ..Default::default()
+            },
+            Facets {
+                lifecycle: Some(LifecyclePhase::Operate),
+                agency: Some(Agency::SelfActor),
+                ..Default::default()
+            },
+            Facets {
+                lifecycle: Some(LifecyclePhase::Design),
+                agency: Some(Agency::Automated),
+                ..Default::default()
+            },
         ];
         let clf = CellClassifier { cells: vec![c] };
         let r = &clf.classify(&basis(4, 0))[0];
@@ -586,19 +677,32 @@ mod tests {
     #[test]
     fn classify_filtered_upweights_matching_facets() {
         let mut c = cell("A", "X", vec![basis(4, 0)]);
-        c.facets = vec![Facets { lifecycle: Some(LifecyclePhase::Operate), ..Default::default() }];
+        c.facets = vec![Facets {
+            lifecycle: Some(LifecyclePhase::Operate),
+            ..Default::default()
+        }];
         let other = cell("B", "Y", vec![basis(4, 0)]);
-        let clf = CellClassifier { cells: vec![c, other.clone()] };
+        let clf = CellClassifier {
+            cells: vec![c, other.clone()],
+        };
 
         // Without a filter both cells tie on embedding; A should still surface via facets.
-        let filter = FacetFilter { lifecycle: Some(LifecyclePhase::Operate), ..Default::default() };
+        let filter = FacetFilter {
+            lifecycle: Some(LifecyclePhase::Operate),
+            ..Default::default()
+        };
         let ranked = clf.classify_filtered(&basis(4, 0), &filter);
-        assert_eq!((ranked[0].domain.as_str(), ranked[0].mode.as_str()), ("A", "X"));
+        assert_eq!(
+            (ranked[0].domain.as_str(), ranked[0].mode.as_str()),
+            ("A", "X")
+        );
     }
 
     #[test]
     fn classify_filtered_empty_is_identity() {
-        let clf = CellClassifier { cells: vec![cell("A", "X", vec![basis(4, 0)])] };
+        let clf = CellClassifier {
+            cells: vec![cell("A", "X", vec![basis(4, 0)])],
+        };
         let a = clf.classify(&basis(4, 0));
         let b = clf.classify_filtered(&basis(4, 0), &FacetFilter::default());
         assert!((a[0].score - b[0].score).abs() < 1e-6);

@@ -377,16 +377,30 @@ impl Hypothesis {
             0.5
         } else {
             let support_conf: Score = self.supporting_evidence.iter().map(|e| e.confidence).sum();
-            let contradict_conf: Score = self.contradicting_evidence.iter().map(|e| e.confidence).sum();
+            let contradict_conf: Score = self
+                .contradicting_evidence
+                .iter()
+                .map(|e| e.confidence)
+                .sum();
             (0.5 + 0.5 * ((support_conf - contradict_conf) / total_ev)).clamp(0.0, 1.0)
         };
 
-        let resolved_preds: Vec<&Prediction> = self.predictions.iter().filter(|p| p.correct.is_some()).collect();
+        let resolved_preds: Vec<&Prediction> = self
+            .predictions
+            .iter()
+            .filter(|p| p.correct.is_some())
+            .collect();
         let (pred_success, failed_preds_penalty) = if resolved_preds.is_empty() {
             (0.5, 0.0)
         } else {
-            let succ = resolved_preds.iter().filter(|p| p.correct == Some(true)).count() as Score;
-            let fail = resolved_preds.iter().filter(|p| p.correct == Some(false)).count() as Score;
+            let succ = resolved_preds
+                .iter()
+                .filter(|p| p.correct == Some(true))
+                .count() as Score;
+            let fail = resolved_preds
+                .iter()
+                .filter(|p| p.correct == Some(false))
+                .count() as Score;
             let s_ratio = succ / resolved_preds.len() as Score;
             let f_penalty = (fail * 0.15).min(0.5);
             (s_ratio, f_penalty)
@@ -425,7 +439,10 @@ impl Hypothesis {
 
     /// Convenience: unresolved predictions.
     pub fn pending_predictions(&self) -> usize {
-        self.predictions.iter().filter(|p| p.correct.is_none()).count()
+        self.predictions
+            .iter()
+            .filter(|p| p.correct.is_none())
+            .count()
     }
 
     fn revise(&mut self, description: impl Into<String>, trigger: Option<String>) {

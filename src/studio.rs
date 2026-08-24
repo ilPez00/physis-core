@@ -67,7 +67,17 @@ impl StudioState {
         let quality = QualityTracker::load_or_new(&quality_path(&data_dir));
         let mut core = load_core(&data_dir);
         core.set_embedder_id(embedder_kind.clone());
-        Self { embedder, embedder_kind, semantic, ontology, classifier, custom_entries, quality, core, data_dir }
+        Self {
+            embedder,
+            embedder_kind,
+            semantic,
+            ontology,
+            classifier,
+            custom_entries,
+            quality,
+            core,
+            data_dir,
+        }
     }
 
     /// Rebuild the classifier (call after ontology edits) and save custom entries.
@@ -95,7 +105,10 @@ fn build_embedder(model_dir: Option<String>) -> (Box<dyn VectorEmbed>, String, b
     if let Some(dir) = model_dir.as_deref() {
         let onnx = crate::embed_onnx::OnnxEmbedder::new(dir);
         if onnx.is_available() {
-            eprintln!("Ontology Studio embedder: ONNX MiniLM ({dir}, {} dims)", onnx.dimension());
+            eprintln!(
+                "Ontology Studio embedder: ONNX MiniLM ({dir}, {} dims)",
+                onnx.dimension()
+            );
             return (Box::new(onnx), "onnx".to_string(), true);
         }
         eprintln!("warning: no ONNX model at {dir}; falling back to random projection");
@@ -112,7 +125,10 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
 
 /// Run the studio with an optional ONNX model directory (None = random projection).
 pub async fn run_with_model(port: u16, model_dir: Option<String>) -> anyhow::Result<()> {
-    let state: Shared = Arc::new(RwLock::new(StudioState::with_embedder(store::data_dir(), model_dir)));
+    let state: Shared = Arc::new(RwLock::new(StudioState::with_embedder(
+        store::data_dir(),
+        model_dir,
+    )));
 
     let app = Router::new()
         .route("/", get(index))
@@ -145,15 +161,33 @@ pub async fn run_with_model(port: u16, model_dir: Option<String>) -> anyhow::Res
         .route("/api/v1/history/import", post(api_history_import))
         .route("/api/v1/praxis/backfill", post(api_praxis_backfill))
         // Epistemic Hypotheses & Explanations API
-        .route("/api/v1/hypotheses", get(api_hypotheses_list).post(api_hypothesis_create))
+        .route(
+            "/api/v1/hypotheses",
+            get(api_hypotheses_list).post(api_hypothesis_create),
+        )
         .route("/api/v1/hypotheses/:id", get(api_hypothesis_get))
-        .route("/api/v1/hypotheses/:id/evidence", post(api_hypothesis_evidence))
-        .route("/api/v1/hypotheses/:id/prediction", post(api_hypothesis_prediction))
-        .route("/api/v1/hypotheses/:id/transition", post(api_hypothesis_transition))
+        .route(
+            "/api/v1/hypotheses/:id/evidence",
+            post(api_hypothesis_evidence),
+        )
+        .route(
+            "/api/v1/hypotheses/:id/prediction",
+            post(api_hypothesis_prediction),
+        )
+        .route(
+            "/api/v1/hypotheses/:id/transition",
+            post(api_hypothesis_transition),
+        )
         .route("/api/v1/explanation/:id", get(api_explanation_get))
         // Contradictions API
-        .route("/api/v1/contradictions", get(api_contradictions_list).post(api_contradiction_create))
-        .route("/api/v1/contradictions/:id/resolve", post(api_contradiction_resolve))
+        .route(
+            "/api/v1/contradictions",
+            get(api_contradictions_list).post(api_contradiction_create),
+        )
+        .route(
+            "/api/v1/contradictions/:id/resolve",
+            post(api_contradiction_resolve),
+        )
         // Epistemic Audit & Replay API
         .route("/api/v1/epistemic/audit", get(api_epistemic_audit))
         .route("/api/v1/epistemic/replay", get(api_epistemic_replay))
@@ -176,12 +210,19 @@ async fn index() -> Html<&'static str> {
 }
 
 async fn app_css() -> Response {
-    ([(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8")], APP_CSS).into_response()
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        APP_CSS,
+    )
+        .into_response()
 }
 
 async fn app_js() -> Response {
     (
-        [(axum::http::header::CONTENT_TYPE, "application/javascript; charset=utf-8")],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "application/javascript; charset=utf-8",
+        )],
         APP_JS,
     )
         .into_response()
@@ -323,7 +364,13 @@ async fn ontology_json(State(state): State<Shared>) -> Response {
         .collect();
     categories.sort_by(|a, b| a.name.cmp(&b.name));
     if !uncat.is_empty() {
-        categories.insert(0, CategoryJson { name: "(uncategorized)".into(), entries: uncat });
+        categories.insert(
+            0,
+            CategoryJson {
+                name: "(uncategorized)".into(),
+                entries: uncat,
+            },
+        );
     }
     Json(OntologyJson {
         categories,
@@ -380,8 +427,10 @@ fn build_axis(canonical: &[&str], used: &HashMap<String, u32>) -> Vec<AxisJson> 
             total: used.get(*name).copied().unwrap_or(0),
         })
         .collect();
-    let mut extras: Vec<(&String, &u32)> =
-        used.iter().filter(|(name, _)| !canonical.contains(&name.as_str())).collect();
+    let mut extras: Vec<(&String, &u32)> = used
+        .iter()
+        .filter(|(name, _)| !canonical.contains(&name.as_str()))
+        .collect();
     extras.sort_by(|a, b| a.0.cmp(b.0));
     axis.extend(extras.into_iter().map(|(name, total)| AxisJson {
         name: name.clone(),
@@ -401,7 +450,10 @@ async fn grid_json(State(state): State<Shared>) -> Response {
     let mut mode_totals: HashMap<String, u32> = HashMap::new();
     for def in s.ontology.classification_domains() {
         if let (Some(d), Some(m)) = (def.domain.as_deref(), def.mode.as_deref()) {
-            cell_map.entry((d.to_string(), m.to_string())).or_default().push(def.name.clone());
+            cell_map
+                .entry((d.to_string(), m.to_string()))
+                .or_default()
+                .push(def.name.clone());
             *domain_totals.entry(d.to_string()).or_default() += 1;
             *mode_totals.entry(m.to_string()).or_default() += 1;
         }
@@ -416,7 +468,10 @@ async fn grid_json(State(state): State<Shared>) -> Response {
     let mut cells = Vec::new();
     for (di, d) in domains.iter().enumerate() {
         for (mi, m) in modes.iter().enumerate() {
-            let mut entries = cell_map.get(&(d.name.clone(), m.name.clone())).cloned().unwrap_or_default();
+            let mut entries = cell_map
+                .get(&(d.name.clone(), m.name.clone()))
+                .cloned()
+                .unwrap_or_default();
             entries.sort();
             let count = entries.len() as u32;
             cells.push(GridCellJson {
@@ -428,7 +483,13 @@ async fn grid_json(State(state): State<Shared>) -> Response {
             heatmap[di][mi] = count;
         }
     }
-    Json(GridJson { domains, modes, cells, heatmap }).into_response()
+    Json(GridJson {
+        domains,
+        modes,
+        cells,
+        heatmap,
+    })
+    .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -514,9 +575,14 @@ async fn classify(State(state): State<Shared>, Json(req): Json<ClassifyReq>) -> 
             })
             .collect(),
         quality_penalties: s.quality.cell_penalties.clone(),
-        best_entry: s.classifier.best_entry_sim(&embedding).map(|(similarity, domain, mode)| {
-            BestEntryJson { similarity, domain, mode }
-        }),
+        best_entry: s
+            .classifier
+            .best_entry_sim(&embedding)
+            .map(|(similarity, domain, mode)| BestEntryJson {
+                similarity,
+                domain,
+                mode,
+            }),
         recall: s
             .core
             .search_nodes(&embedding, 5)
@@ -595,7 +661,9 @@ async fn delete_entry(State(state): State<Shared>, Json(req): Json<DelReq>) -> R
 }
 
 /// Text extensions ingested by the studio discovery pass.
-const TEXT_EXTS: &[&str] = &["txt", "md", "rs", "py", "json", "toml", "csv", "log", "xml", "yml", "yaml"];
+const TEXT_EXTS: &[&str] = &[
+    "txt", "md", "rs", "py", "json", "toml", "csv", "log", "xml", "yml", "yaml",
+];
 
 #[derive(serde::Deserialize)]
 struct IngestReq {
@@ -612,7 +680,11 @@ struct IngestResp {
 async fn ingest_dir(State(state): State<Shared>, Json(req): Json<IngestReq>) -> Response {
     let dir = std::path::PathBuf::from(&req.dir);
     if !dir.is_dir() {
-        return (StatusCode::BAD_REQUEST, format!("not a directory: {}", dir.display())).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("not a directory: {}", dir.display()),
+        )
+            .into_response();
     }
     let s = state.read().unwrap();
 
@@ -620,7 +692,9 @@ async fn ingest_dir(State(state): State<Shared>, Json(req): Json<IngestReq>) -> 
     let mut lines: Vec<String> = Vec::new();
     let mut files = 0usize;
     for path in collect_text_files(&dir) {
-        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            continue;
+        };
         files += 1;
         for line in text.lines() {
             let line = line.trim();
@@ -632,7 +706,12 @@ async fn ingest_dir(State(state): State<Shared>, Json(req): Json<IngestReq>) -> 
 
     let cfg = DiscoveryConfig::default();
     let report = discovery::discover(&lines, &s.classifier, s.embedder.as_ref(), &cfg);
-    Json(IngestResp { files, lines: lines.len(), report }).into_response()
+    Json(IngestResp {
+        files,
+        lines: lines.len(),
+        report,
+    })
+    .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -664,14 +743,15 @@ async fn promote_proposal(State(state): State<Shared>, Json(req): Json<PromoteRe
     };
     s.custom_entries.insert(name.clone(), def);
     s.rebuild();
-    Json(serde_json::json!({ "ok": true, "promoted": name, "samples": req.samples })).into_response()
+    Json(serde_json::json!({ "ok": true, "promoted": name, "samples": req.samples }))
+        .into_response()
 }
 
 #[derive(serde::Serialize)]
 struct QualityJson {
     failures: Vec<serde_json::Value>,
     penalties: HashMap<String, f32>,
-    boosts: HashMap<String, f32>,  // Will be computed from BoostInfo below
+    boosts: HashMap<String, f32>, // Will be computed from BoostInfo below
 }
 
 async fn quality_json(State(state): State<Shared>) -> Response {
@@ -809,7 +889,9 @@ async fn core_nodes(
         .collect();
     // Weakest first: the nodes that most need a human verdict lead the queue.
     nodes.sort_by(|a, b| {
-        a.coherence_score.partial_cmp(&b.coherence_score).unwrap_or(std::cmp::Ordering::Equal)
+        a.coherence_score
+            .partial_cmp(&b.coherence_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
     let out: Vec<RecallJson> = nodes
         .into_iter()
@@ -834,7 +916,11 @@ struct ScanReq {
 async fn core_scan(State(state): State<Shared>, Json(req): Json<ScanReq>) -> Response {
     let dir = std::path::PathBuf::from(&req.dir);
     if !dir.is_dir() {
-        return (StatusCode::BAD_REQUEST, format!("not a directory: {}", dir.display())).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("not a directory: {}", dir.display()),
+        )
+            .into_response();
     }
     let files = collect_text_files(&dir);
     let scanned = files.len();
@@ -985,7 +1071,11 @@ fn verdict_score(verdict: &str) -> Option<f32> {
 
 async fn core_assert(State(state): State<Shared>, Json(req): Json<AssertReq>) -> Response {
     let Some(score) = verdict_score(&req.verdict) else {
-        return (StatusCode::BAD_REQUEST, "verdict must be success|inert|failure").into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            "verdict must be success|inert|failure",
+        )
+            .into_response();
     };
     let mut s = state.write().unwrap();
     if !s.core.assert_coherence(&req.id, score) {
@@ -1007,7 +1097,16 @@ async fn core_dream(State(state): State<Shared>) -> Response {
 /// trees are megabytes of machine-written text that bury whatever the user
 /// actually pointed at.
 const SKIP_DIRS: &[&str] = &[
-    ".git", "target", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".next", "vendor",
+    ".git",
+    "target",
+    "node_modules",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "dist",
+    "build",
+    ".next",
+    "vendor",
 ];
 
 /// Recursive walk returning every readable text file under `dir`.
@@ -1015,7 +1114,9 @@ fn collect_text_files(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     let mut out = Vec::new();
     let mut stack = vec![dir.to_path_buf()];
     while let Some(d) = stack.pop() {
-        let Ok(rd) = std::fs::read_dir(&d) else { continue };
+        let Ok(rd) = std::fs::read_dir(&d) else {
+            continue;
+        };
         for entry in rd.flatten() {
             let path = entry.path();
             if path.is_dir() {
@@ -1071,7 +1172,10 @@ fn load_custom_entries(data_dir: &std::path::Path) -> HashMap<String, DomainDef>
     serde_json::from_str(&contents).unwrap_or_default()
 }
 
-fn save_custom_entries(data_dir: &std::path::Path, entries: &HashMap<String, DomainDef>) -> anyhow::Result<()> {
+fn save_custom_entries(
+    data_dir: &std::path::Path,
+    entries: &HashMap<String, DomainDef>,
+) -> anyhow::Result<()> {
     let _ = std::fs::create_dir_all(data_dir);
     let json = serde_json::to_string_pretty(entries)?;
     std::fs::write(custom_ontology_file(data_dir), json)?;
@@ -1101,7 +1205,10 @@ async fn api_node_edit(State(state): State<Shared>, Json(req): Json<ApiNodeEditR
         PinEdit::Keep
     };
     let kind = s.embedder_kind.clone();
-    match s.core.edit_node(&req.id, &req.label, new_emb, pin, Some(&kind)) {
+    match s
+        .core
+        .edit_node(&req.id, &req.label, new_emb, pin, Some(&kind))
+    {
         Ok(outcome) => {
             s.save_core();
             Json(outcome).into_response()
@@ -1115,7 +1222,10 @@ struct ApiNodeDeleteReq {
     id: String,
 }
 
-async fn api_node_delete(State(state): State<Shared>, Json(req): Json<ApiNodeDeleteReq>) -> Response {
+async fn api_node_delete(
+    State(state): State<Shared>,
+    Json(req): Json<ApiNodeDeleteReq>,
+) -> Response {
     let mut s = state.write().unwrap();
     if s.core.delete_node(&req.id) {
         s.save_core();
@@ -1138,7 +1248,10 @@ fn default_token_budget() -> usize {
     600
 }
 
-async fn api_node_search(State(state): State<Shared>, Json(req): Json<ApiNodeSearchReq>) -> Response {
+async fn api_node_search(
+    State(state): State<Shared>,
+    Json(req): Json<ApiNodeSearchReq>,
+) -> Response {
     let s = state.read().unwrap();
     let q_emb = s.embedder.embed(&req.query);
     let candidates: Vec<(usize, String, Vec<f32>)> = s
@@ -1147,7 +1260,9 @@ async fn api_node_search(State(state): State<Shared>, Json(req): Json<ApiNodeSea
         .values()
         .filter_map(|n| {
             let l = n.label.as_deref()?;
-            if l.trim().is_empty() { return None; }
+            if l.trim().is_empty() {
+                return None;
+            }
             Some((l.to_string(), n.embedding.clone()))
         })
         .enumerate()
@@ -1165,7 +1280,8 @@ async fn api_node_search(State(state): State<Shared>, Json(req): Json<ApiNodeSea
             })
             .collect(),
     };
-    let result = crate::rag::TokenFixedRetriever::new(req.budget, req.top).retrieve(&q_emb, &corpus);
+    let result =
+        crate::rag::TokenFixedRetriever::new(req.budget, req.top).retrieve(&q_emb, &corpus);
     Json(result).into_response()
 }
 
@@ -1180,10 +1296,17 @@ fn default_git_max() -> usize {
     50
 }
 
-async fn api_vault_import(State(state): State<Shared>, Json(req): Json<ApiVaultImportReq>) -> Response {
+async fn api_vault_import(
+    State(state): State<Shared>,
+    Json(req): Json<ApiVaultImportReq>,
+) -> Response {
     let path = PathBuf::from(&req.dir);
     if !path.is_dir() {
-        return (StatusCode::BAD_REQUEST, format!("dir {} not found", req.dir)).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("dir {} not found", req.dir),
+        )
+            .into_response();
     }
     let mut docs = crate::vault::scan_vault(&path);
     if req.git > 0 {
@@ -1204,7 +1327,8 @@ async fn api_vault_import(State(state): State<Shared>, Json(req): Json<ApiVaultI
         "docs": docs.len(),
         "registered": registered,
         "deduped": pairs.len().saturating_sub(registered),
-    })).into_response()
+    }))
+    .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -1212,7 +1336,10 @@ struct ApiHistoryImportReq {
     file: String,
 }
 
-async fn api_history_import(State(state): State<Shared>, Json(req): Json<ApiHistoryImportReq>) -> Response {
+async fn api_history_import(
+    State(state): State<Shared>,
+    Json(req): Json<ApiHistoryImportReq>,
+) -> Response {
     let path = PathBuf::from(&req.file);
     let (docs, name) = match crate::history::import_file(&path) {
         Ok(res) => res,
@@ -1222,7 +1349,8 @@ async fn api_history_import(State(state): State<Shared>, Json(req): Json<ApiHist
     let before = s.core.nodes.len();
     for doc in &docs {
         let emb = s.embedder.embed(&doc.body);
-        s.core.register_node_vec_labeled(emb, Some(doc.title.clone()));
+        s.core
+            .register_node_vec_labeled(emb, Some(doc.title.clone()));
     }
     let registered = s.core.nodes.len() - before;
     s.save_core();
@@ -1231,7 +1359,8 @@ async fn api_history_import(State(state): State<Shared>, Json(req): Json<ApiHist
         "name": name,
         "imported": docs.len(),
         "registered": registered,
-    })).into_response()
+    }))
+    .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -1240,13 +1369,19 @@ struct ApiPraxisBackfillReq {
     file: Option<String>,
 }
 
-async fn api_praxis_backfill(State(state): State<Shared>, Json(req): Json<ApiPraxisBackfillReq>) -> Response {
+async fn api_praxis_backfill(
+    State(state): State<Shared>,
+    Json(req): Json<ApiPraxisBackfillReq>,
+) -> Response {
     let text = if let Some(j) = req.json {
         j
     } else if let Some(f) = req.file {
         match std::fs::read_to_string(&f) {
             Ok(s) => s,
-            Err(e) => return (StatusCode::BAD_REQUEST, format!("failed reading {f}: {e}")).into_response(),
+            Err(e) => {
+                return (StatusCode::BAD_REQUEST, format!("failed reading {f}: {e}"))
+                    .into_response()
+            }
         }
     } else {
         return (StatusCode::BAD_REQUEST, "either json or file is required").into_response();
@@ -1256,7 +1391,9 @@ async fn api_praxis_backfill(State(state): State<Shared>, Json(req): Json<ApiPra
     let before = s.core.nodes.len();
     for r in &records {
         let emb = s.embedder.embed(&r.body);
-        let id = s.core.register_node_vec_labeled(emb, Some(format!("praxis:{}:{}", r.kind, r.title)));
+        let id = s
+            .core
+            .register_node_vec_labeled(emb, Some(format!("praxis:{}:{}", r.kind, r.title)));
         s.core.assert_coherence(&id, r.status.as_score());
     }
     let registered = s.core.nodes.len() - before;
@@ -1265,7 +1402,8 @@ async fn api_praxis_backfill(State(state): State<Shared>, Json(req): Json<ApiPra
         "status": "ok",
         "records": records.len(),
         "registered": registered,
-    })).into_response()
+    }))
+    .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -1283,7 +1421,10 @@ async fn api_hypotheses_list(State(state): State<Shared>) -> Response {
     Json(list).into_response()
 }
 
-async fn api_hypothesis_create(State(state): State<Shared>, Json(req): Json<ApiCreateHypothesisReq>) -> Response {
+async fn api_hypothesis_create(
+    State(state): State<Shared>,
+    Json(req): Json<ApiCreateHypothesisReq>,
+) -> Response {
     let mut s = state.write().unwrap();
     let emb = s.embedder.embed(&req.statement);
     let mut hyp = crate::hypothesis::Hypothesis::new(&req.statement, emb);
@@ -1299,7 +1440,10 @@ async fn api_hypothesis_create(State(state): State<Shared>, Json(req): Json<ApiC
     (StatusCode::CREATED, Json(created)).into_response()
 }
 
-async fn api_hypothesis_get(State(state): State<Shared>, axum::extract::Path(id): axum::extract::Path<String>) -> Response {
+async fn api_hypothesis_get(
+    State(state): State<Shared>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
     let s = state.read().unwrap();
     match s.core.hypothesis(&id) {
         Some(h) => Json(h.clone()).into_response(),
@@ -1323,7 +1467,13 @@ async fn api_hypothesis_evidence(
     Json(req): Json<ApiHypothesisEvidenceReq>,
 ) -> Response {
     let mut s = state.write().unwrap();
-    let pol = match req.polarity.as_deref().unwrap_or("supporting").to_lowercase().as_str() {
+    let pol = match req
+        .polarity
+        .as_deref()
+        .unwrap_or("supporting")
+        .to_lowercase()
+        .as_str()
+    {
         "contradicting" | "contra" | "refuting" => crate::hypothesis::EvidencePolarity::Contradicts,
         _ => crate::hypothesis::EvidencePolarity::Supports,
     };
@@ -1414,10 +1564,15 @@ async fn api_hypothesis_transition(
         "superseded" => crate::hypothesis::HypothesisStatus::Superseded,
         "isolated" => crate::hypothesis::HypothesisStatus::Isolated,
         "certified" => crate::hypothesis::HypothesisStatus::Certified,
-        other => return (StatusCode::BAD_REQUEST, format!("unknown status '{other}'")).into_response(),
+        other => {
+            return (StatusCode::BAD_REQUEST, format!("unknown status '{other}'")).into_response()
+        }
     };
     let mut s = state.write().unwrap();
-    let res = if s.core.transition_hypothesis(&id, target_status, &req.reason, req.trigger_id) {
+    let res = if s
+        .core
+        .transition_hypothesis(&id, target_status, &req.reason, req.trigger_id)
+    {
         s.core.hypothesis(&id).cloned()
     } else {
         None
@@ -1470,7 +1625,13 @@ async fn api_contradiction_create(
     }
     let id = s.core.record_contradiction(contra.clone());
     s.save_core();
-    let created = s.core.contradictions.iter().find(|c| c.id == id).cloned().unwrap_or(contra);
+    let created = s
+        .core
+        .contradictions
+        .iter()
+        .find(|c| c.id == id)
+        .cloned()
+        .unwrap_or(contra);
     (StatusCode::CREATED, Json(created)).into_response()
 }
 
@@ -1500,7 +1661,11 @@ async fn api_contradiction_resolve(
             s.save_core();
             Json(c).into_response()
         }
-        None => (StatusCode::NOT_FOUND, format!("contradiction {id} not found")).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            format!("contradiction {id} not found"),
+        )
+            .into_response(),
     }
 }
 
@@ -1522,14 +1687,21 @@ async fn api_epistemic_replay(
     let s = state.read().unwrap();
     let when = match chrono::DateTime::parse_from_rfc3339(&params.at) {
         Ok(dt) => dt.with_timezone(&chrono::Utc),
-        Err(e) => return (StatusCode::BAD_REQUEST, format!("invalid timestamp '{}': {e}", params.at)).into_response(),
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("invalid timestamp '{}': {e}", params.at),
+            )
+                .into_response()
+        }
     };
     let belief = s.core.reconstruct_belief_at(&params.subject_id, when);
     Json(serde_json::json!({
         "subject_id": params.subject_id,
         "at": params.at,
         "belief": belief,
-    })).into_response()
+    }))
+    .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -1548,7 +1720,8 @@ async fn api_ontology_discover(
     if let Some(m) = req.min_cluster_size {
         config.min_cluster = m;
     }
-    let report = crate::discovery::discover(&req.texts, &s.classifier, s.embedder.as_ref(), &config);
+    let report =
+        crate::discovery::discover(&req.texts, &s.classifier, s.embedder.as_ref(), &config);
     Json(report).into_response()
 }
 
@@ -1654,14 +1827,28 @@ mod tests {
     /// on either side would otherwise ship a blank, silent page.
     #[test]
     fn app_html_loads_the_split_assets() {
-        assert!(APP_HTML.contains("href=\"app.css\""), "app.html must link app.css");
-        assert!(APP_HTML.contains("src=\"app.js\""), "app.html must load app.js");
+        assert!(
+            APP_HTML.contains("href=\"app.css\""),
+            "app.html must link app.css"
+        );
+        assert!(
+            APP_HTML.contains("src=\"app.js\""),
+            "app.html must load app.js"
+        );
         // Every nav target must have a matching section, or the tab is dead.
         // `edition` is the upgrade surface — the only place a Core user can
         // learn Pro exists, so a missing section would silently remove it.
-        for tab in ["classify", "grid", "ontology", "corpus", "discover", "quality", "edition"] {
-            assert!(APP_HTML.contains(&format!("data-tab=\"{tab}\"")), "nav button for {tab}");
-            assert!(APP_HTML.contains(&format!("id=\"tab-{tab}\"")), "section for {tab}");
+        for tab in [
+            "classify", "grid", "ontology", "corpus", "discover", "quality", "edition",
+        ] {
+            assert!(
+                APP_HTML.contains(&format!("data-tab=\"{tab}\"")),
+                "nav button for {tab}"
+            );
+            assert!(
+                APP_HTML.contains(&format!("id=\"tab-{tab}\"")),
+                "section for {tab}"
+            );
         }
     }
 
@@ -1702,8 +1889,14 @@ mod tests {
     /// is a trap (greps go binary, editors mangle it) — it must stay escaped.
     #[test]
     fn app_js_uses_the_nul_cell_separator_escaped() {
-        assert!(!APP_JS.contains('\0'), "app.js must not carry a raw NUL byte");
-        assert!(APP_JS.contains(r"'\u0000'"), "app.js must build cell keys with an escaped NUL");
+        assert!(
+            !APP_JS.contains('\0'),
+            "app.js must not carry a raw NUL byte"
+        );
+        assert!(
+            APP_JS.contains(r"'\u0000'"),
+            "app.js must build cell keys with an escaped NUL"
+        );
     }
 
     /// Real docs blow past any whole-file limit, so a scan has to split them —
@@ -1711,7 +1904,10 @@ mod tests {
     #[test]
     fn chunk_text_packs_paragraphs_and_splits_long_ones() {
         let short = chunk_text("tiny\n\nalso tiny");
-        assert!(short.is_empty(), "sub-threshold text yields no nodes: {short:?}");
+        assert!(
+            short.is_empty(),
+            "sub-threshold text yields no nodes: {short:?}"
+        );
 
         let para = "the pump seal was replaced during the planned shutdown window. ".repeat(4);
         let packed = chunk_text(&format!("{para}\n\n{para}"));
@@ -1720,7 +1916,11 @@ mod tests {
         // Multi-byte chars: a byte-offset split here would panic.
         let long = "é".repeat(CHUNK_CHARS * 2 + 10);
         let split = chunk_text(&long);
-        assert_eq!(split.len(), 2, "two full passages; the 10-char tail is noise");
+        assert_eq!(
+            split.len(),
+            2,
+            "two full passages; the 10-char tail is noise"
+        );
         assert!(split.iter().all(|c| c.chars().count() == CHUNK_CHARS));
     }
 
@@ -1731,17 +1931,37 @@ mod tests {
     #[test]
     fn grid_axes_extend_past_the_builtin_variants() {
         let canonical: Vec<&str> = HumanDomain::all().iter().map(|d| d.as_str()).collect();
-        let used: HashMap<String, u32> =
-            [("STUDY".to_string(), 3), ("EXCHANGE".to_string(), 1), ("DEFEND".to_string(), 2)]
-                .into_iter()
-                .collect();
+        let used: HashMap<String, u32> = [
+            ("STUDY".to_string(), 3),
+            ("EXCHANGE".to_string(), 1),
+            ("DEFEND".to_string(), 2),
+        ]
+        .into_iter()
+        .collect();
 
         let axis = build_axis(&canonical, &used);
         let names: Vec<&str> = axis.iter().map(|a| a.name.as_str()).collect();
         // Canonical order first, then the extras alphabetically.
-        assert_eq!(names, ["HEAL", "CONSTRUCT", "FABRICATE", "BOND", "STUDY", "DEFEND", "EXCHANGE"]);
-        assert!(axis.iter().take(5).all(|a| !a.extra), "built-in axes are not flagged extra");
-        assert!(axis[5].extra && axis[6].extra, "ontology-introduced axes are flagged");
+        assert_eq!(
+            names,
+            [
+                "HEAL",
+                "CONSTRUCT",
+                "FABRICATE",
+                "BOND",
+                "STUDY",
+                "DEFEND",
+                "EXCHANGE"
+            ]
+        );
+        assert!(
+            axis.iter().take(5).all(|a| !a.extra),
+            "built-in axes are not flagged extra"
+        );
+        assert!(
+            axis[5].extra && axis[6].extra,
+            "ontology-introduced axes are flagged"
+        );
         // Totals come from the ontology, so an unused canonical axis reads 0.
         assert_eq!(axis[0].total, 0);
         assert_eq!(axis[4].total, 3);
@@ -1802,7 +2022,10 @@ mod tests {
         core.assert_coherence(&id, -1.0);
         save_core(dir.path(), &core).unwrap();
 
-        assert_eq!(nodes_file(dir.path()).file_name(), crate::store::nodes_path().file_name());
+        assert_eq!(
+            nodes_file(dir.path()).file_name(),
+            crate::store::nodes_path().file_name()
+        );
         let reloaded = load_core(dir.path());
         assert_eq!(reloaded.nodes.len(), 1);
         assert_eq!(reloaded.nodes[&id].asserted, Some(-1.0));

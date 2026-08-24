@@ -3,8 +3,8 @@
 //! Each source is reduced to [`VaultDoc`]s; callers register them as labeled core
 //! nodes with the embedder so a knowledge vault is recallable by content.
 
-use std::path::Path;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 /// A single retrievable unit pulled out of a vault.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,7 +94,9 @@ pub fn scan_vault(dir: &Path) -> Vec<VaultDoc> {
     let mut dirs = vec![dir.to_path_buf()];
 
     while let Some(current) = dirs.pop() {
-        let Ok(entries) = std::fs::read_dir(&current) else { continue };
+        let Ok(entries) = std::fs::read_dir(&current) else {
+            continue;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
@@ -111,12 +113,19 @@ pub fn scan_vault(dir: &Path) -> Vec<VaultDoc> {
                     .and_then(|e| e.to_str())
                     .unwrap_or_default()
                     .to_lowercase();
-                if matches!(ext.as_str(), "md" | "mdx" | "txt" | "rst" | "adoc" | "asciidoc" | "org") {
+                if matches!(
+                    ext.as_str(),
+                    "md" | "mdx" | "txt" | "rst" | "adoc" | "asciidoc" | "org"
+                ) {
                     if let Ok(body) = std::fs::read_to_string(&path) {
                         if body.trim().len() < 8 {
                             continue;
                         }
-                        let rel_path = path.strip_prefix(dir).unwrap_or(&path).to_string_lossy().to_string();
+                        let rel_path = path
+                            .strip_prefix(dir)
+                            .unwrap_or(&path)
+                            .to_string_lossy()
+                            .to_string();
                         let title = title_of(&path, &body);
                         let headings = headings_of(&body);
                         docs.push(VaultDoc {
@@ -157,7 +166,11 @@ pub fn parse_git_log(output: &str) -> Vec<VaultDoc> {
         }
         docs.push(VaultDoc {
             source: format!("git {short}"),
-            title: if subject.is_empty() { short.to_string() } else { subject.to_string() },
+            title: if subject.is_empty() {
+                short.to_string()
+            } else {
+                subject.to_string()
+            },
             body: full,
             headings: vec![],
         });
@@ -246,7 +259,8 @@ mod tests {
 
     #[test]
     fn test_scan_vault_reads_notes_and_skips_binaries() {
-        let dir = std::env::temp_dir().join(format!("physis_core_vault_test_{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("physis_core_vault_test_{}", std::process::id()));
         let notes = dir.join("notes");
         std::fs::create_dir_all(&notes).unwrap();
         std::fs::write(notes.join("one.md"), "# First Note\n\nbody here").unwrap();
@@ -256,7 +270,10 @@ mod tests {
         let docs = scan_vault(&dir);
         let titles: Vec<&str> = docs.iter().map(|d| d.title.as_str()).collect();
         assert!(titles.contains(&"First Note"));
-        assert!(titles.contains(&"two"), "txt file picked up with stem title");
+        assert!(
+            titles.contains(&"two"),
+            "txt file picked up with stem title"
+        );
         assert_eq!(docs.len(), 2, "binary is not a note");
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -75,8 +75,7 @@ pub fn find_executable(name: &str) -> Option<PathBuf> {
         }
     }
     let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path)
-        .find_map(|dir| executable_at(&dir.join(with_exe_suffix(name))))
+    std::env::split_paths(&path).find_map(|dir| executable_at(&dir.join(with_exe_suffix(name))))
 }
 
 /// `name.exe` on Windows, `name` everywhere else.
@@ -109,11 +108,26 @@ fn executable_at(path: &Path) -> Option<PathBuf> {
 /// The one-paragraph pitch shown wherever Pro is absent. Kept here so the CLI
 /// banner and the studio's upgrade panel cannot drift apart.
 pub const PRO_SUMMARY: &[(&str, &str)] = &[
-    ("Operations Console", "live plant dashboards, OEE, shift reports, incident timelines"),
-    ("Machine connectors", "MQTT, Modbus TCP/RTU, serial and OPC-UA adapters"),
-    ("Multi-tenant serving", "per-tenant state, tokens, and an authenticated HTTP API"),
-    ("LLM cascade", "multi-provider routing with a coherence harness over the answers"),
-    ("Durable storage", "embedded database plus an optional graph mirror"),
+    (
+        "Operations Console",
+        "live plant dashboards, OEE, shift reports, incident timelines",
+    ),
+    (
+        "Machine connectors",
+        "MQTT, Modbus TCP/RTU, serial and OPC-UA adapters",
+    ),
+    (
+        "Multi-tenant serving",
+        "per-tenant state, tokens, and an authenticated HTTP API",
+    ),
+    (
+        "LLM cascade",
+        "multi-provider routing with a coherence harness over the answers",
+    ),
+    (
+        "Durable storage",
+        "embedded database plus an optional graph mirror",
+    ),
 ];
 
 #[cfg(test)]
@@ -150,8 +164,11 @@ mod tests {
 
     #[test]
     fn edition_name_reflects_what_was_found() {
-        let core_only =
-            Edition { pro_cli: None, pro_web: None, core_cli: Some("/usr/bin/physis-core".into()) };
+        let core_only = Edition {
+            pro_cli: None,
+            pro_web: None,
+            core_cli: Some("/usr/bin/physis-core".into()),
+        };
         assert!(!core_only.has_pro());
         assert_eq!(core_only.name(), "Physis Core");
 
