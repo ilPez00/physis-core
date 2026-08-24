@@ -402,6 +402,14 @@ impl VectorEmbed for OnnxEmbedder {
     }
 }
 
+/// Read `hidden_size` from a transformers `config.json` next to the model, so
+/// callers never have to hard-code an output width per model family.
+pub fn native_dim(model_dir: &str) -> Option<usize> {
+    let cfg = std::fs::read_to_string(format!("{model_dir}/config.json")).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&cfg).ok()?;
+    v.get("hidden_size")?.as_u64().map(|h| h as usize)
+}
+
 fn fallback_embed(text: &str, dim: usize) -> Vec<f32> {
     let mut v = vec![0.0f32; dim];
     let h: u64 = text

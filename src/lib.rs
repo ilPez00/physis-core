@@ -161,6 +161,9 @@ pub mod vault;
 #[cfg(feature = "studio")]
 pub mod studio;
 
+#[cfg(feature = "studio")]
+pub mod studio_lab;
+
 #[cfg(feature = "embed-onnx")]
 pub mod embed_onnx;
 

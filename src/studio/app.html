@@ -26,11 +26,13 @@
   <nav>
     <button class="active" data-tab="classify">Classify <span class="k">1</span></button>
     <button data-tab="grid">Semiotic grid <span class="k">2</span></button>
-    <button data-tab="ontology">Ontology <span class="k">3</span></button>
-    <button data-tab="corpus">Corpus <span class="k">4</span></button>
-    <button data-tab="discover">Discover <span class="k">5</span></button>
-    <button data-tab="quality">Quality <span class="k">6</span></button>
-    <button data-tab="edition" id="navEdition">Pro <span class="k">7</span></button>
+    <button data-tab="ontology">Lab <span class="k">3</span></button>
+    <button data-tab="flow">Flow <span class="k">4</span></button>
+    <button data-tab="coherence">Coherence <span class="k">5</span></button>
+    <button data-tab="corpus">Corpus <span class="k">6</span></button>
+    <button data-tab="discover">Discover <span class="k">7</span></button>
+    <button data-tab="quality">Quality <span class="k">8</span></button>
+    <button data-tab="edition" id="navEdition">Pro <span class="k">9</span></button>
     <button class="ghost" id="btnHelp" style="margin-top:auto">Shortcuts <span class="k">?</span></button>
   </nav>
 
@@ -100,24 +102,124 @@
     </div>
   </section>
 
-  <!-- ── ONTOLOGY ─────────────────────────────────────────────── -->
+  <!-- ── LAB (ontology & semiotics) ───────────────────────────── -->
   <section class="tab" id="tab-ontology">
     <div class="hero">
       <div>
-        <h2>Ontology</h2>
-        <p>The seed vocabulary the classifier is built from. Edits are yours — they persist to
-           <code>custom_ontology.json</code> and rebuild the classifier immediately.</p>
+        <h2>Semiotics lab</h2>
+        <p>The ontology projected into embedding space — every entry is a glowing point,
+           corpus nodes are diamonds, and your probe text lands live on the map. Clusters are
+           meaning neighbourhoods; outliers are blind spots. Click any point to edit it.</p>
       </div>
       <div class="row tight"><button class="primary" id="btnNew">+ New entry</button></div>
     </div>
-    <div class="panel">
-      <div class="row">
-        <input class="grow" type="text" id="search" placeholder="search entries, hints, cells…  (Ctrl+K)">
-        <span class="muted" id="ontMeta"></span>
+
+    <div class="panel" style="padding:0;overflow:hidden">
+      <div class="row" style="padding:12px 16px;border-bottom:1px solid var(--line)">
+        <input class="grow" type="text" id="probeText"
+               placeholder="probe the space… e.g. 'coolant pump seal replacement'  (Enter drops a marker)">
+        <button class="primary" id="btnProbe">Probe</button>
+        <span class="muted" id="labMeta"></span>
       </div>
-      <div id="cats" class="scroll" style="margin-top:14px;max-height:calc(100vh - 330px)"></div>
+      <div id="mapwrap"><canvas id="labMap"></canvas>
+        <div id="mapTip" class="maptip"></div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="panel">
+        <h3>Nearest entries</h3>
+        <div id="neighbors" class="scroll" style="max-height:340px"><div class="muted">Probe the map to rank the closest vocabulary.</div></div>
+      </div>
+      <div class="panel">
+        <h3>Ontology</h3>
+        <div class="row">
+          <input class="grow" type="text" id="search" placeholder="search entries, hints, cells…  (Ctrl+K)">
+          <span class="muted" id="ontMeta"></span>
+        </div>
+        <div id="cats" class="scroll" style="margin-top:14px;max-height:300px"></div>
+      </div>
     </div>
   </section>
+
+  <!-- ── FLOW (data flow inspector & workflows) ───────────────── -->
+  <section class="tab" id="tab-flow">
+    <div class="hero">
+      <div>
+        <h2>Data flow</h2>
+        <p>The epistemic graph as a living circuit — corpus nodes, competing hypotheses and
+           typed relations with particles streaming along every edge. Workflows run as
+           PLAN → MEASURE → DEVIATE → INTERVENE → OUTCOME lanes underneath.</p>
+      </div>
+      <div class="row tight">
+        <button id="btnDemoFlow">+ Sample workflow</button>
+        <button class="ghost" id="btnFlowPause">Pause</button>
+      </div>
+    </div>
+
+    <div class="panel" style="padding:0;overflow:hidden">
+      <div class="flowlegend">
+        <span><i class="dot n"></i>node</span>
+        <span><i class="dot h"></i>hypothesis</span>
+        <span><i class="dot s"></i>supports</span>
+        <span><i class="dot c"></i>contradicts</span>
+        <span><i class="dot o"></i>other</span>
+        <span class="muted">drag to arrange · scroll to zoom · hover for detail</span>
+      </div>
+      <div id="flowwrap"><canvas id="flowCanvas"></canvas>
+        <div id="flowTip" class="maptip"></div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="panel">
+        <h3>Workflows</h3>
+        <div id="workflows" class="muted">No cycles recorded yet — load a sample workflow or record one via the API.</div>
+      </div>
+      <div class="panel">
+        <h3>Open contradictions</h3>
+        <div id="conflicts" class="muted">None registered.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── COHERENCE CHECKER ────────────────────────────────────── -->
+  <section class="tab" id="tab-coherence">
+    <div class="hero">
+      <div>
+        <h2>Coherence checker</h2>
+        <p>Six orthogonal axes score any statement against everything this engine knows:
+           how well it fits the ontology, whether it collides with known contradictions,
+           if judged evidence supports it, and whether recorded workflows agree.</p>
+      </div>
+      <div class="row tight"><span class="kbd">Ctrl</span><span class="kbd">↵</span></div>
+    </div>
+
+    <div class="panel">
+      <textarea id="cohText" placeholder="Paste an incident report, a claim, a hypothesis…" style="min-height:90px"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="btnCohCheck">Check coherence</button>
+        <button class="ghost" id="btnCohSample">Random claim</button>
+        <span class="muted" id="cohMeta"></span>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="panel cohgrid">
+        <svg id="radar" viewBox="0 0 320 320" width="100%" height="auto"></svg>
+        <div class="verdictbox" id="verdictBox"><span class="muted">no check yet</span></div>
+      </div>
+      <div class="panel">
+        <h3>Dimension breakdown</h3>
+        <div id="dimBars"></div>
+        <h3 style="margin-top:18px">Corpus recall</h3>
+        <div id="cohRecall" class="muted">—</div>
+        <h3 style="margin-top:18px">Workflow alignment</h3>
+        <div id="cohProcHits" class="muted">—</div>
+      </div>
+    </div>
+  </section>
+
 
   <!-- ── CORPUS ───────────────────────────────────────────────── -->
   <section class="tab" id="tab-corpus">
@@ -240,8 +342,8 @@
 <div class="modal-bg" id="help">
   <div class="modal">
     <h3>Shortcuts</h3>
-    <div class="item"><span class="kbd">1</span>–<span class="kbd">6</span> switch tab</div>
-    <div class="item"><span class="kbd">Ctrl</span>+<span class="kbd">Enter</span> classify the current text</div>
+    <div class="item"><span class="kbd">1</span>–<span class="kbd">9</span> switch tab</div>
+    <div class="item"><span class="kbd">Ctrl</span>+<span class="kbd">Enter</span> classify the current text · check coherence on the Coherence tab</div>
     <div class="item"><span class="kbd">Ctrl</span>+<span class="kbd">K</span> focus the search / main input of the tab</div>
     <div class="item"><span class="kbd">S</span> load a random sample into Classify</div>
     <div class="item"><span class="kbd">?</span> this panel · <span class="kbd">Esc</span> close</div>

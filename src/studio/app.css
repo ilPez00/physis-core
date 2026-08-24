@@ -122,6 +122,10 @@ nav button.accent{color:var(--accent2)}
 nav button.accent.active{color:var(--fg)}
 .tab{flex:1;min-width:0;display:none;overflow:auto;padding:26px clamp(18px,3vw,42px);position:relative;z-index:1}
 .tab.active{display:flex;flex-direction:column;gap:16px}
+/* Panels must keep their natural height: as flex children of a scrolling
+   column they would otherwise compress (clipping the canvases) instead of
+   letting the tab scroll. */
+.tab > *{flex-shrink:0}
 
 .hero{
   display:flex;justify-content:space-between;gap:20px;align-items:flex-start;
@@ -210,3 +214,76 @@ table.grid td.cell.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--acc
 .toast.ok{border-color:rgba(114,240,178,.45)}
 .toast.err{border-color:rgba(255,113,141,.5);color:var(--red)}
 kbd{font:10px var(--mono)}
+
+/* ══ LAB — embedding map ═══════════════════════════════════════ */
+#mapwrap,#flowwrap{position:relative;background:
+  radial-gradient(700px 420px at 22% 0%, rgba(75,110,255,.14), transparent 60%),
+  radial-gradient(600px 380px at 88% 110%, rgba(180,156,255,.10), transparent 60%),
+  rgba(6,9,22,.66)}
+#labMap,#flowCanvas{display:block;width:100%;cursor:default}
+.maptip{
+  position:absolute;display:none;z-index:5;pointer-events:none;
+  max-width:220px;font-size:11px;line-height:1.45;
+  background:rgba(7,11,26,.94);border:1px solid var(--line-strong);border-radius:10px;
+  padding:8px 11px;box-shadow:0 12px 40px rgba(0,0,0,.5);
+}
+.nbrow{display:grid;grid-template-columns:minmax(90px,1.3fr) minmax(74px,.8fr) 1fr 46px;
+  gap:8px;align-items:center;padding:5px 6px;border-radius:7px;cursor:pointer;font-size:11.5px}
+.nbrow:hover{background:rgba(104,231,255,.07)}
+.nbname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nbcell{font:9.5px var(--mono);color:var(--muted);letter-spacing:.05em}
+.nbbar{height:4px;border-radius:2px;background:rgba(5,9,22,.85);overflow:hidden}
+.nbbar i{display:block;height:100%;border-radius:2px;box-shadow:0 0 8px currentColor}
+.nbsim{font:10px var(--mono);color:var(--accent);text-align:right}
+
+/* ══ FLOW — legend, workflow cards ═════════════════════════════ */
+.flowlegend{
+  display:flex;gap:16px;align-items:center;padding:10px 16px;
+  border-bottom:1px solid var(--line);
+  font:10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+}
+.flowlegend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.flowlegend .dot.n{background:#68e7ff;box-shadow:0 0 8px #68e7ff}
+.flowlegend .dot.h{background:#b49cff;box-shadow:0 0 8px #b49cff}
+.flowlegend .dot.s{background:#72f0b2}
+.flowlegend .dot.c{background:#ff718d}
+.flowlegend .dot.o{background:#68a8ff}
+.wfcard{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px;
+  background:linear-gradient(150deg,rgba(19,28,61,.72),rgba(9,14,33,.86))}
+.wfcard .l1{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.stagerow{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap}
+.stage{
+  flex:1;min-width:96px;border:1px solid var(--line);border-radius:10px;
+  padding:8px 10px;background:var(--panel2);position:relative;
+}
+.stagename{font:9px var(--mono);letter-spacing:.14em;color:var(--accent);margin-bottom:3px}
+.stageval{font-size:11.5px;color:var(--fg)}
+.stagearrow{position:absolute;right:-13px;top:50%;transform:translateY(-50%);
+  color:var(--accent);z-index:2;font-size:12px;text-shadow:0 0 8px rgba(104,231,255,.8)}
+.taskrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.taskchip{
+  font:10.5px var(--mono);border:1px solid;border-radius:7px;padding:3px 8px;
+  background:rgba(5,9,22,.55);letter-spacing:.02em;
+}
+.obadge{font:10px var(--mono);letter-spacing:.08em;text-transform:uppercase;
+  border:1px solid;border-radius:999px;padding:3px 10px}
+.obadge.good{color:var(--green);border-color:rgba(114,240,178,.45);background:rgba(114,240,178,.07)}
+.obadge.bad{color:var(--red);border-color:rgba(255,113,141,.5);background:rgba(255,113,141,.07)}
+
+/* ══ COHERENCE — radar + verdict ═══════════════════════════════ */
+.cohgrid{display:flex;flex-direction:column;gap:14px;align-items:center}
+.verdictbox{display:flex;gap:14px;align-items:center;min-height:44px}
+.vbadge{
+  font:12px var(--mono);letter-spacing:.22em;padding:8px 18px;border-radius:999px;
+  border:1px solid;text-shadow:0 0 12px currentColor;
+}
+.vbadge.good{color:var(--green);border-color:rgba(114,240,178,.5);background:rgba(114,240,178,.06)}
+.vbadge.warn{color:var(--amber);border-color:rgba(255,198,109,.5);background:rgba(255,198,109,.06)}
+.vbadge.bad{color:var(--red);border-color:rgba(255,113,141,.55);background:rgba(255,113,141,.06)}
+.vscore{font:20px var(--mono);color:var(--fg)}
+.dimbar{display:grid;grid-template-columns:150px 1fr 52px;gap:10px;align-items:center;margin-bottom:8px}
+.dimbar .dl{font-size:11.5px;color:var(--muted)}
+.dimbar .db{height:6px;border-radius:3px;background:rgba(5,9,22,.85);overflow:hidden}
+.dimbar .db i{display:block;height:100%;border-radius:3px;
+  box-shadow:0 0 10px rgba(104,231,255,.35);transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.dimbar .dv{font:10.5px var(--mono);color:var(--fg);text-align:right}

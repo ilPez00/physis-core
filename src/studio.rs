@@ -93,25 +93,53 @@ impl StudioState {
         let _ = self.quality.save(&quality_path(&self.data_dir));
     }
 
-    fn save_core(&self) {
+    pub fn save_core(&self) {
         let _ = save_core(&self.data_dir, &self.core);
     }
 }
 
 /// Resolve the active embedder: ONNX when requested + available, else RP.
+///
+/// Model directory resolution order: explicit argument (CLI `--model`),
+/// `PHYSIS_MODEL_DIR`, then `./models` when it looks like a model home.
+/// `PHYSIS_EMBEDDER=random-projection` forces the offline embedder even when
+/// a model is present.
 #[cfg_attr(not(feature = "embed-onnx"), allow(unused_variables))]
 fn build_embedder(model_dir: Option<String>) -> (Box<dyn VectorEmbed>, String, bool) {
     #[cfg(feature = "embed-onnx")]
-    if let Some(dir) = model_dir.as_deref() {
-        let onnx = crate::embed_onnx::OnnxEmbedder::new(dir);
-        if onnx.is_available() {
-            eprintln!(
-                "Ontology Studio embedder: ONNX MiniLM ({dir}, {} dims)",
-                onnx.dimension()
-            );
-            return (Box::new(onnx), "onnx".to_string(), true);
+    {
+        let requested = std::env::var("PHYSIS_EMBEDDER")
+            .map(|v| v != "random-projection" && v.trim() != "off")
+            .unwrap_or(true);
+        let dir = model_dir
+            .or_else(|| std::env::var("PHYSIS_MODEL_DIR").ok())
+            .or_else(|| {
+                let p = std::path::Path::new("models");
+                (p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists())
+                    .then(|| "models".to_string())
+            });
+        if requested {
+            if let Some(dir) = dir {
+                // A 768-d model truncated into a 384-d buffer silently throws
+                // away half its signal — read the native width when exported
+                // alongside a transformers config.json.
+                let dim = crate::embed_onnx::native_dim(&dir).unwrap_or(384);
+                let onnx =
+                    crate::embed_onnx::OnnxEmbedder::with_config(&crate::embed_onnx::OnnxConfig {
+                        dim,
+                        model_dir: Some(dir.clone()),
+                        ..crate::embed_onnx::OnnxConfig::default()
+                    });
+                if onnx.is_available() {
+                    eprintln!(
+                        "Ontology Studio embedder: ONNX ({dir}, {} dims)",
+                        onnx.dimension()
+                    );
+                    return (Box::new(onnx), "onnx".to_string(), true);
+                }
+                eprintln!("warning: no ONNX model at {dir}; falling back to random projection");
+            }
         }
-        eprintln!("warning: no ONNX model at {dir}; falling back to random projection");
     }
     let rp = RandomProjectionEmbedder::new(384);
     (Box::new(rp), "random-projection".to_string(), false)
@@ -192,6 +220,7 @@ pub async fn run_with_model(port: u16, model_dir: Option<String>) -> anyhow::Res
         .route("/api/v1/epistemic/audit", get(api_epistemic_audit))
         .route("/api/v1/epistemic/replay", get(api_epistemic_replay))
         .route("/api/v1/ontology/discover", post(api_ontology_discover))
+        .merge(crate::studio_lab::router())
         .with_state(state);
 
     // Loopback by default: every ingest/scan route reads arbitrary local paths,
