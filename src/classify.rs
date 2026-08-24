@@ -19,6 +19,20 @@ use crate::ontology::OntologyLoader;
 /// Adaptive: small cells use TOP_K=1 (specificity), medium use 2, large use 3.
 const TOP_K: usize = 2; // base value; adaptive logic applies at call site
 
+/// Per-cell top-k selection for classification scoring.
+///
+/// [`TopKStrategy::Adaptive`] is the shipped default (see
+/// [`adaptive_top_k`](Self::adaptive_top_k) on the classifier);
+/// [`TopKStrategy::Fixed`] pins one k for every cell — the calibration
+/// lever behind the PLAN 8.8 precision investigation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TopKStrategy {
+    /// Cell-size-aware smoothing (1–3 entries → 1, 4–10 → 2, 11–30 → 3, 31+ → 4).
+    Adaptive,
+    /// The same k for every cell, regardless of size.
+    Fixed(usize),
+}
+
 /// Nested-classification blend weight: final = ALPHA·domain + (1-ALPHA)·cell.
 const ALPHA: f32 = 0.4;
 
@@ -321,15 +335,12 @@ impl CellClassifier {
         self.cells.len()
     }
 
-    /// Adaptive TOP_K based on cell entry count for optimal precision.
-    /// Uses `TOP_K` as the medium/default value (4-10 entries → TOP_K=2).
-    /// - 1-3 entries: TOP_K=1 (maximize specificity, no averaging noise)
-    /// - 4-10 entries: TOP_K=2 (current balanced behavior, via TOP_K constant)
-    /// - 11-30 entries: TOP_K=3 (smooth noise while keeping top entries)
-    /// - 31+ entries: TOP_K=4 (significant smoothing)
+    /// Adaptive TOP_K based on cell entry count.
     ///
-    /// Used by [`CellClassifier::classify`](Self::classify) to select the number of
-    /// top similarities to average per cell.
+    /// **No longer the default** (2026-08-24, PLAN 8.8): measurement under
+    /// bge-base showed smoothing hurts once cells grow large — averaging
+    /// dilutes the precise anchor that max would have used. Kept reachable
+    /// via [`TopKStrategy`] for recalibration sweeps; `Fixed(1)` ships.
     pub fn adaptive_top_k(num_entries: usize) -> usize {
         let base = TOP_K; // = 2, the medium default
         match num_entries {
@@ -341,13 +352,31 @@ impl CellClassifier {
     }
 
     /// Classify a pre-computed embedding with soft nested (domain→mode) scoring.
-    /// Uses adaptive TOP_K per cell size for improved precision:
-    /// Small cells preserve specificity, large cells get noise smoothing.
+    ///
+    /// Cell score = **max cosine to any member entry** (`Fixed(1)`).
+    /// Measured 2026-08-24 under bge-base-en on the curated fixture set
+    /// (PLAN 8.8): max beats every smoothed variant on cell precision
+    /// (CORE 0.782 vs 0.636 adaptive) and ties on domain, because the
+    /// 2026-08-14 ontology expansion turned top-k averaging into a dilution
+    /// machine — loosely-related entries drag precise anchors toward the cell
+    /// mean. `classify_with_topk` keeps the alternatives reachable.
     pub fn classify(&self, embedding: &[f32]) -> Vec<CellScore> {
+        self.classify_with_topk(embedding, TopKStrategy::Fixed(1))
+    }
+
+    /// Same scoring with an explicit top-k strategy — the tuning seam behind
+    /// PLAN 8.8: the 2026-08-14 ontology expansion grew cells into higher
+    /// smoothing buckets and cell-level precision fell. This lets a harness
+    /// sweep strategies against fixtures and pick a new default on measurement.
+    pub fn classify_with_topk(&self, embedding: &[f32], strat: TopKStrategy) -> Vec<CellScore> {
+        let k_of = |n: usize| match strat {
+            TopKStrategy::Adaptive => Self::adaptive_top_k(n),
+            TopKStrategy::Fixed(k) => k,
+        };
         let mut domain_cell_scores: HashMap<&str, Vec<f32>> = HashMap::new();
         let mut cell_scores: Vec<f32> = Vec::with_capacity(self.cells.len());
         for cell in &self.cells {
-            let k = Self::adaptive_top_k(cell.embeddings.len());
+            let k = k_of(cell.embeddings.len());
             let mut sims: Vec<f32> = cell
                 .embeddings
                 .iter()
