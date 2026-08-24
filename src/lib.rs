@@ -167,7 +167,7 @@ pub mod studio_lab;
 #[cfg(feature = "embed-onnx")]
 pub mod embed_onnx;
 
-pub use classify::{CellClassifier, CellScore};
+pub use classify::{CellClassifier, CellScore, TopKStrategy};
 pub use coherence_dimensions::{CoherenceDimension, CoherenceProfile};
 pub use coherence_query::{
     EpistemicQuery, EpistemicQueryResult, FailedPredictionSummary, HypothesisSummary,
