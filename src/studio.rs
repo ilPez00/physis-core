@@ -145,7 +145,7 @@ fn build_embedder(model_dir: Option<String>) -> (Box<dyn VectorEmbed>, String, b
     (Box::new(rp), "random-projection".to_string(), false)
 }
 
-type Shared = Arc<RwLock<StudioState>>;
+pub type Shared = Arc<RwLock<StudioState>>;
 
 pub async fn run(port: u16) -> anyhow::Result<()> {
     run_with_model(port, None).await
@@ -181,6 +181,7 @@ pub async fn run_with_model(port: u16, model_dir: Option<String>) -> anyhow::Res
         .route("/api/core/search", post(core_search))
         .route("/api/core/assert", post(core_assert))
         .route("/api/core/dream", post(core_dream))
+        .route("/api/v1/communities", get(crate::studio_communities::api_communities))
         // MVP Node & Importers API
         .route("/api/v1/coherence/edit", post(api_node_edit))
         .route("/api/v1/coherence/delete", post(api_node_delete))

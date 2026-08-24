@@ -33,6 +33,7 @@
     <button data-tab="discover">Discover <span class="k">7</span></button>
     <button data-tab="quality">Quality <span class="k">8</span></button>
     <button data-tab="edition" id="navEdition">Pro <span class="k">9</span></button>
+    <button data-tab="communities">Communities <span class="k">0</span></button>
     <button class="ghost" id="btnHelp" style="margin-top:auto">Shortcuts <span class="k">?</span></button>
   </nav>
 
@@ -317,6 +318,18 @@
         <div id="qlist" class="scroll"></div>
       </div>
     </div>
+  </section>
+
+  <!-- ── COMMUNITIES ─────────────────────────────────────────── -->
+  <section class="tab" id="tab-communities">
+    <div class="hero">
+      <div>
+        <h2>Communities</h2>
+        <p>Label-propagation clusters over the coherence graph, with cohesion (intra-cluster edge density).</p>
+      </div>
+      <button class="ghost" id="communitiesReload">Reload</button>
+    </div>
+    <div id="communitiesList" class="muted">Loading…</div>
   </section>
 
   <!-- ── EDITION / PRO ────────────────────────────────────────── -->

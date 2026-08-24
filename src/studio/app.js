@@ -59,7 +59,7 @@ function typing() {
 }
 
 /* ── tabs ─────────────────────────────────────────────────────── */
-const TABS = ['classify', 'grid', 'ontology', 'flow', 'coherence', 'corpus', 'discover', 'quality', 'edition'];
+const TABS = ['classify', 'grid', 'ontology', 'flow', 'coherence', 'corpus', 'discover', 'quality', 'edition', 'communities'];
 
 function showTab(name) {
   state.tab = name;
@@ -77,7 +77,26 @@ function showTab(name) {
   if (name === 'corpus') { loadSnapshot(); loadNodes(); }
   if (name === 'quality') loadQuality();
   if (name === 'edition') loadEdition();
+  if (name === 'communities') loadCommunities();
 }
+
+/* ── communities (9.4b) ───────────────────────────────────────── */
+async function loadCommunities() {
+  const el = $('communitiesList');
+  try {
+    const r = await api('/api/v1/communities');
+    if (!r.communities.length) { el.innerHTML = '<div class="muted">No labeled nodes yet — ingest or scan to grow the graph.</div>'; return; }
+    const sorted = r.communities.slice().sort((a, b) => b.members.length - a.members.length);
+    el.innerHTML = sorted.map(c => `
+      <div class="panel">
+        <b>${esc(c.members.length)} nodes</b> · cohesion ${(c.cohesion * 100).toFixed(0)}%
+        <div class="muted" style="margin-top:6px">${c.members.slice(0, 12).map(esc).join(' · ')}${c.members.length > 12 ? ' …' : ''}</div>
+      </div>`).join('');
+  } catch (e) {
+    el.innerHTML = '<div class="muted">Failed to load communities: ' + esc(e.message) + '</div>';
+  }
+}
+$('communitiesReload').onclick = () => loadCommunities();
 document.querySelectorAll('nav button[data-tab]').forEach(b => {
   b.onclick = () => showTab(b.dataset.tab);
 });

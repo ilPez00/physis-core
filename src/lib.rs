@@ -160,6 +160,8 @@ pub mod vault;
 
 #[cfg(feature = "studio")]
 pub mod studio;
+#[cfg(feature = "studio")]
+pub mod studio_communities;
 
 #[cfg(feature = "studio")]
 pub mod studio_lab;
