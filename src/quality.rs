@@ -249,12 +249,17 @@ impl QualityTracker {
             return out;
         }
 
+        // Cell keys are stored as "DOMAIN\0MODE" (NUL-joined) for exact lookup;
+        // NUL renders as an invisible/broken glyph in terminals, so display a
+        // readable separator instead.
+        let display_cell = |cell: &str| cell.replace('\0', "/");
+
         out.push_str("--- Recent Failures ---\n");
         for f in self.failures.iter().rev().take(5) {
             out.push_str(&format!(
                 "  [{}] cell={} score={:.3} sev={:.1} feedback={}\n",
                 &f.id[..8],
-                f.top_cell,
+                display_cell(&f.top_cell),
                 f.top_score,
                 f.severity,
                 &f.feedback[..f.feedback.len().min(60)],
@@ -266,7 +271,11 @@ impl QualityTracker {
         let mut sorted: Vec<_> = self.cell_penalties.iter().collect();
         sorted.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap_or(std::cmp::Ordering::Equal));
         for (cell, penalty) in sorted.iter().take(10) {
-            out.push_str(&format!("  {}: penalty={:.2}\n", cell, penalty));
+            out.push_str(&format!(
+                "  {}: penalty={:.2}\n",
+                display_cell(cell),
+                penalty
+            ));
         }
 
         out
@@ -468,6 +477,21 @@ mod tests {
         centroids.insert("WORK\x00LIFT".to_string(), vec![0.5; 64]);
         t.report_failure("wrong", &centroids, None);
         assert!(t.adjust_score("WORK\x00LIFT", 0.8) < 0.8);
+    }
+
+    /// Regression (QA 8.5): cell keys are NUL-joined for exact lookup, but the
+    /// summary is terminal output — an invisible/broken glyph must never reach
+    /// it. Both the failure list and the penalty table render "DOMAIN/MODE".
+    #[test]
+    fn summary_renders_cells_without_nul() {
+        let mut t = make_tracker();
+        let mut centroids = HashMap::new();
+        centroids.insert("WORK\x00LIFT".to_string(), vec![0.5; 64]);
+        t.report_failure("this output missed the mark", &centroids, None);
+
+        let s = t.summary();
+        assert!(!s.contains('\0'), "summary must not contain NUL");
+        assert!(s.contains("WORK/LIFT"), "readable separator expected: {s}");
     }
 
     #[test]
