@@ -53,11 +53,7 @@ fn edges_of(core: &PhysisCore) -> Vec<(String, String)> {
 }
 
 /// Label propagation over ID-space; deterministic smallest-label tie-break.
-fn label_propagation(
-    ids: &[String],
-    adj: &[Vec<usize>],
-    max_rounds: usize,
-) -> Vec<u32> {
+fn label_propagation(ids: &[String], adj: &[Vec<usize>], max_rounds: usize) -> Vec<u32> {
     let n = ids.len();
     let mut labels: Vec<u32> = (0..n as u32).collect();
     for _ in 0..max_rounds {
@@ -110,15 +106,15 @@ pub fn rollup(
         .collect();
 
     let ids: Vec<String> = labeled.iter().map(|(id, _)| id.clone()).collect();
-    let idx_of: HashMap<&str, usize> =
-        ids.iter().enumerate().map(|(i, id)| (id.as_str(), i)).collect();
+    let idx_of: HashMap<&str, usize> = ids
+        .iter()
+        .enumerate()
+        .map(|(i, id)| (id.as_str(), i))
+        .collect();
 
     let mut adj: Vec<Vec<usize>> = vec![Vec::new(); ids.len()];
     for (a, b) in &filtered {
-        let (&ia, &ib) = (
-            &idx_of[a.as_str()],
-            &idx_of[b.as_str()],
-        );
+        let (&ia, &ib) = (&idx_of[a.as_str()], &idx_of[b.as_str()]);
         if !adj[ia].contains(&ib) {
             adj[ia].push(ib);
         }
@@ -184,11 +180,7 @@ pub async fn api_communities(State(state): State<Shared>) -> Response {
         .core
         .nodes
         .values()
-        .filter_map(|n| {
-            n.label
-                .as_ref()
-                .map(|l| (n.id.clone(), l.clone()))
-        })
+        .filter_map(|n| n.label.as_ref().map(|l| (n.id.clone(), l.clone())))
         .collect();
     let edges = edges_of(&s.core);
     drop(s);
