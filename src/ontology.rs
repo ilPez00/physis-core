@@ -239,11 +239,17 @@ impl OntologyLoader {
         }
     }
 
-    /// All domain definitions used for classification: the human grid plus every
-    /// extra domain-specific ontology. All share the grid vocabulary.
+    /// All domain definitions used for classification: the human grid, the
+    /// machine ontology, and every extra domain-specific ontology. All share
+    /// the grid vocabulary.
+    ///
+    /// Phase 10c parity fix — this used to chain only `human + custom`, which
+    /// left the whole `machine_domains` bucket authored and displayed but
+    /// never scoreable (the studio's "730 advertised vs 623 scoreable" gap).
     pub fn classification_domains(&self) -> impl Iterator<Item = &DomainDef> {
         self.human_domains
             .values()
+            .chain(self.machine_domains.values())
             .chain(self.custom_domains.values())
     }
 
@@ -275,9 +281,10 @@ impl OntologyLoader {
         cats
     }
 
-    /// Total number of classification-relevant domains (human + custom).
+    /// Total number of classification-reachable domains (human + machine +
+    /// custom) — must equal what `classification_domains()` yields.
     pub fn entry_count(&self) -> usize {
-        self.human_domains.len() + self.custom_domains.len()
+        self.human_domains.len() + self.machine_domains.len() + self.custom_domains.len()
     }
 }
 
@@ -302,10 +309,10 @@ mod tests {
     }
 
     /// Any surface reporting an "entries" total is telling the user how much
-    /// vocabulary the classifier has. `all_domains()` is a different, larger set
-    /// — it folds in `machine_domains`, which `classification_domains()` never
-    /// yields — so reporting its length claimed 730 entries where only 623 could
-    /// ever be scored. Keep the count tied to what actually feeds the grid.
+    /// vocabulary the classifier has. Phase 10c folded `machine_domains` into
+    /// classification, so entry_count and all_domains now describe the same
+    /// set — the old "advertised 730, scoreable 623" gap is closed, and this
+    /// test keeps them from drifting apart again.
     #[test]
     fn entry_count_matches_what_the_classifier_is_built_from() {
         let loader = OntologyLoader::load_all();
@@ -314,17 +321,18 @@ mod tests {
             loader.classification_domains().count(),
             "entry_count must count exactly the entries the classifier receives",
         );
-    }
-
-    #[test]
-    fn all_domains_is_a_superset_and_not_an_entry_count() {
-        // Guards the substitution that caused the mismatch: these two are not
-        // interchangeable, and a future edit swapping one for the other should
-        // have to delete this test on purpose.
-        let loader = OntologyLoader::load_all();
+        assert_eq!(
+            loader.all_domains().len(),
+            loader.entry_count(),
+            "all_domains and the classified set must stay the same size now that \
+             machine domains are reachable",
+        );
+        // The machine ontology's flagship entries must actually be scoreable.
         assert!(
-            loader.all_domains().len() >= loader.entry_count(),
-            "all_domains folds in machine domains on top of the classified set",
+            loader
+                .classification_domains()
+                .any(|d| d.name.contains("OEE")),
+            "machine entries (OEE) must be reachable by the classifier",
         );
     }
 

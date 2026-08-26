@@ -181,7 +181,10 @@ pub async fn run_with_model(port: u16, model_dir: Option<String>) -> anyhow::Res
         .route("/api/core/search", post(core_search))
         .route("/api/core/assert", post(core_assert))
         .route("/api/core/dream", post(core_dream))
-        .route("/api/v1/communities", get(crate::studio_communities::api_communities))
+        .route(
+            "/api/v1/communities",
+            get(crate::studio_communities::api_communities),
+        )
         // MVP Node & Importers API
         .route("/api/v1/coherence/edit", post(api_node_edit))
         .route("/api/v1/coherence/delete", post(api_node_delete))
@@ -266,11 +269,10 @@ async fn health_json(State(state): State<Shared>) -> Response {
         "embedder": s.embedder_kind,
         "semantic": s.semantic,
         "dimension": s.embedder.dimension(),
-        // Count what the classifier is actually built from. `all_domains()`
-        // additionally folds in `machine_domains`, which `classification_domains()`
-        // never yields — so the header advertised 730 "entries" against the CLI's
-        // 623, and the 107-entry difference could never be scored or reached from
-        // any cell in the grid below it.
+        // Count what the classifier is actually built from. Phase 10c folded
+        // `machine_domains` into `classification_domains()`, so this now equals
+        // `all_domains().len()` — the old "advertised 730 vs 623 scoreable"
+        // gap is closed. Keep the count tied to what feeds the grid.
         "entries": s.ontology.entry_count(),
         "custom": s.custom_entries.len(),
         "cells": s.classifier.cell_count(),
