@@ -375,16 +375,22 @@ impl CellClassifier {
         };
         let mut domain_cell_scores: HashMap<&str, Vec<f32>> = HashMap::new();
         let mut cell_scores: Vec<f32> = Vec::with_capacity(self.cells.len());
+        let mut ranked_entries: Vec<Vec<String>> = Vec::with_capacity(self.cells.len());
         for cell in &self.cells {
             let k = k_of(cell.embeddings.len());
-            let mut sims: Vec<f32> = cell
+            // Pair each member's similarity with its name so the displayed
+            // exemplars can be ordered by the similarity that produced them.
+            let mut scored: Vec<(f32, &String)> = cell
                 .embeddings
                 .iter()
-                .map(|e| cosine_sim(embedding, e))
+                .zip(&cell.entries)
+                .map(|(e, name)| (cosine_sim(embedding, e), name))
                 .collect();
-            sims.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+            scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            let sims: Vec<f32> = scored.iter().map(|(s, _)| *s).collect();
             let cs = topk_mean(&sims, k);
             cell_scores.push(cs);
+            ranked_entries.push(scored.into_iter().map(|(_, name)| name.clone()).collect());
             domain_cell_scores
                 .entry(cell.domain.as_str())
                 .or_default()
@@ -403,7 +409,8 @@ impl CellClassifier {
             .cells
             .iter()
             .zip(cell_scores)
-            .map(|(cell, cell_score)| {
+            .zip(ranked_entries)
+            .map(|((cell, cell_score), entries)| {
                 let ds = *domain_score.get(cell.domain.as_str()).unwrap_or(&0.0);
                 // Population weight: larger cells have more reliable top entries,
                 // so their scores get a modest boost; small cells get a small boost
@@ -420,7 +427,8 @@ impl CellClassifier {
                     domain: cell.domain.clone(),
                     mode: cell.mode.clone(),
                     score,
-                    entries: cell.entries.clone(),
+                    // Already ranked by per-entry similarity in the scoring loop.
+                    entries,
                     facets: Facets::aggregate(&cell.facets),
                 }
             })
