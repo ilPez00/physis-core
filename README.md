@@ -461,6 +461,298 @@ cargo publish --package physis-core --dry-run
 
 ---
 
+---
+
+## Practical Examples
+
+### Build a Quality Prediction Agent
+
+```rust
+use physis_core::{
+    PhysisCore, RandomProjectionEmbedder, VectorEmbed,
+    quality::QualityTracker,
+    classify::{classify_text, ClassifierConfig},
+    ontology::OntologyLoader,
+    config::PhysisConfig,
+};
+
+fn main() -> anyhow::Result<()> {
+    let embedder = RandomProjectionEmbedder::new(64);
+    let ontology = OntologyLoader::load_all(&PhysisConfig::default());
+    let mut core = PhysisCore::new();
+    core.set_embedder_id("random-projection");
+
+    // Load quality tracker (persisted penalties)
+    let mut quality = QualityTracker::load("~/.physis-core/quality.json")?;
+
+    // Ingest a production defect report
+    let report = "Surface finish degradation on turned parts — chatter marks";
+    let classification = classify_text(report, &ontology, &embedder, &ClassifierConfig::default());
+
+    println!("Top cell: {}×{} ({:.2})", 
+        classification.top_cell.domain, 
+        classification.top_cell.mode, 
+        classification.top_cell.score);
+
+    // Apply quality penalty for this cell (learned from past failures)
+    let penalty = quality.penalty_for_cell(&classification.top_cell.domain, &classification.top_cell.mode);
+    println!("Learned penalty: {:.2}", penalty);
+
+    // Register the defect with asserted failure
+    let node_id = core.register_node_from_text(report, &embedder)?;
+    core.assert_coherence(&node_id, -1.0);
+
+    // Save updated quality tracker
+    quality.save("~/.physis-core/quality.json")?;
+
+    Ok(())
+}
+```
+
+### Competing Hypotheses for Root Cause Analysis
+
+```rust
+use physis_core::{
+    PhysisCore, Hypothesis, HypothesisStatus, Evidence, EvidencePolarity,
+    RandomProjectionEmbedder, VectorEmbed,
+};
+
+fn main() {
+    let embedder = RandomProjectionEmbedder::new(128);
+    let mut core = PhysisCore::new();
+
+    // Hypothesis A: Thermal issue
+    let emb_a = embedder.embed("Nozzle temperature instability causes layer adhesion failure");
+    let mut hyp_a = Hypothesis::new("Thermal instability", emb_a);
+    hyp_a.assumptions.push("Thermistor reads true melt temperature".to_string());
+    let id_a = core.register_hypothesis(hyp_a);
+
+    // Hypothesis B: Material issue  
+    let emb_b = embedder.embed("Wet filament causes steam bubbles and poor layer bonding");
+    let mut hyp_b = Hypothesis::new("Moisture contamination", emb_b);
+    hyp_b.assumptions.push("Filament stored in sealed container with desiccant".to_string());
+    let id_b = core.register_hypothesis(hyp_b);
+
+    // Evidence supporting A
+    core.attach_evidence(&id_a, Evidence {
+        source: "thermal_camera".to_string(),
+        polarity: EvidencePolarity::Supports,
+        confidence: 0.92,
+        claim: "Nozzle temp oscillates ±8°C during print".to_string(),
+        observed_at: Some(chrono::Utc::now()),
+        embedding: vec![],
+        context: vec!["material: PLA".to_string(), "nozzle: 0.4mm".to_string()],
+    });
+
+    // Evidence refuting B
+    core.attach_evidence(&id_b, Evidence {
+        source: "humidity_sensor".to_string(),
+        polarity: EvidencePolarity::Refutes,
+        confidence: 0.88,
+        claim: "Filament chamber RH 12% — well below absorption threshold".to_string(),
+        observed_at: Some(chrono::Utc::now()),
+        embedding: vec![],
+        context: vec!["chamber: dry_box".to_string()],
+    });
+
+    // Update fitness scores
+    if let Some(h) = core.hypotheses.get_mut(&id_a) {
+        h.status = HypothesisStatus::Supported;
+        h.fitness = 0.91;
+    }
+    if let Some(h) = core.hypotheses.get_mut(&id_b) {
+        h.status = HypothesisStatus::Refuted;
+        h.fitness = 0.22;
+    }
+
+    // Best hypothesis wins
+    let best = core.hypotheses.values().max_by(|a,b| a.fitness.partial_cmp(&b.fitness).unwrap());
+    println!("Root cause: {} (fitness: {:.2})", best.unwrap().label, best.unwrap().fitness);
+}
+```
+
+### Token-Budgeted RAG for LLM Context
+
+```rust
+use physis_core::{
+    RagCorpus, RagChunk, TokenFixedRetriever, RandomProjectionEmbedder, VectorEmbed,
+};
+
+fn main() {
+    let embedder = RandomProjectionEmbedder::new(64);
+    let mut corpus = RagCorpus::new();
+
+    // Ingest technical docs
+    corpus.add_chunk(RagChunk::new(
+        "sof-001", 
+        "SOP-204: Spindle bearing replacement. Torque to 45Nm. Run-in 30min at 500RPM.",
+        embedder.embed("spindle bearing replacement torque run-in")
+    ));
+    corpus.add_chunk(RagChunk::new(
+        "sof-002",
+        "SOP-312: Coolant filter change. Interval 500h. Use FN-7 filter only.",
+        embedder.embed("coolant filter change interval")
+    ));
+    corpus.add_chunk(RagChunk::new(
+        "sof-003",
+        "SOP-108: Emergency stop reset. Verify guard closure. Press blue reset 3s.",
+        embedder.embed("emergency stop reset guard")
+    ));
+
+    let retriever = TokenFixedRetriever::new();
+    let query = embedder.embed("bearing torque procedure");
+
+    // Hard budget: 200 tokens max, diversity threshold 0.7
+    let result = retriever.retrieve_bounded(&corpus, &query, 200, 0.70);
+    
+    println!("Retrieved {} chunks, {} tokens", result.chunks.len(), result.total_tokens);
+    for chunk in result.chunks {
+        println!("  [{}] {}", chunk.id, chunk.text);
+    }
+}
+```
+
+### Ontology Gap Discovery — Find Missing Domains
+
+```rust
+use physis_core::{
+    discover, DiscoveryConfig, RandomProjectionEmbedder, OntologyLoader, PhysisConfig,
+};
+
+fn main() {
+    let embedder = RandomProjectionEmbedder::new(64);
+    let ontology = OntologyLoader::load_all(&PhysisConfig::default());
+
+    // Unclassified maintenance logs from a new machine type
+    let logs = vec![
+        "Laser power drift during micro-welding cycle".to_string(),
+        "Beam focus position variance exceeds 15 microns".to_string(),
+        "Argon shield gas flow instability at 12 L/min".to_string(),
+        "Galvo scanner hysteresis on tight radius corners".to_string(),
+    ];
+
+    let config = DiscoveryConfig {
+        coverage_threshold: 0.75,   // Flag texts below 0.75 similarity
+        min_cluster_size: 2,        // Need at least 2 similar texts
+        max_clusters: 8,
+    };
+
+    let report = discover(&logs, &ontology, &embedder, &config);
+
+    println!("Gap report: {} texts analyzed, {} clusters found", 
+        report.analyzed, report.proposed_domains.len());
+    
+    for (i, domain) in report.proposed_domains.iter().enumerate() {
+        println!("  Proposal {}: {}×{} — {}", i+1, domain.domain, domain.mode, domain.rationale);
+        println!("    Exemplars: {}", domain.exemplars.join(", "));
+    }
+
+    // Promote to ontology (serializes JSON for config/)
+    println!("{}", serde_json::to_string_pretty(&report.proposed_domains)?);
+}
+```
+
+### Contradiction Tracking — Non-Destructive Conflict Resolution
+
+```rust
+use physis_core::{
+    PhysisCore, Contradiction, ContradictionParty, ResolutionStatus,
+};
+
+fn main() {
+    let mut core = PhysisCore::new();
+
+    // Sensor A says pressure nominal
+    let claim_a = ContradictionParty {
+        source: "pressure_transducer_primary".to_string(),
+        claim: "System pressure 6.2 bar — within spec".to_string(),
+        confidence: 0.91,
+        context: vec!["location: manifold".to_string()],
+    };
+
+    // Sensor B says cavitation
+    let claim_b = ContradictionParty {
+        source: "acoustic_emission_sensor".to_string(),
+        claim: "Cavitation signatures detected at impeller".to_string(),
+        confidence: 0.96,
+        context: vec!["location: pump_impeller".to_string()],
+    };
+
+    // Register explicit contradiction (both preserved)
+    let conflict = Contradiction::new(claim_a, claim_b, 0.93);
+    let conflict_id = core.register_contradiction(conflict);
+
+    // Later: resolve with contextual grounding — dissent NOT deleted
+    core.resolve_contradiction(
+        &conflict_id,
+        ResolutionStatus::ResolvedPreferredB,
+        "Primary transducer upstream of clogged suction filter; cavitation confirmed by borescope",
+    );
+
+    // Audit trail shows full history
+    let events = core.epistemic_audit.query(&conflict_id);
+    for e in events {
+        println!("[{}] {} — {}", e.timestamp, e.event_type, e.note);
+    }
+}
+```
+
+### CLI Workflows
+
+```bash
+# Classify a technical issue
+physis-core classify "Coolant pump seal leaking at 200h interval"
+
+# Search ontology for relevant entries
+physis-core ontology --search "seal"
+
+# Filter by facets (machine process domain)
+physis-core facet --kind machine --lifecycle OPERATE
+
+# Ingest a vault of engineering notes
+physis-core scan ~/engineering-notes
+
+# Search coherence graph for similar issues
+physis-core search "pump seal" --limit 10
+
+# Assert a failure verdict (reinforcement learning signal)
+physis-core assert "Coolant pump seal leak" failure
+
+# Run dream cycle to generate countermeasures
+physis-core dream
+
+# Discover ontology gaps in unclassified logs
+physis-core discover ~/unclassified-logs --min-cluster 3
+
+# Launch embedded studio UI
+physis-core studio --port 3000
+```
+
+### Embedded Studio Web Workbench
+
+```bash
+# Start the studio (feature: studio, enabled by default)
+physis-core studio --port 3000 --host 127.0.0.1
+
+# Open http://127.0.0.1:3000 for:
+# - Classify Workbench: live multi-cell classification with quality penalties
+# - Semiotic Heatmap: interactive 5×14 grid with density mapping
+# - Ontology Editor: create/modify domain entries with instant re-indexing
+# - Corpus & Coherence Graph: browse nodes, examine confidence links
+# - Gap Discovery Studio: cluster unmapped docs → promote to ontology
+# - Quality Matrix: view penalties, inspect failures, apply boosts
+```
+
+### Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PHYSIS_CORE_DIR` | `$HOME/.physis-core` | State directory (`nodes.json`, `quality.json`, `custom_ontology.json`) |
+| `PHYSIS_STUDIO_HOST` | `127.0.0.1` | Bind address (loopback by default — scan routes read local paths) |
+| `PHYSIS_EMBEDDER` | auto-detect | `random-projection` for deterministic offline mode |
+
+---
+
 ## License
 
 `physis-core` is dual-licensed under the **Apache License, Version 2.0** ([LICENSE](LICENSE)).
