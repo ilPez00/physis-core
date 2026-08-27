@@ -113,6 +113,52 @@ pub struct ProcessMeasurement {
     pub is_nominal: bool,
 }
 
+impl ProcessMeasurement {
+    /// Compare this measurement against a constraint. Returns a `ProcessDeviation`
+    /// when `value` falls outside `[min_value, max_value]`; `severity` is a
+    /// normalized 0..1 overshoot beyond the nearest bound (clamped). A constraint
+    /// with neither bound set can never flag.
+    pub fn deviation_against(
+        &self,
+        constraint: &ProcessConstraint,
+        task_or_process_id: &str,
+    ) -> Option<ProcessDeviation> {
+        let (lo, hi) = (constraint.min_value, constraint.max_value);
+        let out_of = match (lo, hi) {
+            (Some(l), Some(h)) => self.value < l || self.value > h,
+            (Some(l), None) => self.value < l,
+            (None, Some(h)) => self.value > h,
+            (None, None) => false,
+        };
+        if !out_of {
+            return None;
+        }
+        let (overshoot, expected) = match (lo, hi) {
+            (Some(l), _) if self.value < l => (l - self.value, l),
+            (_, Some(h)) if self.value > h => (self.value - h, h),
+            _ => (0.0, self.value),
+        };
+        let span = match (lo, hi) {
+            (Some(l), Some(h)) => (h - l).max(1e-9),
+            _ => 1.0,
+        };
+        let severity: Score = ((overshoot / span).min(1.0)) as f32;
+        Some(ProcessDeviation {
+            id: format!("{}-dev", self.id),
+            task_or_process_id: task_or_process_id.to_string(),
+            metric: self.metric.clone(),
+            expected_value: expected,
+            observed_value: self.value,
+            severity,
+            detected_at: self.timestamp,
+            description: format!(
+                "{} out of nominal range for {} (observed {}{})",
+                self.metric, constraint.id, self.value, self.unit
+            ),
+        })
+    }
+}
+
 /// Observed deviation from plan or expected nominal state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessDeviation {
@@ -191,5 +237,98 @@ impl ProcessCycle {
 
     pub fn complete_outcome(&mut self, outcome: ProcessOutcome) {
         self.outcome = Some(outcome);
+    }
+
+    /// Scan recorded measurements against a set of constraints, pushing a
+    /// `ProcessDeviation` for each out-of-bounds reading (matched on `metric`).
+    /// Returns the number of deviations added. Idempotent only if the caller
+    /// clears `deviations` first — callers usually run this once before review.
+    pub fn scan_deviations(&mut self, constraints: &[ProcessConstraint]) -> usize {
+        let before = self.deviations.len();
+        for m in &self.measurements {
+            for c in constraints {
+                if c.metric == m.metric {
+                    if let Some(d) = m.deviation_against(c, &self.id) {
+                        self.deviations.push(d);
+                    }
+                }
+            }
+        }
+        self.deviations.len() - before
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn constraint(metric: &str, lo: Option<f64>, hi: Option<f64>) -> ProcessConstraint {
+        ProcessConstraint {
+            id: format!("c-{metric}"),
+            name: metric.to_string(),
+            metric: metric.to_string(),
+            min_value: lo,
+            max_value: hi,
+            is_hard_constraint: true,
+        }
+    }
+
+    fn measurement(metric: &str, value: f64) -> ProcessMeasurement {
+        ProcessMeasurement {
+            id: format!("m-{metric}-{value}"),
+            metric: metric.to_string(),
+            value,
+            unit: "C".to_string(),
+            machine_or_source: "sensor-1".to_string(),
+            timestamp: chrono::Utc::now(),
+            is_nominal: true,
+        }
+    }
+
+    #[test]
+    fn test_in_range_is_no_deviation() {
+        let c = constraint("temp", Some(0.0), Some(100.0));
+        let m = measurement("temp", 50.0);
+        assert!(m.deviation_against(&c, "cyc-1").is_none());
+    }
+
+    #[test]
+    fn test_over_max_flags_with_severity() {
+        let c = constraint("temp", Some(0.0), Some(100.0));
+        let m = measurement("temp", 150.0);
+        let d = m.deviation_against(&c, "cyc-1").expect("should flag");
+        assert_eq!(d.metric, "temp");
+        assert_eq!(d.expected_value, 100.0);
+        assert!((d.severity - 0.5).abs() < 1e-9, "50 over a span of 100 → 0.5");
+        assert!(d.description.contains("150"));
+    }
+
+    #[test]
+    fn test_under_min_flags_with_expected_lo() {
+        let c = constraint("temp", Some(10.0), Some(100.0));
+        let m = measurement("temp", 5.0);
+        let d = m.deviation_against(&c, "cyc-1").expect("should flag");
+        assert_eq!(d.expected_value, 10.0);
+        assert!(((d.severity as f64) - 5.0 / 90.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_unbounded_constraint_never_flags() {
+        let c = constraint("temp", None, None);
+        let m = measurement("temp", 999.0);
+        assert!(m.deviation_against(&c, "cyc-1").is_none());
+    }
+
+    #[test]
+    fn test_cycle_scan_deviations_counts() {
+        let mut cyc = ProcessCycle::new("cyc-1");
+        cyc.record_measurement(measurement("temp", 50.0)); // ok
+        cyc.record_measurement(measurement("temp", 150.0)); // over
+        cyc.record_measurement(measurement("press", 5.0)); // no constraint match
+        let c_temp = constraint("temp", Some(0.0), Some(100.0));
+        let added = cyc.scan_deviations(&[c_temp]);
+        assert_eq!(added, 1);
+        assert_eq!(cyc.deviations.len(), 1);
+        assert_eq!(cyc.deviations[0].metric, "temp");
     }
 }
