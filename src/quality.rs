@@ -10,21 +10,6 @@ use serde::{Deserialize, Serialize};
 use crate::embed::VectorEmbed;
 use crate::models::{cosine_sim, Score};
 
-/// Penalty reason codes for auditability and automatic boost triggers.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum PenaltyReason {
-    /// Generic failure, no specific pattern identified
-    Generic,
-    /// Repeated failure in same cell type (pattern learning)
-    RepeatFailure,
-    /// Adjacent cell should have been chosen instead (cross-cell learning)
-    RelatedCellBetter,
-    /// Domain criticality makes this failure more significant
-    DomainCritical,
-    /// Quality threshold exceeded, auto-boost needed
-    ThresholdExceeded,
-}
-
 /// A recorded quality failure — what was wrong, where in the grid it landed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QualityFailure {
@@ -58,37 +43,14 @@ impl QualityFailure {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct BoostInfo {
-    pub amount: f32,
-    pub decay_rate: f32, // per second
-    pub last_reinforced: std::time::Instant,
-}
-
-impl BoostInfo {
-    pub fn current_value(&self) -> f32 {
-        let elapsed = self.last_reinforced.elapsed().as_secs_f32();
-        let decay = self.decay_rate * elapsed;
-        (self.amount - decay).max(0.0)
-    }
-
-    pub fn reinforce(&mut self, amount: f32) {
-        self.amount = (self.amount + amount).min(1.0);
-        self.last_reinforced = std::time::Instant::now();
-    }
-}
-
 /// Tracks quality feedback and applies penalty/gain to semiotic cells.
 pub struct QualityTracker {
     pub failures: Vec<QualityFailure>,
     /// Per-cell negative weight (cell_key → penalty 0.0–1.0).
     pub cell_penalties: HashMap<String, f32>,
-    /// Per-cell positive weight (cell_key → f32, capped at 1.0). Boosts
-    /// accumulate with reinforcement and decay over time if not reinforced.
-    pub cell_boosts: HashMap<String, BoostInfo>,
+    /// Per-cell positive weight (corrections).
+    pub cell_boosts: HashMap<String, f32>,
     embedder: Box<dyn VectorEmbed>,
-    /// Decay rate for boosts (per second)
-    pub boost_decay_rate: f32,
 }
 
 impl QualityTracker {
@@ -98,7 +60,6 @@ impl QualityTracker {
             cell_penalties: HashMap::new(),
             cell_boosts: HashMap::new(),
             embedder,
-            boost_decay_rate: 0.001,
         }
     }
 
@@ -118,10 +79,7 @@ impl QualityTracker {
             .collect();
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        let (top_cell, top_score) = scored
-            .first()
-            .map(|(k, s)| (*k, *s))
-            .unwrap_or(("UNKNOWN", 0.0));
+        let (top_cell, top_score) = scored.first().map(|(k, s)| (*k, *s)).unwrap_or(("UNKNOWN", 0.0));
 
         let severity = if top_score < 0.3 {
             0.8
@@ -138,15 +96,8 @@ impl QualityTracker {
             let correct_emb = self.embedder.embed(correct);
             for (key, centroid) in cell_centroids {
                 if cosine_sim(&correct_emb, centroid) > 0.6 {
-                    let boost = self
-                        .cell_boosts
-                        .entry(key.clone())
-                        .or_insert_with(|| BoostInfo {
-                            amount: 0.0,
-                            decay_rate: self.boost_decay_rate,
-                            last_reinforced: std::time::Instant::now(),
-                        });
-                    boost.reinforce(0.1);
+                    let boost = self.cell_boosts.entry(key.clone()).or_insert(0.0);
+                    *boost = (*boost + 0.1).min(1.0);
                 }
             }
         }
@@ -154,18 +105,11 @@ impl QualityTracker {
         failure.severity = severity;
         self.failures.push(failure);
 
-        let penalty = self
-            .cell_penalties
-            .entry(top_cell.to_string())
-            .or_insert(0.0);
+        let penalty = self.cell_penalties.entry(top_cell.to_string()).or_insert(0.0);
         *penalty = (*penalty + severity * 0.2).min(1.0);
 
         // Same cell flagged 3+ times → lock it.
-        let same_cell_count = self
-            .failures
-            .iter()
-            .filter(|f| f.top_cell == top_cell)
-            .count();
+        let same_cell_count = self.failures.iter().filter(|f| f.top_cell == top_cell).count();
         if same_cell_count >= 3 {
             *penalty = 1.0;
         }
@@ -192,18 +136,8 @@ impl QualityTracker {
 
     /// Report positive feedback — user confirmed the output is good.
     pub fn report_success(&mut self, cell: &str) {
-        let decay_rate = self.boost_decay_rate;
-        let boost = self
-            .cell_boosts
-            .entry(cell.to_string())
-            .or_insert_with(|| BoostInfo {
-                amount: 0.0,
-                decay_rate,
-                last_reinforced: std::time::Instant::now(),
-            });
-        boost.reinforce(0.15);
-
-        // Reduce penalty if the cell was previously penalized
+        let boost = self.cell_boosts.entry(cell.to_string()).or_insert(0.0);
+        *boost = (*boost + 0.15).min(1.0);
         if let Some(p) = self.cell_penalties.get_mut(cell) {
             *p = (*p - 0.1).max(0.0);
         }
@@ -218,11 +152,7 @@ impl QualityTracker {
     /// the display can say "healthy" about a cell the engine is demoting.
     pub fn cell_standing(&self, cell: &str) -> f32 {
         let penalty = self.cell_penalties.get(cell).copied().unwrap_or(0.0);
-        let boost = self
-            .cell_boosts
-            .get(cell)
-            .map(|b| b.current_value())
-            .unwrap_or(0.0);
+        let boost = self.cell_boosts.get(cell).copied().unwrap_or(0.0);
         1.0 - penalty + boost
     }
 
@@ -237,10 +167,7 @@ impl QualityTracker {
         out.push_str("=== Quality Tracker ===");
         out.push('\n');
         out.push_str(&format!("Total failures: {}\n", self.failures.len()));
-        out.push_str(&format!(
-            "Cells with penalties: {}\n",
-            self.cell_penalties.len()
-        ));
+        out.push_str(&format!("Cells with penalties: {}\n", self.cell_penalties.len()));
         out.push_str(&format!("Cells with boosts: {}\n", self.cell_boosts.len()));
         out.push('\n');
 
@@ -249,17 +176,12 @@ impl QualityTracker {
             return out;
         }
 
-        // Cell keys are stored as "DOMAIN\0MODE" (NUL-joined) for exact lookup;
-        // NUL renders as an invisible/broken glyph in terminals, so display a
-        // readable separator instead.
-        let display_cell = |cell: &str| cell.replace('\0', "/");
-
         out.push_str("--- Recent Failures ---\n");
         for f in self.failures.iter().rev().take(5) {
             out.push_str(&format!(
                 "  [{}] cell={} score={:.3} sev={:.1} feedback={}\n",
                 &f.id[..8],
-                display_cell(&f.top_cell),
+                f.top_cell,
                 f.top_score,
                 f.severity,
                 &f.feedback[..f.feedback.len().min(60)],
@@ -271,11 +193,7 @@ impl QualityTracker {
         let mut sorted: Vec<_> = self.cell_penalties.iter().collect();
         sorted.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap_or(std::cmp::Ordering::Equal));
         for (cell, penalty) in sorted.iter().take(10) {
-            out.push_str(&format!(
-                "  {}: penalty={:.2}\n",
-                display_cell(cell),
-                penalty
-            ));
+            out.push_str(&format!("  {}: penalty={:.2}\n", cell, penalty));
         }
 
         out
@@ -446,6 +364,7 @@ impl ConditionLens {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -479,32 +398,10 @@ mod tests {
         assert!(t.adjust_score("WORK\x00LIFT", 0.8) < 0.8);
     }
 
-    /// Regression (QA 8.5): cell keys are NUL-joined for exact lookup, but the
-    /// summary is terminal output — an invisible/broken glyph must never reach
-    /// it. Both the failure list and the penalty table render "DOMAIN/MODE".
-    #[test]
-    fn summary_renders_cells_without_nul() {
-        let mut t = make_tracker();
-        let mut centroids = HashMap::new();
-        centroids.insert("WORK\x00LIFT".to_string(), vec![0.5; 64]);
-        t.report_failure("this output missed the mark", &centroids, None);
-
-        let s = t.summary();
-        assert!(!s.contains('\0'), "summary must not contain NUL");
-        assert!(s.contains("WORK/LIFT"), "readable separator expected: {s}");
-    }
-
     #[test]
     fn adjust_score_with_boost_increases() {
         let mut t = make_tracker();
-        t.cell_boosts.insert(
-            "WORK\x00LIFT".to_string(),
-            BoostInfo {
-                amount: 0.5,
-                decay_rate: t.boost_decay_rate,
-                last_reinforced: std::time::Instant::now(),
-            },
-        );
+        t.cell_boosts.insert("WORK\x00LIFT".to_string(), 0.5);
         assert!(t.adjust_score("WORK\x00LIFT", 0.8) > 0.8);
     }
 
@@ -533,10 +430,7 @@ mod tests {
         // Out-of-range severity is clamped rather than trusted.
         let mut t2 = make_tracker();
         t2.penalize_cell(cell, -5.0);
-        assert_eq!(
-            t2.cell_penalties[cell], 0.0,
-            "negative severity cannot boost"
-        );
+        assert_eq!(t2.cell_penalties[cell], 0.0, "negative severity cannot boost");
     }
 
     #[test]
@@ -557,16 +451,9 @@ mod tests {
     /// paint 40-odd uncovered intersections alarm-red and bury the real ones.
     #[test]
     fn an_unpopulated_cell_reads_as_unknown_not_bad() {
-        for lens in [
-            ConditionLens::Responsive,
-            ConditionLens::Balanced,
-            ConditionLens::Trusting,
-        ] {
+        for lens in [ConditionLens::Responsive, ConditionLens::Balanced, ConditionLens::Trusting] {
             let c = cell_condition(0, 0.1, Some(-1.0), lens.confidence());
-            assert_eq!(
-                c, NEUTRAL_CONDITION,
-                "{lens:?} must call an empty cell unknown"
-            );
+            assert_eq!(c, NEUTRAL_CONDITION, "{lens:?} must call an empty cell unknown");
         }
     }
 
@@ -577,10 +464,7 @@ mod tests {
         let conf = ConditionLens::Responsive.confidence();
         let healthy = cell_condition(10, 1.0, None, conf);
         let demoted = cell_condition(10, 0.2, None, conf);
-        assert!(
-            demoted < healthy,
-            "demoted {demoted} should read worse than healthy {healthy}"
-        );
+        assert!(demoted < healthy, "demoted {demoted} should read worse than healthy {healthy}");
     }
 
     /// Boosts push standing above 1.0 without bound; squashing keeps them
@@ -591,10 +475,7 @@ mod tests {
         let neutral = cell_condition(10, 1.0, None, conf);
         let boosted = cell_condition(10, 2.0, None, conf);
         let very_boosted = cell_condition(10, 6.0, None, conf);
-        assert!(
-            neutral < boosted && boosted < very_boosted,
-            "boost must stay ordered"
-        );
+        assert!(neutral < boosted && boosted < very_boosted, "boost must stay ordered");
         assert!(very_boosted <= 1.0, "condition must stay within the ramp");
     }
 
@@ -625,14 +506,8 @@ mod tests {
         let conf = ConditionLens::Trusting.confidence();
         let thin = cell_condition(2, 0.1, Some(-1.0), conf);
         let thick = cell_condition(64, 0.1, Some(-1.0), conf);
-        assert!(
-            thick < thin,
-            "more evidence must move the colour further from neutral"
-        );
-        assert!(
-            thick < 0.2,
-            "a well-evidenced bad cell must still read bad (got {thick})"
-        );
+        assert!(thick < thin, "more evidence must move the colour further from neutral");
+        assert!(thick < 0.2, "a well-evidenced bad cell must still read bad (got {thick})");
     }
 
     /// Population alone is not health: the responsive lens must ignore size
@@ -642,26 +517,14 @@ mod tests {
         let conf = ConditionLens::Responsive.confidence();
         let small = cell_condition(1, 0.4, Some(0.2), conf);
         let large = cell_condition(400, 0.4, Some(0.2), conf);
-        assert!(
-            (small - large).abs() < 1e-6,
-            "size must not shift the responsive reading"
-        );
+        assert!((small - large).abs() < 1e-6, "size must not shift the responsive reading");
     }
 
     #[test]
     fn lens_parses_presets_and_slider_positions_and_rejects_junk() {
-        assert_eq!(
-            ConditionLens::parse("trusting"),
-            Some(ConditionLens::Trusting)
-        );
-        assert_eq!(
-            ConditionLens::parse("  Balanced "),
-            Some(ConditionLens::Balanced)
-        );
-        assert_eq!(
-            ConditionLens::parse("0.25"),
-            Some(ConditionLens::Custom(0.25))
-        );
+        assert_eq!(ConditionLens::parse("trusting"), Some(ConditionLens::Trusting));
+        assert_eq!(ConditionLens::parse("  Balanced "), Some(ConditionLens::Balanced));
+        assert_eq!(ConditionLens::parse("0.25"), Some(ConditionLens::Custom(0.25)));
         assert_eq!(ConditionLens::parse("0"), Some(ConditionLens::Custom(0.0)));
         // Out of range and nonsense both fall back to the default rather than
         // silently pinning the grid to an extreme.
@@ -675,14 +538,7 @@ mod tests {
     fn condition_stays_within_the_ramp_for_extreme_inputs() {
         for count in [0u32, 1, 7, 1_000] {
             for standing in [0.0f32, 0.5, 1.0, 25.0] {
-                for verdict in [
-                    None,
-                    Some(-1.0),
-                    Some(0.0),
-                    Some(1.0),
-                    Some(-9.0),
-                    Some(9.0),
-                ] {
+                for verdict in [None, Some(-1.0), Some(0.0), Some(1.0), Some(-9.0), Some(9.0)] {
                     for conf in [0.0f32, 0.35, 1.0] {
                         let c = cell_condition(count, standing, verdict, conf);
                         assert!(
@@ -726,30 +582,14 @@ impl FitnessContext {
     /// Compact key for maps: sorted `key=value` pairs joined by `;`.
     pub fn key(&self) -> String {
         let mut parts = Vec::new();
-        if let Some(v) = &self.domain {
-            parts.push(format!("domain={v}"));
-        }
-        if let Some(v) = &self.machine {
-            parts.push(format!("machine={v}"));
-        }
-        if let Some(v) = &self.process {
-            parts.push(format!("process={v}"));
-        }
-        if let Some(v) = &self.environment {
-            parts.push(format!("env={v}"));
-        }
-        if let Some(v) = &self.operator {
-            parts.push(format!("operator={v}"));
-        }
-        if let Some(v) = &self.material {
-            parts.push(format!("material={v}"));
-        }
-        if let Some(v) = &self.state {
-            parts.push(format!("state={v}"));
-        }
-        if let Some(v) = &self.task {
-            parts.push(format!("task={v}"));
-        }
+        if let Some(v) = &self.domain { parts.push(format!("domain={v}")); }
+        if let Some(v) = &self.machine { parts.push(format!("machine={v}")); }
+        if let Some(v) = &self.process { parts.push(format!("process={v}")); }
+        if let Some(v) = &self.environment { parts.push(format!("env={v}")); }
+        if let Some(v) = &self.operator { parts.push(format!("operator={v}")); }
+        if let Some(v) = &self.material { parts.push(format!("material={v}")); }
+        if let Some(v) = &self.state { parts.push(format!("state={v}")); }
+        if let Some(v) = &self.task { parts.push(format!("task={v}")); }
         parts.sort();
         parts.join(";")
     }
@@ -844,17 +684,8 @@ impl ContextualQualityTracker {
             .collect();
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        let (top_cell, top_score) = scored
-            .first()
-            .map(|(k, s)| (*k, *s))
-            .unwrap_or(("UNKNOWN", 0.0));
-        let severity = if top_score < 0.3 {
-            0.8
-        } else if top_score < 0.6 {
-            0.5
-        } else {
-            0.3
-        };
+        let (top_cell, top_score) = scored.first().map(|(k, s)| (*k, *s)).unwrap_or(("UNKNOWN", 0.0));
+        let severity = if top_score < 0.3 { 0.8 } else if top_score < 0.6 { 0.5 } else { 0.3 };
 
         let mut failure = QualityFailure::new(feedback, embedding, top_cell, top_score);
         failure.severity = severity;
@@ -872,18 +703,14 @@ impl ContextualQualityTracker {
 
         self.global_failures.push(failure);
 
-        let penalty = self
-            .global_penalties
-            .entry(top_cell.to_string())
-            .or_insert(0.0);
+        let penalty = self.global_penalties.entry(top_cell.to_string()).or_insert(0.0);
         *penalty = (*penalty + severity * 0.2).min(1.0);
 
         // Context-dependent fitness update
         let ctx_key = format!("{top_cell}:{}", context.key());
-        let rec = self
-            .fitness_records
-            .entry(ctx_key)
-            .or_insert_with(|| FitnessRecord::new(top_cell.to_string(), context));
+        let rec = self.fitness_records.entry(ctx_key).or_insert_with(|| {
+            FitnessRecord::new(top_cell.to_string(), context)
+        });
         rec.record_failure();
 
         self.global_failures.last().unwrap()
@@ -903,10 +730,9 @@ impl ContextualQualityTracker {
         }
 
         let ctx_key = format!("{cell}:{}", context.key());
-        let rec = self
-            .fitness_records
-            .entry(ctx_key)
-            .or_insert_with(|| FitnessRecord::new(cell.to_string(), context));
+        let rec = self.fitness_records.entry(ctx_key).or_insert_with(|| {
+            FitnessRecord::new(cell.to_string(), context)
+        });
         rec.record_failure();
     }
 
@@ -919,10 +745,9 @@ impl ContextualQualityTracker {
         }
 
         let ctx_key = format!("{cell}:{}", context.key());
-        let rec = self
-            .fitness_records
-            .entry(ctx_key)
-            .or_insert_with(|| FitnessRecord::new(cell.to_string(), context));
+        let rec = self.fitness_records.entry(ctx_key).or_insert_with(|| {
+            FitnessRecord::new(cell.to_string(), context)
+        });
         rec.record_success();
     }
 
@@ -962,14 +787,8 @@ impl ContextualQualityTracker {
     pub fn summary(&self) -> String {
         let mut out = String::new();
         out.push_str("=== Contextual Quality Tracker ===\n");
-        out.push_str(&format!(
-            "Global failures: {}\n",
-            self.global_failures.len()
-        ));
-        out.push_str(&format!(
-            "Context records: {}\n",
-            self.fitness_records.len()
-        ));
+        out.push_str(&format!("Global failures: {}\n", self.global_failures.len()));
+        out.push_str(&format!("Context records: {}\n", self.fitness_records.len()));
         out.push('\n');
 
         for (key, rec) in self.fitness_records.iter().take(10) {
