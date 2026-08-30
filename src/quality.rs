@@ -44,12 +44,17 @@ impl QualityFailure {
 }
 
 /// Tracks quality feedback and applies penalty/gain to semiotic cells.
+/// Also tracks per-agent penalty/boost state for agent judging/tracking.
 pub struct QualityTracker {
     pub failures: Vec<QualityFailure>,
     /// Per-cell negative weight (cell_key → penalty 0.0–1.0).
     pub cell_penalties: HashMap<String, f32>,
     /// Per-cell positive weight (corrections).
     pub cell_boosts: HashMap<String, f32>,
+    /// Per-agent negative weight (agent_id → penalty 0.0–1.0).
+    pub agent_penalties: HashMap<String, f32>,
+    /// Per-agent positive weight (agent_id → boost 0.0–1.0).
+    pub agent_boosts: HashMap<String, f32>,
     embedder: Box<dyn VectorEmbed>,
 }
 
@@ -59,6 +64,8 @@ impl QualityTracker {
             failures: Vec::new(),
             cell_penalties: HashMap::new(),
             cell_boosts: HashMap::new(),
+            agent_penalties: HashMap::new(),
+            agent_boosts: HashMap::new(),
             embedder,
         }
     }
@@ -140,6 +147,28 @@ impl QualityTracker {
         *boost = (*boost + 0.15).min(1.0);
         if let Some(p) = self.cell_penalties.get_mut(cell) {
             *p = (*p - 0.1).max(0.0);
+        }
+    }
+
+    /// Report positive feedback for an agent — agent confirmed output is good.
+    /// Increases agent boost and decreases agent penalty.
+    pub fn report_agent_success(&mut self, agent_id: &str) {
+        let agent_boost = self.agent_boosts.entry(agent_id.to_string()).or_insert(0.0);
+        *agent_boost = (*agent_boost + 0.1).min(1.0);
+        let agent_penalty = self.agent_penalties.get_mut(agent_id);
+        if let Some(p) = agent_penalty {
+            *p = (*p - 0.05).max(0.0);
+        }
+    }
+
+    /// Report agent failure — agent produced bad output / error.
+    /// Increases agent penalty and decreases agent boost.
+    pub fn report_agent_failure(&mut self, agent_id: &str) {
+        let agent_penalty = self.agent_penalties.entry(agent_id.to_string()).or_insert(0.0);
+        *agent_penalty = (*agent_penalty + 0.1).min(1.0);
+        let agent_boost = self.agent_boosts.get_mut(agent_id);
+        if let Some(b) = agent_boost {
+            *b = (*b - 0.05).max(0.0);
         }
     }
 
