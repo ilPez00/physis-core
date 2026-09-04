@@ -139,6 +139,7 @@ pub mod coherence_dimensions;
 pub mod coherence_query;
 pub mod contradiction;
 pub mod core;
+pub mod delta_engine;
 pub mod discovery;
 pub mod edition;
 pub mod embed;
@@ -176,6 +177,11 @@ pub use coherence_query::{
 };
 pub use contradiction::{Contradiction, ContradictionParty, ResolutionStatus};
 pub use core::PhysisCore;
+pub use delta_engine::{
+    evaluate_mutation, EvaluationContext, HypothesisTransition, MutationOp, NodeDelta,
+    OntologyDeltaReport, OntologyMutation, DEGRADATION_THRESHOLD, GAMMA, MAX_PROPAGATION_DEPTH,
+    MIN_IMPACT,
+};
 pub use discovery::{discover, DiscoveryConfig, DiscoveryReport, ProposedDomain};
 pub use embed::{RandomProjectionEmbedder, VectorEmbed};
 pub use epistemic::{EpistemicAuditTrail, EpistemicEvent, EpistemicEventType};
