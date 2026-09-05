@@ -63,7 +63,12 @@ fn single_node_mutation_affects_radius() {
         "n0",
         MutationOp::EmbeddingShift {
             old_embedding: unit_vector(0),
-            new_embedding: vec![0.7071, 0.7071, 0.0, 0.0],
+            new_embedding: vec![
+                std::f32::consts::FRAC_1_SQRT_2,
+                std::f32::consts::FRAC_1_SQRT_2,
+                0.0,
+                0.0,
+            ],
         },
     );
 

@@ -533,54 +533,54 @@ pub fn evaluate_mutation(
 
         let coherence_delta = prev_coherence - updated.coherence;
 
-        if coherence_delta > DEGRADATION_THRESHOLD {
-            if matches!(
+        if coherence_delta > DEGRADATION_THRESHOLD
+            && matches!(
                 prev_status,
                 HypothesisStatus::Supported | HypothesisStatus::Confirmed
-            ) {
-                let new_status = HypothesisStatus::Contradicted;
+            )
+        {
+            let new_status = HypothesisStatus::Contradicted;
 
-                // Insert contradicting evidence automatically
-                let evidence = Evidence::contradicts(
-                    &mutation.id,
-                    format!(
-                        "Node '{}' embedding shifted; semantic alignment degraded \
-                         by {:.4} (coherence {:.4} → {:.4}). Fitness change: {:.4}.",
-                        target_id,
-                        coherence_delta,
-                        prev_coherence,
-                        updated.coherence,
-                        prev_fitness - updated.fitness,
-                    ),
-                );
-                updated.contradicting_evidence.push(evidence);
-                updated.recompute_fitness();
+            // Insert contradicting evidence automatically
+            let evidence = Evidence::contradicts(
+                &mutation.id,
+                format!(
+                    "Node '{}' embedding shifted; semantic alignment degraded \
+                     by {:.4} (coherence {:.4} → {:.4}). Fitness change: {:.4}.",
+                    target_id,
+                    coherence_delta,
+                    prev_coherence,
+                    updated.coherence,
+                    prev_fitness - updated.fitness,
+                ),
+            );
+            updated.contradicting_evidence.push(evidence);
+            updated.recompute_fitness();
 
-                hypothesis_transitions.push(HypothesisTransition {
-                    hypothesis_id: updated.id.clone(),
-                    previous_status: prev_status,
-                    new_status,
-                    trigger_reason: format!(
-                        "Semantic degradation exceeded threshold ϵ={} \
-                         (Δcoherence={:.4})",
-                        DEGRADATION_THRESHOLD, coherence_delta,
-                    ),
-                });
+            hypothesis_transitions.push(HypothesisTransition {
+                hypothesis_id: updated.id.clone(),
+                previous_status: prev_status,
+                new_status,
+                trigger_reason: format!(
+                    "Semantic degradation exceeded threshold ϵ={} \
+                     (Δcoherence={:.4})",
+                    DEGRADATION_THRESHOLD, coherence_delta,
+                ),
+            });
 
-                // Reflect the transition on the shadow hypothesis
-                updated.status = new_status;
-                updated.revised_at = Utc::now();
-                updated.revision_history.push(crate::hypothesis::Revision {
-                    timestamp: Utc::now(),
-                    description: format!(
-                        "Auto-transitioned to Contradicted by delta engine (mutation {})",
-                        mutation.id
-                    ),
-                    previous_status: prev_status,
-                    new_status,
-                    trigger: Some(mutation.id.clone()),
-                });
-            }
+            // Reflect the transition on the shadow hypothesis
+            updated.status = new_status;
+            updated.revised_at = Utc::now();
+            updated.revision_history.push(crate::hypothesis::Revision {
+                timestamp: Utc::now(),
+                description: format!(
+                    "Auto-transitioned to Contradicted by delta engine (mutation {})",
+                    mutation.id
+                ),
+                previous_status: prev_status,
+                new_status,
+                trigger: Some(mutation.id.clone()),
+            });
         }
 
         ctx.shadow_hypotheses.insert(updated.id.clone(), updated);
