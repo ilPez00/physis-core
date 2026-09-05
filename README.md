@@ -159,9 +159,9 @@ Cross-referenced across **14 Operational Modes**:
 - **`hypothesis`**: Competing hypothesis data structures, evidence polarities, and revision histories.
 - **`ontology`**: Embedded loader for 33 built-in domain ontologies (human grid, machine process, AI agents, office operations).
 - **`praxis`**: Behavioral tracking records with success/inert/failure feedback loops.
-- **`process`**: Industrial and operational state machines, task sequences, and cycle tracking.
+- **`process`**: Industrial and operational state machines, task sequences, and cycle tracking; measurements flag their own deviation from a constraint's `[min, max]` band with a normalized 0..1 severity.
 - **`provenance`**: Cryptographic SHA-256 provenance chains connecting source data to final inferences.
-- **`quality`**: Quality feedback tracker with cell-level penalties and contextual fitness weighting.
+- **`quality`**: Quality feedback tracker with cell-level *and* per-agent penalties/boosts, plus contextual fitness weighting — an agent that keeps producing bad output for a domain gets demoted the same way a cell does.
 - **`rag`**: Fixed-budget token retrievers with BPE-style approximate tokenization and diversity filtering.
 - **`vault`**: Knowledge vault readers for Markdown hierarchies (frontmatter, headings) and Git log streams.
 - **`studio`**: Embedded Axum web server providing an interactive browser UI and RESTful HTTP API.
@@ -348,6 +348,61 @@ fn main() {
 
     let report = discover(&unmapped_corpus, &ontology, &embedder, &config);
     println!("Discovered {} candidate domain proposals", report.proposed_domains.len());
+}
+```
+
+### 6. Process Deviation Detection
+
+```rust
+use physis_core::{ProcessConstraint, ProcessCycle, ProcessMeasurement};
+
+fn main() {
+    let constraint = ProcessConstraint {
+        id: "spindle-temp".into(),
+        name: "Spindle temperature".into(),
+        metric: "temp_c".into(),
+        min_value: None,
+        max_value: Some(80.0),
+        is_hard_constraint: true,
+    };
+
+    let mut cycle = ProcessCycle::default();
+    cycle.measurements.push(ProcessMeasurement {
+        id: "m-1".into(),
+        metric: "temp_c".into(),
+        value: 92.0,
+        unit: "°C".into(),
+        machine_or_source: "cnc-01".into(),
+        timestamp: chrono::Utc::now(),
+        is_nominal: false,
+    });
+
+    // Flags every measurement outside its matching constraint's band.
+    let added = cycle.scan_deviations(&[constraint]);
+    println!("{added} deviation(s): {:?}", cycle.deviations);
+}
+```
+
+### 7. Per-Agent Quality Tracking
+
+```rust
+use physis_core::{QualityTracker, RandomProjectionEmbedder};
+
+fn main() {
+    let mut quality = QualityTracker::new(Box::new(RandomProjectionEmbedder::new(64)));
+
+    // A cell-level penalty (existing) and an agent-level one (new) are tracked
+    // separately, so a bad agent in an otherwise-healthy domain gets demoted
+    // without punishing every other agent working that cell.
+    quality.report_agent_failure("agent-euclid-worker-3");
+    quality.report_agent_failure("agent-euclid-worker-3");
+    quality.report_agent_success("agent-euclid-worker-3");
+
+    println!(
+        "penalty: {:.2}, boost: {:.2}",
+        quality.agent_penalties.get("agent-euclid-worker-3").copied().unwrap_or(0.0),
+        quality.agent_boosts.get("agent-euclid-worker-3").copied().unwrap_or(0.0),
+    );
 }
 ```
 
