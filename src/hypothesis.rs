@@ -432,6 +432,60 @@ impl Hypothesis {
         self.fitness = composite;
     }
 
+    /// Resolve a pending prediction: record what actually happened and whether
+    /// it matched, then let fitness absorb it.
+    ///
+    /// `recompute_fitness` has always read `Prediction.correct` — it drives both
+    /// `predictive_success` (0.25 of the composite) and
+    /// `failed_prediction_penalty`. Nothing could ever *write* it, so a quarter
+    /// of the fitness score was pinned at its 0.5 "no resolved predictions"
+    /// default for every hypothesis that has ever existed. Resolving a
+    /// prediction is the one operation that distinguishes this from a notes
+    /// file, and it was the only one missing.
+    ///
+    /// Returns false if `index` is out of range or that prediction is already
+    /// resolved. Re-resolving is refused rather than silently overwritten: a
+    /// prediction whose recorded outcome can change on a second call is not a
+    /// record of anything.
+    pub fn resolve_prediction(
+        &mut self,
+        index: usize,
+        actual_outcome: impl Into<String>,
+        correct: bool,
+    ) -> bool {
+        let Some(pred) = self.predictions.get_mut(index) else {
+            return false;
+        };
+        if pred.correct.is_some() {
+            return false;
+        }
+        pred.actual_outcome = Some(actual_outcome.into());
+        pred.observed_at = Some(chrono::Utc::now());
+        pred.correct = Some(correct);
+        let statement = pred.statement.clone();
+        self.recompute_fitness();
+        self.revise(
+            format!(
+                "Resolved prediction {} ({}): {}",
+                index,
+                if correct { "correct" } else { "WRONG" },
+                statement
+            ),
+            None,
+        );
+        true
+    }
+
+    /// Predictions still awaiting an outcome, with their index so they can be
+    /// resolved by position.
+    pub fn open_predictions(&self) -> Vec<(usize, &Prediction)> {
+        self.predictions
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.correct.is_none())
+            .collect()
+    }
+
     /// Convenience: total evidence count.
     pub fn evidence_count(&self) -> usize {
         self.supporting_evidence.len() + self.contradicting_evidence.len()
@@ -455,5 +509,119 @@ impl Hypothesis {
             new_status: self.status,
             trigger,
         });
+    }
+}
+
+#[cfg(test)]
+mod resolution_tests {
+    use super::*;
+
+    fn hyp() -> Hypothesis {
+        Hypothesis::new("clogs correlate with humidity", vec![0.1; 8])
+    }
+
+    /// `recompute_fitness` has always weighted `predictive_success` at 0.25 of
+    /// the composite, and nothing could write `Prediction.correct`, so that
+    /// quarter was pinned at its 0.5 default for every hypothesis that ever
+    /// existed. This is the test that the write path exists at all.
+    #[test]
+    fn resolving_a_prediction_moves_fitness() {
+        let mut h = hyp();
+        h.add_prediction(Prediction::new("humidity above 60% precedes a clog"));
+        let before = h.fitness;
+        assert!(h.resolve_prediction(0, "three clogs, all above 62%", true));
+        assert!(
+            h.fitness > before,
+            "a correct prediction must raise fitness ({before} -> {})",
+            h.fitness
+        );
+        assert_eq!(h.predictions[0].correct, Some(true));
+        assert!(h.predictions[0].observed_at.is_some());
+    }
+
+    #[test]
+    fn a_wrong_prediction_lowers_fitness() {
+        let mut h = hyp();
+        h.add_prediction(Prediction::new("humidity above 60% precedes a clog"));
+        let before = h.fitness;
+        assert!(h.resolve_prediction(0, "clogged at 31% humidity", false));
+        assert!(
+            h.fitness < before,
+            "a wrong prediction must lower fitness ({before} -> {})",
+            h.fitness
+        );
+    }
+
+    /// A record whose recorded outcome can change on a second call is not a
+    /// record of anything. Re-resolving is refused, not silently overwritten.
+    #[test]
+    fn a_resolved_prediction_cannot_be_rewritten() {
+        let mut h = hyp();
+        h.add_prediction(Prediction::new("p"));
+        assert!(h.resolve_prediction(0, "it held", true));
+        assert!(
+            !h.resolve_prediction(0, "actually it did not", false),
+            "re-resolving must be refused"
+        );
+        assert_eq!(h.predictions[0].correct, Some(true));
+        assert_eq!(h.predictions[0].actual_outcome.as_deref(), Some("it held"));
+    }
+
+    #[test]
+    fn resolving_out_of_range_is_refused_not_panicking() {
+        let mut h = hyp();
+        assert!(!h.resolve_prediction(7, "x", true));
+    }
+
+    /// `open_predictions` carries the index, because that index is what the CLI
+    /// asks the reader to type back into `hypothesis resolve`.
+    #[test]
+    fn open_predictions_carry_a_usable_index() {
+        let mut h = hyp();
+        h.add_prediction(Prediction::new("first"));
+        h.add_prediction(Prediction::new("second"));
+        h.add_prediction(Prediction::new("third"));
+        assert!(h.resolve_prediction(1, "done", true));
+
+        let open = h.open_predictions();
+        assert_eq!(open.len(), 2);
+        assert_eq!(h.pending_predictions(), 2);
+        assert_eq!(open[0].0, 0);
+        assert_eq!(open[1].0, 2, "indices must survive a gap, not be renumbered");
+        assert_eq!(open[1].1.statement, "third");
+    }
+
+    /// Resolving is a revision: the trajectory has to show it, or the audit
+    /// trail is missing the only event that carries an outcome.
+    #[test]
+    fn resolving_appends_to_the_revision_history() {
+        let mut h = hyp();
+        h.add_prediction(Prediction::new("p"));
+        let before = h.revision_history.len();
+        h.resolve_prediction(0, "it did not hold", false);
+        assert_eq!(h.revision_history.len(), before + 1);
+        let last = h.revision_history.last().unwrap();
+        assert!(
+            last.description.contains("WRONG"),
+            "the revision must say which way it went, got {:?}",
+            last.description
+        );
+    }
+
+    /// `correct` is a plain serialised field, so a resolved prediction must
+    /// survive the JSON round-trip that `PhysisCore::persist` performs.
+    #[test]
+    fn a_resolution_survives_serialisation() {
+        let mut h = hyp();
+        h.add_prediction(Prediction::new("p"));
+        h.resolve_prediction(0, "observed", false);
+        let json = serde_json::to_string(&h).unwrap();
+        let back: Hypothesis = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.predictions[0].correct, Some(false));
+        assert_eq!(
+            back.predictions[0].actual_outcome.as_deref(),
+            Some("observed")
+        );
+        assert!((back.fitness - h.fitness).abs() < 1e-6);
     }
 }

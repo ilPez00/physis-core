@@ -61,6 +61,17 @@ pub struct CoherenceNode {
     /// Which embedder produced `embedding` (provenance).
     #[serde(default)]
     pub embedder: Option<String>,
+    /// Previous coherence state for trajectory tracking; None on first creation.
+    #[serde(default)]
+    pub previous_coherence_state: Option<f32>,
+    /// Self-model version; increments when internal state is aggregated.
+    #[serde(default)]
+    pub self_model_version: u32,
+    /// Explicit preference score in [-1, 1]; None = no explicit preference set.
+    /// Enables preference-aware dream seeding and volitional analogue production.
+    /// Level 4 (preference) → Level 5 (volition) transition point.
+    #[serde(default)]
+    pub preference: Option<f32>,
 }
 
 /// A request to modify a node's cell pin during a semiotic edit.
@@ -91,6 +102,9 @@ impl CoherenceNode {
             label: None,
             cell_pin: None,
             embedder: None,
+            previous_coherence_state: None,
+            self_model_version: 0,
+            preference: None,
         }
     }
 

@@ -11,7 +11,7 @@ use physis_core::history::import_file as import_history_file;
 use physis_core::hypothesis::{
     Evidence, EvidencePolarity, Hypothesis, HypothesisStatus, Prediction,
 };
-use physis_core::models::{Abstraction, Agency, FacetFilter, LifecyclePhase, PinEdit, Scale};
+use physis_core::models::{cosine_sim, Abstraction, Agency, FacetFilter, LifecyclePhase, PinEdit, Scale};
 use physis_core::ontology::OntologyLoader;
 use physis_core::praxis::parse_export as parse_praxis_export;
 use physis_core::quality::QualityTracker;
@@ -245,8 +245,49 @@ enum HypothesisCmd {
     },
     /// Show structured explanation report for a hypothesis.
     Explain {
-        /// Hypothesis ID.
+        /// Hypothesis ID (full UUID or any unambiguous prefix).
         id: String,
+    },
+    /// Rank registered hypotheses by relevance to a topic.
+    ///
+    /// This is the retrieval step of the development loop. `list` prints
+    /// everything in insertion order, which stops being readable at ~30 claims
+    /// and so quietly stops being run.
+    Query {
+        /// Topic or question to retrieve against.
+        topic: String,
+        /// Max results.
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+        /// Include hypotheses whose epistemic status is dead (Failed, Inert,
+        /// Superseded). Off by default: they are the answer to "what was tried"
+        /// and noise for "what is believed".
+        #[arg(long)]
+        include_dead: bool,
+    },
+    /// Record what actually happened to a prediction, and let fitness move.
+    Resolve {
+        /// Hypothesis ID (full UUID or any unambiguous prefix).
+        id: String,
+        /// Which prediction, by index as shown by `open` or `explain`.
+        index: usize,
+        /// What actually happened.
+        actual: String,
+        /// The prediction held.
+        #[arg(long, conflicts_with = "wrong")]
+        correct: bool,
+        /// The prediction did not hold.
+        #[arg(long)]
+        wrong: bool,
+    },
+    /// List predictions that were made and never resolved.
+    ///
+    /// The point of the exercise: it makes you confront what you predicted and
+    /// never checked.
+    Open {
+        /// Only show predictions older than this many days.
+        #[arg(long, default_value_t = 0)]
+        older_than: i64,
     },
 }
 
@@ -862,6 +903,38 @@ fn run_quality(cmd: QualityCmd) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// `IdMatch` as a `Result`, for the mutating subcommands.
+///
+/// Prefix resolution already existed here — but only `replay` used it. Every
+/// mutating subcommand did a `HashMap::get_mut` on the full 36-character UUID
+/// while `hypothesis list` printed `&h.id[..8]`, so nothing the tool printed
+/// could be pasted back into it: `hypothesis predict 7824e0f2 ...` answered
+/// "not found". Friction like that does not make a loop slower, it makes it
+/// stop running. Ambiguity is an error that names the candidates rather than
+/// picking one.
+fn require_hypothesis_id(core: &PhysisCore, needle: &str) -> anyhow::Result<String> {
+    match resolve_hypothesis_id(core, needle) {
+        IdMatch::Exact(id) => Ok(id),
+        IdMatch::Unknown => anyhow::bail!("hypothesis {needle} not found"),
+        IdMatch::Ambiguous(_) => {
+            let mut msg = format!("'{needle}' is ambiguous — these hypotheses match:\n");
+            for (id, h) in core.hypotheses.iter().filter(|(id, _)| id.starts_with(needle)) {
+                msg.push_str(&format!("  {id}  {}\n", h.statement));
+            }
+            msg.push_str("Use more characters of the id.");
+            anyhow::bail!(msg)
+        }
+    }
+}
+
+/// Statuses that mean "this claim is no longer a live belief".
+fn is_dead(status: HypothesisStatus) -> bool {
+    matches!(
+        status,
+        HypothesisStatus::Failed | HypothesisStatus::Inert | HypothesisStatus::Superseded
+    )
+}
+
 fn run_hypothesis(cmd: HypothesisCmd) -> anyhow::Result<()> {
     let mut core = load_core();
     let embedder = load_embedder();
@@ -896,6 +969,7 @@ fn run_hypothesis(cmd: HypothesisCmd) -> anyhow::Result<()> {
             polarity,
             weight,
         } => {
+            let id = require_hypothesis_id(&core, &id)?;
             let hyp = core
                 .hypotheses
                 .get_mut(&id)
@@ -917,6 +991,7 @@ fn run_hypothesis(cmd: HypothesisCmd) -> anyhow::Result<()> {
             statement,
             expected,
         } => {
+            let id = require_hypothesis_id(&core, &id)?;
             let hyp = core
                 .hypotheses
                 .get_mut(&id)
@@ -930,6 +1005,7 @@ fn run_hypothesis(cmd: HypothesisCmd) -> anyhow::Result<()> {
             println!("Added prediction to hypothesis [{id}]");
         }
         HypothesisCmd::Transition { id, status, reason } => {
+            let id = require_hypothesis_id(&core, &id)?;
             let target_status = match status.to_lowercase().as_str() {
                 "candidate" => HypothesisStatus::Candidate,
                 "supported" => HypothesisStatus::Supported,
@@ -950,10 +1026,174 @@ fn run_hypothesis(cmd: HypothesisCmd) -> anyhow::Result<()> {
             }
         }
         HypothesisCmd::Explain { id } => {
+            let id = require_hypothesis_id(&core, &id)?;
             let report = core
                 .full_explanation_report(&id)
                 .ok_or_else(|| anyhow::anyhow!("hypothesis {id} not found"))?;
             println!("{}", report.ascii_summary());
+        }
+        HypothesisCmd::Query {
+            topic,
+            limit,
+            include_dead,
+        } => {
+            let q = embedder.embed(&topic);
+            let mut ranked: Vec<(f32, &Hypothesis)> = core
+                .hypotheses
+                .values()
+                .filter(|h| include_dead || !is_dead(h.status))
+                .map(|h| (cosine_sim(&q, &h.embedding), h))
+                .collect();
+            ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
+
+            if ranked.is_empty() {
+                println!("No hypotheses match '{topic}'.");
+                println!(
+                    "  {} registered in total{}.",
+                    core.hypotheses.len(),
+                    if include_dead {
+                        String::new()
+                    } else {
+                        format!(
+                            ", {} of them dead and hidden (--include-dead to see them)",
+                            core.hypotheses.values().filter(|h| is_dead(h.status)).count()
+                        )
+                    }
+                );
+                return Ok(());
+            }
+
+            println!("Relevant to '{topic}':");
+            for (score, h) in ranked.iter().take(limit) {
+                let pending = h.pending_predictions();
+                println!(
+                    "  [{}] rel={:.3} {:<12} fitness={:.3} ev=+{}/-{} pred={} pending",
+                    &h.id[..8],
+                    score,
+                    format!("{:?}", h.status),
+                    h.fitness,
+                    h.supporting_evidence.len(),
+                    h.contradicting_evidence.len(),
+                    pending,
+                );
+                println!("      {}", h.statement);
+            }
+            // Relevance alone would launder a speculative claim into an answer.
+            // The directive is explicit that an agent which cannot tell
+            // certified from speculative will do exactly that, so the split is
+            // printed rather than left to the reader.
+            let certified = ranked
+                .iter()
+                .filter(|(_, h)| h.status == HypothesisStatus::Certified)
+                .count();
+            println!(
+                "\n{} shown, {} certified, {} speculative.",
+                ranked.len().min(limit),
+                certified,
+                ranked.len().min(limit) - certified.min(ranked.len().min(limit)),
+            );
+            // `load_embedder` returns a RandomProjectionEmbedder unconditionally
+            // — hashed bag-of-words, no trained weights. Its cosine is high
+            // between arbitrary sentences: "stripe payment webhooks in the
+            // praxis backend" scores 0.83 against a claim about the ontology
+            // delta report. The ORDER is usable; the NUMBER is not, and printing
+            // it bare would be describing the system as more capable than the
+            // code makes it. Say so on every query rather than in a doc nobody
+            // reads at the moment they are trusting the score.
+            println!(
+                "rel= is random-projection cosine, not a trained embedding. Treat the\n\
+                 ordering as a hint and the absolute value as meaningless (unrelated\n\
+                 text routinely scores >0.8)."
+            );
+        }
+        HypothesisCmd::Resolve {
+            id,
+            index,
+            actual,
+            correct,
+            wrong,
+        } => {
+            if correct == wrong {
+                anyhow::bail!(
+                    "pass exactly one of --correct or --wrong. \n\
+                     Defaulting either way would let a wrong prediction be recorded \n\
+                     as right by omission, which is the one thing this command exists \n\
+                     to prevent."
+                );
+            }
+            let id = require_hypothesis_id(&core, &id)?;
+            let hyp = core
+                .hypotheses
+                .get_mut(&id)
+                .ok_or_else(|| anyhow::anyhow!("hypothesis {id} not found"))?;
+            let before = hyp.fitness;
+            if !hyp.resolve_prediction(index, &actual, correct) {
+                match hyp.predictions.get(index) {
+                    Some(p) => anyhow::bail!(
+                        "prediction {index} is already resolved (correct={:?}, actual={:?}). \n\
+                         Refusing to overwrite it — a record that can be rewritten is not a record.",
+                        p.correct,
+                        p.actual_outcome
+                    ),
+                    None => anyhow::bail!(
+                        "hypothesis [{}] has {} predictions; {index} is out of range",
+                        &id[..8],
+                        hyp.predictions.len()
+                    ),
+                }
+            }
+            let after = hyp.fitness;
+            let status = hyp.status;
+            let pending = hyp.pending_predictions();
+            core.persist()?;
+            println!(
+                "Resolved prediction {index} of [{}] as {}.",
+                &id[..8],
+                if correct { "CORRECT" } else { "WRONG" }
+            );
+            println!("  fitness {before:.3} -> {after:.3}   status={status:?}   {pending} still pending");
+        }
+        HypothesisCmd::Open { older_than } => {
+            let cutoff = chrono::Utc::now() - chrono::Duration::days(older_than.max(0));
+            let mut rows: Vec<(&Hypothesis, usize, &Prediction)> = Vec::new();
+            for h in core.hypotheses.values() {
+                for (i, p) in h.open_predictions() {
+                    if p.made_at <= cutoff {
+                        rows.push((h, i, p));
+                    }
+                }
+            }
+            rows.sort_by_key(|(_, _, p)| p.made_at);
+
+            if rows.is_empty() {
+                println!(
+                    "No open predictions{}.",
+                    if older_than > 0 {
+                        format!(" older than {older_than} days")
+                    } else {
+                        String::new()
+                    }
+                );
+                return Ok(());
+            }
+            println!("{} open prediction(s), oldest first:", rows.len());
+            for (h, i, p) in rows {
+                let age = (chrono::Utc::now() - p.made_at).num_days();
+                println!(
+                    "  [{}] #{i}  made {age}d ago  (hypothesis: {:?}, fitness {:.3})",
+                    &h.id[..8],
+                    h.status,
+                    h.fitness
+                );
+                println!("      predicted: {}", p.statement);
+                if let Some(e) = &p.expected_outcome {
+                    println!("      expected : {e}");
+                }
+                println!(
+                    "      resolve  : physis-core hypothesis resolve {} {i} \"<what happened>\" --correct|--wrong",
+                    &h.id[..8]
+                );
+            }
         }
     }
     Ok(())

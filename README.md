@@ -201,7 +201,7 @@ physis-core = { version = "0.1", features = ["embed-onnx"] }
 ```rust
 use physis_core::{
     PhysisCore, RandomProjectionEmbedder, Hypothesis, HypothesisStatus,
-    Evidence, EvidencePolarity, VectorEmbed,
+    Evidence, EvidencePolarity, Prediction, VectorEmbed,
 };
 
 fn main() {
@@ -228,12 +228,34 @@ fn main() {
         embedding: vec![],
         context: vec!["nozzle_diameter: 0.4mm".to_string()],
     };
-    core.attach_evidence(&id_a, ev);
+    core.hypotheses.get_mut(&id_a).unwrap().add_supporting_evidence(ev);
 
-    // Update survival fitness
+    // Commit to something falsifiable BEFORE the next run, then record what
+    // actually happened. This — not hand-assigning a status — is what moves
+    // fitness: `resolve_prediction` writes `Prediction.correct`, which feeds
+    // the `predictive_success` term and the falsified-prediction penalty.
     if let Some(h) = core.hypotheses.get_mut(&id_a) {
-        h.status = HypothesisStatus::Supported;
-        h.fitness = 0.91;
+        h.add_prediction(Prediction::new(
+            "Raising the setpoint 18C eliminates delamination on the next run",
+        ));
+
+        // ... the next run happens, and it does not ...
+        let resolved = h.resolve_prediction(0, "Delamination unchanged at +18C", false);
+        assert!(resolved);
+        assert_eq!(h.predictions[0].correct, Some(false));
+
+        // Fitness fell on its own; nothing set it by hand.
+        // Resolution is write-once — a second call is refused, not applied:
+        assert!(!h.resolve_prediction(0, "actually it worked", true));
+
+        // Status changes go through `transition_to`, which records the
+        // before/after pair in the revision history.
+        h.transition_to(HypothesisStatus::Failed, "prediction falsified", None);
+    }
+
+    // Anything still outstanding, with the index `resolve` wants:
+    for (idx, pending) in core.hypotheses[&id_a].open_predictions() {
+        println!("#{idx} still open: {}", pending.statement);
     }
 }
 ```
@@ -470,6 +492,73 @@ physis-core discover /path/to/unclassified/notes --min-cluster 3
 # 9. Launch the Embedded Studio Web Workbench
 physis-core studio --port 3000 --host 127.0.0.1
 ```
+
+### `physis-core hypothesis` — the epistemic loop
+
+Everything above classifies. This subcommand is the part that *keeps score*: it
+records what you believed, what you predicted would follow, and — crucially —
+what actually happened.
+
+```sh
+# Register a candidate. Prints the id; the first 8 chars are enough everywhere.
+physis-core hypothesis create "Clogs correlate with ambient humidity" --confidence 0.55
+
+# What do we already believe about this? Ranked, dead claims hidden.
+physis-core hypothesis query "humidity clog" --limit 5
+
+# Attest evidence, with a polarity and a weight.
+physis-core hypothesis evidence a1b2c3d4 "Three clogs, all above 62% RH" --source "line-2 log" --weight 0.7
+physis-core hypothesis evidence a1b2c3d4 "One clog at 31% RH" --contradicts --weight 0.4
+
+# Commit to something falsifiable BEFORE you find out.
+physis-core hypothesis predict a1b2c3d4 "Next clog occurs above 60% RH" \
+    --expected "RH > 60 at the timestamp of the next clog event"
+
+# What did I predict and never check?  Oldest first.
+physis-core hypothesis open --older-than 14
+
+# Record the outcome. Fitness moves. This is the step that makes the rest real.
+physis-core hypothesis resolve a1b2c3d4 0 "Clogged at 34% RH" --wrong
+
+physis-core hypothesis explain a1b2c3d4     # full structured report
+physis-core hypothesis transition a1b2c3d4 failed --reason "prediction falsified twice"
+```
+
+**Ids are prefixes.** Every command that takes an id accepts any unambiguous
+prefix of it, because that is what `list` and `query` print. An ambiguous prefix
+is an error that shows you the candidates; it never silently picks one.
+
+**`resolve` requires a verdict.** Exactly one of `--correct` or `--wrong` — the
+command refuses if you pass neither or both, rather than defaulting. A default in
+either direction would let a falsified prediction be recorded as successful by
+omission, which is the one outcome this command exists to prevent.
+
+**Resolution is write-once.** Re-resolving an already-resolved prediction is
+refused. A record whose outcome can change on a second call is not a record.
+
+**What resolving actually moves.** `Prediction.correct` feeds `predictive_success`,
+which is 25% of the composite fitness, plus a separate penalty for falsified
+predictions:
+
+```text
+fitness 0.500 -> 0.225    after one prediction resolved --wrong
+fitness 0.500 -> 0.625    after one prediction resolved --correct
+```
+
+#### A caveat on `query` relevance scores
+
+`query` ranks by cosine similarity in the embedding space, and **the default
+embedder is `RandomProjectionEmbedder`** — hashed bag-of-words with no trained
+weights. Its absolute scores are not meaningful: unrelated sentences routinely
+score above 0.8. In one measured case, the query *"stripe payment webhooks in the
+praxis backend"* scored **0.830** against a claim about `OntologyDeltaReport` and
+ranked it first.
+
+Treat the *ordering* as a weak hint and the *number* as noise. The CLI prints
+this warning in its own output rather than burying it here, because the moment
+you need to know is the moment you are reading a score. Build with
+`--features embed-onnx` and supply `model.onnx` + `tokenizer.json` for
+similarity that means something.
 
 ---
 
