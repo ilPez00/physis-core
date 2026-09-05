@@ -152,6 +152,7 @@ pub mod ontology;
 pub mod praxis;
 pub mod process;
 pub mod provenance;
+pub mod experiments;
 pub mod quality;
 pub mod rag;
 pub mod relation;

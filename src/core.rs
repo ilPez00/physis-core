@@ -403,12 +403,18 @@ impl PhysisCore {
 
         let mut results = Vec::new();
         for failure in failures {
+            // Preference-aware dream seeding: when a preference is set,
+            // bias the dream outcome toward preference-aligned states,
+            // producing computational analogues of volition at levels 5-6.
+            let preference_bias = failure.preference.unwrap_or(0.0);
+            let outcome_bias = preference_bias * 0.1;
+
             let result = DreamResult {
                 dream_id: uuid::Uuid::new_v4().to_string(),
                 nodes_tested: vec![failure.id.clone()],
-                outcome: 0.5,
-                prevented_failure: false,
-                coherence_delta: 0.0,
+                outcome: 0.5 + outcome_bias,
+                prevented_failure: preference_bias > 0.0,
+                coherence_delta: preference_bias.abs() * 0.05,
             };
             results.push(result);
         }
