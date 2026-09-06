@@ -25,6 +25,17 @@ pub struct OnnxConfig {
     pub max_length: usize,
     pub model_dir: Option<String>,
     pub pooling: PoolingStrategy,
+    /// ONNX Runtime intra-op thread count. `None` (the default) uses all
+    /// available parallelism. Set `Some(1)` to pin single-threaded execution.
+    ///
+    /// Note on determinism: this knob is exposed because parallel float
+    /// reduction order is a *plausible* reproducibility hazard in general — but
+    /// on this model it was measured NOT to be one. A direct probe
+    /// (`examples/probe_embedding_determinism.rs`) found embeddings
+    /// bit-identical across runs and across thread counts. Reach for this only
+    /// with evidence; don't assume threading is the cause of a reproducibility
+    /// problem, which is a mistake this codebase already made once.
+    pub intra_threads: Option<usize>,
 }
 
 impl Default for OnnxConfig {
@@ -34,6 +45,7 @@ impl Default for OnnxConfig {
             max_length: 128,
             model_dir: None,
             pooling: PoolingStrategy::Mean,
+            intra_threads: None,
         }
     }
 }
@@ -57,11 +69,13 @@ pub struct OnnxEmbedder {
 
 /// Load an ONNX session, logging the actual `ort` error on failure instead of
 /// swallowing it.
-fn load_onnx_session(model_path: &Path) -> Option<ort::session::Session> {
+fn load_onnx_session(model_path: &Path, intra_threads: Option<usize>) -> Option<ort::session::Session> {
     use ort::session::builder::GraphOptimizationLevel;
-    let threads = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1);
+    let threads = intra_threads.unwrap_or_else(|| {
+        std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1)
+    });
     let build = |opt: GraphOptimizationLevel| -> ort::Result<ort::session::Session> {
         ort::session::Session::builder()?
             .with_optimization_level(opt)?
@@ -103,7 +117,7 @@ impl OnnxEmbedder {
         let tok_path = Path::new(model_dir).join("tokenizer.json");
 
         let session = if model_path.exists() {
-            load_onnx_session(&model_path)
+            load_onnx_session(&model_path, config.intra_threads)
         } else {
             None
         };

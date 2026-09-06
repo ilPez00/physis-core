@@ -246,11 +246,29 @@ impl OntologyLoader {
     /// Phase 10c parity fix — this used to chain only `human + custom`, which
     /// left the whole `machine_domains` bucket authored and displayed but
     /// never scoreable (the studio's "730 advertised vs 623 scoreable" gap).
+    /// Iteration order is **deterministic** (sorted by name, then domain, then
+    /// mode). It previously chained `HashMap::values()` directly, which meant
+    /// callers saw a different order on every process run — Rust seeds its
+    /// hasher randomly. Aggregates over the whole set were unaffected, but
+    /// anything that slices, samples, or shows "the first N" silently changed
+    /// run to run; that cost real debugging time in the perspective-discovery
+    /// track, where a train/test split keyed on entry index was quietly being
+    /// recomposed on each run and the resulting accuracy swing was
+    /// misattributed to float nondeterminism.
     pub fn classification_domains(&self) -> impl Iterator<Item = &DomainDef> {
-        self.human_domains
+        let mut all: Vec<&DomainDef> = self
+            .human_domains
             .values()
             .chain(self.machine_domains.values())
             .chain(self.custom_domains.values())
+            .collect();
+        all.sort_by(|a, b| {
+            a.name
+                .cmp(&b.name)
+                .then_with(|| a.domain.cmp(&b.domain))
+                .then_with(|| a.mode.cmp(&b.mode))
+        });
+        all.into_iter()
     }
 
     /// Every domain definition across all loaded ontologies, merged into one map.

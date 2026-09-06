@@ -39,6 +39,11 @@ fn main() {
     {
         use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
         let minilm_dir = ["models", "../models"].iter().find(|d| std::path::Path::new(d).join("model.onnx").exists());
+        // Multi-threaded embedding is fine here: this experiment's run-to-run
+        // variation was NOT float nondeterminism (a direct probe showed embeddings
+        // are bit-identical across runs and thread counts). It was entry ORDER —
+        // `classification_domains()` used to iterate HashMaps — plus an untied sort
+        // below. Both are fixed; single-threading was not needed.
         let minilm = match minilm_dir.map(|dir| OnnxEmbedder::with_config(&OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), pooling: PoolingStrategy::Mean, ..OnnxConfig::default() })) {
             Some(e) if e.is_available() => e,
             _ => { println!("WARNING: MiniLM not available — aborting."); return; }
@@ -121,7 +126,11 @@ fn main() {
 
         println!("=== Fixed-cell linkage graph: {} cell pairs bridged by at least one real entry ===\n", bridge_counts.len());
         let mut sorted_links: Vec<(&(usize, usize), &Vec<usize>)> = bridge_counts.iter().collect();
-        sorted_links.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+        // Tiebreak on the cell-pair key, not just count: the source is a HashMap
+        // iterator (randomly seeded per process), and a stable sort preserves that
+        // random order among equal counts — which made this output differ run to
+        // run even after the entry-order fix.
+        sorted_links.sort_by(|a, b| b.1.len().cmp(&a.1.len()).then_with(|| a.0.cmp(b.0)));
         for (&(a, b), items) in sorted_links.iter().take(20) {
             let examples: Vec<&str> = items.iter().take(3).map(|&i| texts[i].split_whitespace().next().unwrap_or("")).collect();
             println!(
@@ -134,7 +143,7 @@ fn main() {
         // single-domain hard classification at all — the genuinely new structure.
         println!("\n=== Cross-DOMAIN links only (structurally invisible to single-label classification) ===\n");
         let mut cross_links: Vec<(&(usize, usize), &Vec<usize>)> = bridge_counts.iter().filter(|((a, b), _)| domain_of(*a) != domain_of(*b)).collect();
-        cross_links.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+        cross_links.sort_by(|a, b| b.1.len().cmp(&a.1.len()).then_with(|| a.0.cmp(b.0)));
         for (&(a, b), items) in cross_links.iter().take(15) {
             let examples: Vec<&str> = items.iter().take(3).map(|&i| texts[i].split_whitespace().next().unwrap_or("")).collect();
             println!(
