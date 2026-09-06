@@ -20,7 +20,6 @@
 //!   cargo run -p physis-core --features embed-onnx --release --example experiment21_fixed_cell_linkage
 
 use physis_core::embed::VectorEmbed;
-use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
 use physis_core::models::cosine_sim;
 use physis_core::ontology::OntologyLoader;
 use std::collections::HashMap;
@@ -38,6 +37,7 @@ fn main() {
 
     #[cfg(feature = "embed-onnx")]
     {
+        use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
         let minilm_dir = ["models", "../models"].iter().find(|d| std::path::Path::new(d).join("model.onnx").exists());
         let minilm = match minilm_dir.map(|dir| OnnxEmbedder::with_config(&OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), pooling: PoolingStrategy::Mean, ..OnnxConfig::default() })) {
             Some(e) if e.is_available() => e,

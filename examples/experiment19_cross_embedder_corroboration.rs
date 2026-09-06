@@ -29,10 +29,11 @@
 //!   cargo run -p physis-core --features embed-onnx --release --example experiment19_cross_embedder_corroboration
 
 use physis_core::embed::VectorEmbed;
-use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
 use physis_core::models::cosine_sim;
 use physis_core::ontology::OntologyLoader;
 use std::collections::HashMap;
+#[cfg(feature = "embed-onnx")]
+use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
 
 fn centroid(embeddings: &[&Vec<f32>]) -> Vec<f32> {
     let dim = embeddings[0].len();
@@ -144,6 +145,7 @@ fn local_split_membership_sets(all_emb: &[Vec<f32>], n_pure: usize) -> Vec<Vec<&
     }).collect()
 }
 
+#[cfg(feature = "embed-onnx")]
 fn run_vehicle_test(minilm: &OnnxEmbedder, bge: &OnnxEmbedder, representation: &str) {
     let n_pure = PURE.len();
     let n_cross = CROSS.len();
@@ -198,6 +200,7 @@ fn run_vehicle_test(minilm: &OnnxEmbedder, bge: &OnnxEmbedder, representation: &
 
 // ═══════════════════════════════ Part B: real 730-entry ontology (descriptive, no ground truth) ═══════════════════════════════
 
+#[cfg(feature = "embed-onnx")]
 fn run_real_ontology_test(minilm: &OnnxEmbedder, bge: &OnnxEmbedder) {
     println!("\n\n########## Part B: real 730-entry ontology (descriptive — no ground truth exists) ##########");
     let ontology = OntologyLoader::load_all();

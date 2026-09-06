@@ -32,7 +32,6 @@
 //!   cargo run -p physis-core --features embed-onnx --release --example experiment20_fixed_point_discovery
 
 use physis_core::embed::VectorEmbed;
-use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
 use physis_core::models::cosine_sim;
 
 /// Density of item i = mean cosine similarity to its M nearest OTHER items.
@@ -161,6 +160,7 @@ fn main() {
 
     #[cfg(feature = "embed-onnx")]
     {
+        use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
         let minilm_dir = ["models", "../models"].iter().find(|d| std::path::Path::new(d).join("model.onnx").exists());
         let minilm = minilm_dir.map(|dir| OnnxEmbedder::with_config(&OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), pooling: PoolingStrategy::Mean, ..OnnxConfig::default() }));
         let bge_dir = ["models/bge-base-en-v1.5", "../models/bge-base-en-v1.5"].iter().find(|d| std::path::Path::new(d).join("onnx/model.onnx").exists());

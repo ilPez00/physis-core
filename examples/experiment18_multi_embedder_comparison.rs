@@ -30,7 +30,6 @@
 //!   cargo run -p physis-core --features embed-onnx --release --example experiment18_multi_embedder_comparison
 
 use physis_core::embed::VectorEmbed;
-use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
 use physis_core::models::cosine_sim;
 use physis_core::ontology::OntologyLoader;
 use std::collections::HashMap;
@@ -115,6 +114,7 @@ fn main() {
 
     #[cfg(feature = "embed-onnx")]
     {
+        use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
         let ontology = OntologyLoader::load_all();
         let mut texts = Vec::new();
         let mut domains = Vec::new();
