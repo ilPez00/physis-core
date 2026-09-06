@@ -146,6 +146,7 @@ pub mod embed;
 pub mod epistemic;
 pub mod explanation;
 pub mod history;
+pub mod linkage;
 pub mod hypothesis;
 pub mod models;
 pub mod ontology;

@@ -4,6 +4,35 @@ Notable changes to `physis-core`. This file starts at 0.1.15; earlier
 releases predate it and are documented only by their git tags and commit
 history.
 
+## 0.1.16
+
+### Added
+
+- **`physis_core::linkage`** — a new module answering "which `(domain, mode)`
+  cells does real data bridge, and via which items". Each text contributes one
+  bridge, between its top-scoring and second-scoring cell. That is the whole
+  rule: no threshold, no `k`, no seed, and ties broken on the cell key rather
+  than on iteration order.
+
+  It deliberately does **not** discover cells. A long research track tried
+  seven structurally distinct ways to derive stable groupings from embedding
+  geometry — margin/silhouette gating, three kNN-consistency variants,
+  cross-embedder corroboration, density peaks, cross-embedder split agreement,
+  capacity-constrained training loss, and plain k-means — and all seven failed
+  on real data. Re-derived clusters do not survive corpus growth (58% anchor
+  overlap after +25% data) and nothing survives an embedder swap (ARI ~0.10).
+  So this module takes the ontology's hand-authored cells as the fixed points,
+  because they cannot drift, and measures only the links between them.
+
+  No claim is made about any individual item being "genuinely cross-cutting";
+  an earlier thresholded version degenerated to a 98% flag rate, which merely
+  restates that domains overlap. The signal is aggregate — a cell pair that
+  recurs as many different items' runner-up is meaningfully linked.
+
+  `LinkageGraph::build` / `links` / `strongest` / `cross_domain`, with
+  `CellLink::is_cross_domain` for the links a single-label classification
+  cannot represent at all.
+
 ## 0.1.15
 
 ### Fixed

@@ -20,6 +20,7 @@
 - [Module Catalog](#module-catalog)
 - [Installation & Cargo Features](#installation--cargo-features)
 - [Determinism & Reproducibility](#determinism--reproducibility)
+- [Cell Linkage](#cell-linkage)
 - [Rust API Usage & Code Examples](#rust-api-usage--code-examples)
   - [1. Competing Hypotheses & Evidence Attestation](#1-competing-hypotheses--evidence-attestation)
   - [2. Truth Maintenance & Contradiction Resolution](#2-truth-maintenance--contradiction-resolution)
@@ -264,6 +265,65 @@ pinning inference in constrained environments. It is **not** a determinism
 knob — this embedder's output was measured bit-identical at every thread
 count, so setting it to `Some(1)` will not change your results, only your
 performance.
+
+---
+
+## Cell Linkage
+
+`physis_core::linkage` answers a question the classifier alone does not:
+**which `(domain, mode)` cells does your data actually bridge, and through
+which items?**
+
+```rust
+use physis_core::classify::CellClassifier;
+use physis_core::linkage::LinkageGraph;
+
+let classifier = CellClassifier::build(&ontology, &embedder);
+let graph = LinkageGraph::build(&classifier, &embedder, corpus_texts);
+
+for link in graph.strongest(10) {
+    println!("{}/{} <-> {}/{}  ({} bridges)",
+             link.a.0, link.a.1, link.b.0, link.b.1, link.bridge_count);
+}
+
+// Only the links a single-label classification cannot represent:
+for link in graph.cross_domain() { /* ... */ }
+```
+
+Each text contributes exactly one bridge, between its top-scoring and
+second-scoring cell. **No threshold, no `k`, no random seed**, and ties break
+on the cell key rather than on iteration order — so the same corpus and the
+same embedder always produce the same graph.
+
+### What it deliberately does not do
+
+It does not *discover* cells. It takes the ontology's hand-authored cells as
+given, because they are the only thing measured to be stable: they cannot
+drift, and they are identical on every run.
+
+That restraint is a finding, not modesty. Seven structurally distinct
+mechanisms for deriving stable groupings from embedding geometry were tried
+and all seven failed on real data — margin/silhouette gating, three
+kNN-consistency variants, cross-embedder corroboration, density peaks,
+cross-embedder split agreement, capacity-constrained training loss, and plain
+k-means. Two specific limits are worth stating outright, because both are easy
+to assume away:
+
+- **Re-derived clusters do not survive corpus growth.** Adding 25% more data
+  replaced half the anchors (58% identity overlap) and destroyed ~80% of the
+  structure. Persist anchor identity; do not re-derive and assume continuity.
+- **Nothing survives an embedder swap.** Agreement between MiniLM- and
+  BGE-derived structure on the same corpus is near-random (ARI ~0.10) even
+  holding cluster identity fixed. Pin your embedder.
+
+### Reading the output
+
+The signal is aggregate, not per-item. A cell pair that recurs as many
+different items' runner-up is meaningfully linked; a single bridge is noise.
+No claim is made that any individual item is "genuinely cross-cutting" — an
+earlier thresholded version of this calibrated a similarity delta and
+degenerated into flagging 98% of entries, a rate that carries no information
+beyond "domains overlap".
 
 ---
 

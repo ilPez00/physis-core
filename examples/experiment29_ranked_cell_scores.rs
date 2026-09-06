@@ -24,7 +24,6 @@
 
 use physis_core::classify::CellClassifier;
 use physis_core::ontology::OntologyLoader;
-use std::collections::HashMap;
 
 fn main() {
     println!("Experiment 29: what does the ranked cell list carry beyond its argmax?\n");
@@ -32,6 +31,7 @@ fn main() {
     #[cfg(feature = "embed-onnx")]
     {
         use physis_core::embed::VectorEmbed;
+        use std::collections::HashMap;
         use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
 
         let dir = match ["models", "../models"]
