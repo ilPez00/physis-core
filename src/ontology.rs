@@ -255,6 +255,41 @@ impl OntologyLoader {
     /// track, where a train/test split keyed on entry index was quietly being
     /// recomposed on each run and the resulting accuracy swing was
     /// misattributed to float nondeterminism.
+    /// The ordering key for [`OntologyLoader::classification_domains`].
+    /// Extracted so the sort and the test proving it total cannot drift apart.
+    ///
+    /// It must be a TOTAL order over the real data. Sorting on
+    /// (name, domain, mode) alone is not: six built-in entries collide on that
+    /// triple while differing in `hints` (e.g. "Trip Planning", "Incident
+    /// Response"), so for those the tie fell through to the `HashMap`
+    /// iteration order this sort exists to defeat — they still swapped between
+    /// runs after 0.1.15 nominally fixed the ordering. Every field that feeds
+    /// a classification text is therefore part of the key.
+    #[allow(clippy::type_complexity)]
+    fn order_key(
+        d: &DomainDef,
+    ) -> (
+        &String,
+        &Option<String>,
+        &Option<String>,
+        &Option<String>,
+        &Option<String>,
+        &Option<String>,
+        &String,
+        &Vec<String>,
+    ) {
+        (
+            &d.name,
+            &d.domain,
+            &d.mode,
+            &d.category,
+            &d.axis_kind,
+            &d.axis_name,
+            &d.unit,
+            &d.hints,
+        )
+    }
+
     pub fn classification_domains(&self) -> impl Iterator<Item = &DomainDef> {
         let mut all: Vec<&DomainDef> = self
             .human_domains
@@ -262,12 +297,7 @@ impl OntologyLoader {
             .chain(self.machine_domains.values())
             .chain(self.custom_domains.values())
             .collect();
-        all.sort_by(|a, b| {
-            a.name
-                .cmp(&b.name)
-                .then_with(|| a.domain.cmp(&b.domain))
-                .then_with(|| a.mode.cmp(&b.mode))
-        });
+        all.sort_by(|a, b| Self::order_key(a).cmp(&Self::order_key(b)));
         all.into_iter()
     }
 
@@ -387,5 +417,53 @@ mod tests {
         assert_eq!(pump.facets.sub_domain.as_deref(), Some("Repair"));
         // A facet-less entry in the example still parses (back-compat default).
         assert!(map.contains_key("Contract Negotiation"));
+    }
+
+    /// The implementation's ordering key must be TOTAL over the real built-in
+    /// data, not merely sorted.
+    ///
+    /// A same-process test cannot catch `HashMap` iteration variance — one
+    /// process, one hasher seed — so "two calls agree" would have passed while
+    /// the bug was live. This asserts the invariant that actually prevents it:
+    /// entries that tie under `order_key` must be genuinely interchangeable.
+    /// It calls `order_key` rather than restating it, so shrinking the key
+    /// fails this test instead of silently passing.
+    ///
+    /// Regression: 0.1.15 keyed on (name, domain, mode) only. Six built-ins
+    /// collide on that triple while differing in `hints`, so their order still
+    /// came from `HashMap` iteration and still changed between runs. Verified
+    /// by shrinking the key back and watching this fail.
+    #[test]
+    fn classification_domain_order_is_a_total_order_over_builtins() {
+        let loader = OntologyLoader::load_all();
+        let all: Vec<&DomainDef> = loader.classification_domains().collect();
+        assert!(all.len() > 100, "expected the built-in ontologies to load");
+
+        for w in all.windows(2) {
+            if OntologyLoader::order_key(w[0]) == OntologyLoader::order_key(w[1]) {
+                // Tied entries must be indistinguishable in everything that
+                // feeds a classification text — otherwise which one comes first
+                // is decided by HashMap iteration order.
+                let (a, b) = (w[0], w[1]);
+                assert!(
+                    a.name == b.name
+                        && a.domain == b.domain
+                        && a.mode == b.mode
+                        && a.category == b.category
+                        && a.axis_kind == b.axis_kind
+                        && a.axis_name == b.axis_name
+                        && a.unit == b.unit
+                        && a.hints == b.hints,
+                    "entries named {:?} tie on the whole ordering key yet differ in \
+                     content, so their relative order comes from HashMap iteration",
+                    a.name
+                );
+            }
+        }
+
+        let keys: Vec<_> = all.iter().map(|d| OntologyLoader::order_key(d)).collect();
+        let mut sorted = keys.clone();
+        sorted.sort();
+        assert_eq!(keys, sorted, "classification_domains must yield sorted order");
     }
 }
