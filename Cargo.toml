@@ -1,6 +1,6 @@
 [package]
 name = "physis-core"
-version = "0.1.14"
+version = "0.1.15"
 edition = "2021"
 description = "Physis core engine — competing interpretations, multidimensional coherence, contradiction tracking, epistemic audit, and quality feedback."
 license = "Apache-2.0"
@@ -10,6 +10,8 @@ homepage = "https://github.com/ilPez00/physis-core"
 documentation = "https://docs.rs/physis-core"
 keywords = ["knowledge-graph", "epistemic-engine", "truth-maintenance", "coherence", "embeddings"]
 categories = ["data-structures", "algorithms", "science", "text-processing"]
+# Keep stray backups and non-library files out of the published .crate.
+exclude = ["**/*.bak", "sw_add_domains.py", "STRIPE_LICENSE_GUIDE.md"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -30,8 +32,6 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"], option
 # builds anywhere without model files). Enable with --features embed-onnx.
 ort = { version = "2.0.0-rc.13", optional = true }
 tokenizers = { version = "0.21", optional = true }
-wordnet-db = "0.1.3"
-wordnet-types = "0.1.3"
 
 [features]
 default = ["cli", "studio"]
@@ -43,6 +43,12 @@ embed-onnx = ["dep:ort", "dep:tokenizers"]
 
 [dev-dependencies]
 tempfile = "3"
+# Used only by the research examples (experiment22/23, WordNet lexical
+# anchoring). Deliberately NOT a regular dependency: nothing in src/
+# touches WordNet, so shipping it as one would force the whole
+# database crate on every downstream consumer for no benefit.
+wordnet-db = "0.1.3"
+wordnet-types = "0.1.3"
 
 [lib]
 name = "physis_core"

@@ -19,6 +19,7 @@
 - [The Semiotic Grid](#the-semiotic-grid)
 - [Module Catalog](#module-catalog)
 - [Installation & Cargo Features](#installation--cargo-features)
+- [Determinism & Reproducibility](#determinism--reproducibility)
 - [Rust API Usage & Code Examples](#rust-api-usage--code-examples)
   - [1. Competing Hypotheses & Evidence Attestation](#1-competing-hypotheses--evidence-attestation)
   - [2. Truth Maintenance & Contradiction Resolution](#2-truth-maintenance--contradiction-resolution)
@@ -191,6 +192,78 @@ physis-core = { version = "0.1", features = ["embed-onnx"] }
 | `cli` | **Yes** | `clap` | Standalone CLI binary (`physis-core`) with subcommands. |
 | `studio` | **Yes** | `axum`, `tokio` | Embedded Web GUI workbench and REST API server. |
 | `embed-onnx` | No | `ort`, `tokenizers` | Hardware-accelerated ONNX semantic embeddings. |
+
+---
+
+## Determinism & Reproducibility
+
+Several parts of this engine are consumed by pipelines that need the *same
+input to produce the same output*, run after run — classification, ontology
+gap discovery, and anything that clusters or ranks by embedding similarity.
+The guarantees, and their limits, are stated here explicitly because the
+limits are easy to get wrong.
+
+### What is guaranteed
+
+| Guarantee | Since | Notes |
+|---|---|---|
+| `OntologyLoader::classification_domains()` yields entries in a **stable, total order** | 0.1.15 | Sorted by `(name, domain, mode)`. Before 0.1.15 it chained three `HashMap::values()` iterators, and Rust seeds `HashMap`'s hasher randomly **per process** — so the order changed on every run. See below. |
+| `RandomProjectionEmbedder` is deterministic | — | Seeded projection; reproducible and coarse. Also selectable via `PHYSIS_EMBEDDER=random-projection`. |
+| `OnnxEmbedder` output is deterministic | — | Measured bit-identical for the same input across processes **and across intra-op thread counts** (`examples/probe_embedding_determinism.rs`). |
+| Epistemic event replay | — | Append-only trail; belief state at any prior timestamp reconstructs exactly. |
+
+### The 0.1.15 ordering fix — worth reading if you use this crate
+
+`classification_domains()` returned entries in `HashMap` iteration order.
+That order is randomized per process by design in Rust (SipHash with a
+random seed, as DoS hardening). Any downstream computation sensitive to
+input order — centroid accumulation, train/test splits, tie-breaking
+between near-equal similarity scores — therefore produced **different
+results on every run from identical data and identical model weights**.
+
+This was subtle enough to be misdiagnosed twice in our own research track
+as floating-point nondeterminism in the ONNX runtime. It was not. If you
+observed unstable classification or discovery output on <= 0.1.14, upgrade
+before investigating anything else.
+
+**If you iterate ontology entries yourself**, apply the same discipline:
+sort before you fold, and break ties on a stable key rather than relying
+on a stable sort over an unstable input order.
+
+### What is *not* guaranteed
+
+- **Cross-embedder stability.** Results are not portable between embedding
+  models. Structure derived under one model does not survive a swap to
+  another (we measured near-random agreement, ARI ~= 0.10, between MiniLM
+  and BGE embeddings of the same corpus, even holding cluster identity
+  fixed). Treat the embedder as **part of your ontology's identity**, not
+  as an interchangeable backend — pin it, and version your derived
+  structures against it.
+- **Stability of re-derived clusters under corpus growth.** Anchors
+  re-derived from scratch after new data move substantially. Persist
+  anchor identity across runs and assign new items to existing anchors;
+  do not re-derive and assume continuity.
+
+### `OnnxConfig::intra_threads`
+
+```rust
+use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
+
+let embedder = OnnxEmbedder::with_config(&OnnxConfig {
+    dim: 384,
+    model_dir: Some("models".into()),
+    pooling: PoolingStrategy::Mean,
+    intra_threads: Some(1), // opt-in; `None` (default) uses all cores
+    ..OnnxConfig::default()
+});
+```
+
+Opt-in ONNX Runtime intra-op thread control, default `None` (unchanged
+behavior, all cores). Provided for throughput/latency tuning and for
+pinning inference in constrained environments. It is **not** a determinism
+knob — this embedder's output was measured bit-identical at every thread
+count, so setting it to `Some(1)` will not change your results, only your
+performance.
 
 ---
 
