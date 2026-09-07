@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 23 — fixes the two real flaws Iteration 22 found and
 //! reported honestly rather than glossed over: (1) several "jargon"
 //! entries were actually Italian text colliding with unrelated English

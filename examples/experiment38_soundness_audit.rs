@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 38 — a SOUNDNESS check, which is the half `coverage` does not have.
 //!
 //! Iteration 33 shipped `physis_core::coverage` with a caveat: "coverage is not
@@ -169,8 +172,8 @@ fn auc(scored: &[(f64, bool)]) -> f64 {
             j += 1;
         }
         let avg = ((i + 1 + j + 1) as f64) / 2.0;
-        for k in i..=j {
-            if v[k].1 {
+        for x in &v[i..=j] {
+            if x.1 {
                 rank_sum += avg;
             }
         }
@@ -258,7 +261,7 @@ fn main() {
         for i in 0..n {
             if anc[i].is_empty() { continue }
             k += 1;
-            if k % 7 == 0 {
+            if k.is_multiple_of(7) {
                 // move to a deterministically-chosen DIFFERENT cell
                 let mut c = cell_names[(i * 13 + 5) % cell_names.len()].clone();
                 if c == true_cell[i] {
@@ -275,8 +278,8 @@ fn main() {
 
         // Cell membership under the PERTURBED assignment — what an auditor sees.
         let mut members: HashMap<(String, String), Vec<usize>> = HashMap::new();
-        for i in 0..n {
-            members.entry(cell[i].clone()).or_default().push(i);
+        for (i, c) in cell.iter().enumerate() {
+            members.entry(c.clone()).or_default().push(i);
         }
 
         let mut rows: Vec<(f64, f64, f64, bool, f64)> = Vec::new(); // nonlattice, ancestry, cosine, injected, orphan

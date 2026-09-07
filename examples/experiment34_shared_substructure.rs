@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 34 — is a link corroborated by SHARED SECOND-GRADE STRUCTURE?
 //!
 //! User's proposal, and the reason it is not a tenth geometric mechanism:

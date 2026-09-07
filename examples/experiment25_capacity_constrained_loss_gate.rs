@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 25 — roadmap item 13, finishing Iteration 17's original
 //! proposal properly. Correction to the record first: Iteration 17's
 //! code DID already compute and test final training loss as a candidate
@@ -82,9 +85,9 @@ impl Predictor {
     }
     fn forward(&self, x: &[f32]) -> (Vec<f32>, Vec<f32>) {
         let mut h = vec![0.0f32; self.k];
-        for kk in 0..self.k { let mut s = 0.0; for d in 0..self.dim { s += self.u[d][kk] * x[d]; } h[kk] = s; }
+        for (kk, hk) in h.iter_mut().enumerate() { let mut s = 0.0; for (d, xd) in x.iter().enumerate() { s += self.u[d][kk] * xd; } *hk = s; }
         let mut pred_raw = vec![0.0f32; self.dim];
-        for d in 0..self.dim { let mut s = 0.0; for kk in 0..self.k { s += self.v[d][kk] * h[kk]; } pred_raw[d] = s; }
+        for (d, pr) in pred_raw.iter_mut().enumerate() { let mut s = 0.0; for (kk, hk) in h.iter().enumerate() { s += self.v[d][kk] * hk; } *pr = s; }
         (pred_raw, h)
     }
     fn train_step(&mut self, xs: &[Vec<f32>], own_centroids: &[Vec<f32>], other_centroids: &[Vec<f32>], tau: f32, lr: f32) -> f32 {
@@ -116,7 +119,7 @@ impl Predictor {
 fn holdout_split(assignment: &[usize]) -> Vec<bool> {
     let n = assignment.len();
     let mut held_out = vec![false; n];
-    for i in 0..n { if i % 3 == 0 { held_out[i] = true; } }
+    for (i, ho) in held_out.iter_mut().enumerate() { if i.is_multiple_of(3) { *ho = true; } }
     for c in 0..2 {
         let members: Vec<usize> = (0..n).filter(|&i| assignment[i] == c).collect();
         let ho_count = members.iter().filter(|&&i| held_out[i]).count();
@@ -224,7 +227,8 @@ fn main() {
         let mech_emb: Vec<Vec<f32>> = MECHANICAL_BRANCH.iter().map(|(_, s)| minilm.embed(s)).collect();
         let mech_real = kmeans(&mech_emb, 2, 30);
 
-        let cases: Vec<(&str, bool, &Vec<Vec<f32>>, &Vec<usize>)> = vec![
+        type Case<'a> = (&'a str, bool, &'a Vec<Vec<f32>>, &'a Vec<usize>);
+        let cases: Vec<Case> = vec![
             ("1: GOOD-balanced", true, &a_emb, &a_true),
             ("2: BAD-imbalanced", false, &a_emb, &a_real),
             ("3: BAD-balanced", false, &bird_emb, &bird_real),

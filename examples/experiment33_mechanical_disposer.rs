@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 33 — can the disposer be a MACHINE rather than a person?
 //!
 //! Nine mechanisms have now failed to certify discovered structure, and every
@@ -345,7 +348,6 @@ fn main() {
             worst_z = worst_z.min(z);
         }
         println!("\n  weakest margin across all controls: t = {worst_t:+.2}, z = {worst_z:+.2}");
-        let (t, z) = (worst_t, worst_z);
 
         println!("\n=== Verdict ===\n");
 

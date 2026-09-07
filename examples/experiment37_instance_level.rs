@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 37 — number the instances instead of pooling them.
 //!
 //! Iteration 36 came back inconclusive with the two matching rules disagreeing
@@ -143,11 +146,11 @@ fn main() {
         // unioned. This is the whole difference from Iteration 36.
         const MAX_INST: usize = 24;
         let mut inst: Vec<Vec<usize>> = Vec::with_capacity(n);
-        for i in 0..n {
+        for name in &names {
             let mut v = Vec::new();
-            if names[i].len() >= 2 {
+            if name.len() >= 2 {
                 for (e, toks) in ep_toks.iter().enumerate() {
-                    if names[i].iter().filter(|w| toks.binary_search(w).is_ok()).count() >= 2 {
+                    if name.iter().filter(|w| toks.binary_search(w).is_ok()).count() >= 2 {
                         v.push(e);
                         if v.len() >= MAX_INST { break; }
                     }

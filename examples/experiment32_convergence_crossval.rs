@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 32 — the powered re-test of Iteration 31, with its confound fixed.
 //!
 //! Iteration 31 built the outward loop and got two underpowered answers:
@@ -220,7 +223,7 @@ fn main() {
                     continue; // keep at least 2 so the cell survives
                 }
                 for (j, &idx) in m.iter().enumerate() {
-                    if j % FOLDS == fold && m.len() - 1 >= 2 {
+                    if j % FOLDS == fold && m.len() > 2 {
                         held.push(idx);
                     }
                 }
@@ -272,8 +275,8 @@ fn main() {
                 .map(|ms| {
                     let mut acc = vec![0.0f32; 384];
                     for &pi in ms {
-                        for d in 0..384 {
-                            acc[d] += proposals[pi].0[d];
+                        for (d, a) in acc.iter_mut().enumerate() {
+                            *a += proposals[pi].0[d];
                         }
                     }
                     normalize(&acc)

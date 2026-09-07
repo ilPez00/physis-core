@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 18 — Next Experiment 9: does a different embedding model
 //! show meaningfully better raw separability on physis-core's REAL
 //! 5-domain ontology than all-MiniLM-L6-v2 (which Iterations 15 and 17

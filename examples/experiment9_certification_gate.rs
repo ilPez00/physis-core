@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 9 — does a cheap "certification" signal actually distinguish
 //! a good split from a bad one, before wiring it into recursion?
 //!
@@ -94,7 +97,7 @@ fn silhouette_like(embeddings: &[Vec<f32>], assignment: &[usize]) -> f32 {
     for c in 0..2 {
         if counts[c] == 0 { continue; }
         let norm: f32 = centroids[c].iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
-        for d in 0..dim { centroids[c][d] /= norm; }
+        for v in &mut centroids[c] { *v /= norm; }
     }
     let mut total = 0.0;
     for (i, e) in embeddings.iter().enumerate() {
@@ -122,8 +125,8 @@ fn purity(assignment: &[usize]) -> f32 {
     let mut correct = 0usize;
     for c in 0..2 {
         let mut counts = std::collections::HashMap::new();
-        for i in 0..n {
-            if assignment[i] == c { *counts.entry(true_coarse(i)).or_insert(0usize) += 1; }
+        for (i, a) in assignment.iter().enumerate() {
+            if *a == c { *counts.entry(true_coarse(i)).or_insert(0usize) += 1; }
         }
         correct += counts.values().copied().max().unwrap_or(0);
     }

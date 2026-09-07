@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 28 — roadmap item 24. Plain unsupervised clustering is
 //! described at the top of FINAL_REPORT.md as "the one mechanism this
 //! track never found a way to make lose on exclusive-membership data",
@@ -112,10 +115,10 @@ fn kmeans(embeddings: &[Vec<f32>], k: usize, seed: u64, iters: usize) -> Vec<usi
                 changed = true;
             }
         }
-        for c in 0..k {
+        for (c, centre) in centres.iter_mut().enumerate() {
             let members: Vec<&Vec<f32>> = (0..n).filter(|&i| assign[i] == c).map(|i| &embeddings[i]).collect();
             if !members.is_empty() {
-                centres[c] = centroid(&members);
+                *centre = centroid(&members);
             }
         }
         if !changed {

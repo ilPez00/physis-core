@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 16 — the mission's Section 18 formal ablation matrix,
 //! finally run end-to-end: does each component (multi-membership,
 //! certification, recursion) actually earn its complexity over the
@@ -252,10 +255,10 @@ fn run(representation: &str, embedder: &impl VectorEmbed) -> Vec<ConfigResult> {
         let split = kmeans(&sub_emb, 2, 30);
         let balance = balance_ratio_k(&split, 2);
         let mut leaf_labels = [String::from("?"), String::from("?")];
-        for c in 0..2 {
+        for (c, slot) in leaf_labels.iter_mut().enumerate() {
             let mut counts: HashMap<&str, usize> = HashMap::new();
             for (li, &gi) in members.iter().enumerate() { if split[li] == c && gi < n_pure { *counts.entry(PURE[gi].4).or_insert(0) += 1; } }
-            if let Some((label, _)) = counts.into_iter().max_by_key(|(_, c)| *c) { leaf_labels[c] = label.to_string(); }
+            if let Some((label, _)) = counts.into_iter().max_by_key(|(_, c)| *c) { *slot = label.to_string(); }
         }
         branches.push(Branch { coarse, members, split, balance, leaf_labels });
     }

@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 6 — replicate Iteration 5's finding on a SECOND, structurally
 //! different dataset: mission Dataset A (a real taxonomic hierarchy), not
 //! Dataset B's cross-cutting perspectives-on-one-object.
@@ -129,8 +132,8 @@ fn purity(assignment: &[usize], k: usize, label_of: impl Fn(usize) -> &'static s
     let mut correct = 0usize;
     for c in 0..k {
         let mut counts = std::collections::HashMap::new();
-        for i in 0..n {
-            if assignment[i] == c { *counts.entry(label_of(i)).or_insert(0usize) += 1; }
+        for (i, a) in assignment.iter().enumerate() {
+            if *a == c { *counts.entry(label_of(i)).or_insert(0usize) += 1; }
         }
         correct += counts.values().copied().max().unwrap_or(0);
     }

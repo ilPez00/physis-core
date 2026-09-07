@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 3 — JEPA-style predictive latent vs. static cosine similarity.
 //!
 //! Iterations 1-2 (see `../research/perspective-discovery/RESEARCH_LOG.md`)
@@ -91,10 +94,9 @@ impl Predictor {
     /// z = Uᵀ r  (RANK,)
     fn project(&self, r: &[f32]) -> Vec<f32> {
         let mut z = vec![0.0f32; RANK];
-        for d in 0..self.dim {
-            let rd = r[d];
-            for k in 0..RANK {
-                z[k] += self.u[d * RANK + k] * rd;
+        for (d, rd) in r.iter().enumerate() {
+            for (k, zk) in z.iter_mut().enumerate() {
+                *zk += self.u[d * RANK + k] * rd;
             }
         }
         z
@@ -103,12 +105,12 @@ impl Predictor {
     /// pred = V z  (dim,)
     fn predict_from_z(&self, z: &[f32]) -> Vec<f32> {
         let mut p = vec![0.0f32; self.dim];
-        for d in 0..self.dim {
+        for (d, pd) in p.iter_mut().enumerate() {
             let mut acc = 0.0;
-            for k in 0..RANK {
-                acc += self.v[d * RANK + k] * z[k];
+            for (k, zk) in z.iter().enumerate() {
+                acc += self.v[d * RANK + k] * zk;
             }
-            p[d] = acc;
+            *pd = acc;
         }
         p
     }
@@ -164,26 +166,25 @@ fn train_predictor(
                 }
             }
             for &pos_idx in &positives {
-                for d in 0..dim {
-                    dloss_dp[d] -= train_embeddings[pos_idx][d];
+                for (d, dp) in dloss_dp.iter_mut().enumerate() {
+                    *dp -= train_embeddings[pos_idx][d];
                 }
             }
-            for d in 0..dim {
-                dloss_dp[d] /= TAU;
+            for dp in dloss_dp.iter_mut() {
+                *dp /= TAU;
             }
 
             // dLoss/dV[d,k] += dloss_dp[d] * z[k]
             for d in 0..dim {
-                for k in 0..RANK {
-                    grad_v[d * RANK + k] += dloss_dp[d] * z[k];
+                for (k, zk) in z.iter().enumerate() {
+                    grad_v[d * RANK + k] += dloss_dp[d] * zk;
                 }
             }
             // dLoss/dz[k] = sum_d V[d,k] * dloss_dp[d]
-            let mut dloss_dz = vec![0.0f32; RANK];
-            for d in 0..dim {
-                let g = dloss_dp[d];
-                for k in 0..RANK {
-                    dloss_dz[k] += pred.v[d * RANK + k] * g;
+            let mut dloss_dz = [0.0f32; RANK];
+            for (d, g) in dloss_dp.iter().enumerate() {
+                for (k, dz) in dloss_dz.iter_mut().enumerate() {
+                    *dz += pred.v[d * RANK + k] * g;
                 }
             }
             // dLoss/dU[d,k] += r[d] * dloss_dz[k]
@@ -328,7 +329,7 @@ fn main() {
         let (mut c_sum, mut f_sum) = (0.0, 0.0);
         let (mut c_n, mut f_n) = (0, 0);
 
-        for i in 0..CORPUS.len() {
+        for (i, item) in CORPUS.iter().enumerate() {
             let seed = 1000 + i as u64; // deterministic, distinct per fold
             let (fc, lc) = loo_eval(&embeddings, coarse, i, seed).unwrap_or((f32::NAN, f32::NAN));
             let (ff, lf) = loo_eval(&embeddings, fine, i, seed).unwrap_or((f32::NAN, f32::NAN));
@@ -336,7 +337,7 @@ fn main() {
             if ff.is_finite() { f_sum += ff; f_n += 1; }
             println!(
                 "{:<20} {:>10.3} {:>10.3} {:>12.4} {:>12.4}",
-                CORPUS[i].0, fc, ff, lc, lf
+                item.0, fc, ff, lc, lf
             );
             results.push(Result3 {
                 reference: CORPUS[i].0,

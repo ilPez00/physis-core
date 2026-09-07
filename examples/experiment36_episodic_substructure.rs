@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 36 — the EPISODIC form of the depth-1 nesting proposal.
 //!
 //! Iteration 34 tested it with the authored `hints` and got nothing (z = +0.62),

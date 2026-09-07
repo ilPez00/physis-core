@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 1 — reference-conditioned discovery vs. naive baselines.
 //!
 //! Tests the hypothesis: "a reference point changes the *relational structure*

@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 5 — does perspective-framing context in the embedding INPUT
 //! matter more than the discovery MECHANISM?
 //!
@@ -180,8 +183,8 @@ fn purity(assignment: &[usize], k: usize, label_of: impl Fn(usize) -> &'static s
     let mut correct = 0usize;
     for c in 0..k {
         let mut counts = std::collections::HashMap::new();
-        for i in 0..n {
-            if assignment[i] == c {
+        for (i, a) in assignment.iter().enumerate() {
+            if *a == c {
                 *counts.entry(label_of(i)).or_insert(0usize) += 1;
             }
         }

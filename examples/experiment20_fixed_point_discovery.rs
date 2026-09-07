@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 20 — an architectural redesign, not another certification
 //! signal. Every mechanism tried across Iterations 1-19 (k-means,
 //! calibration, certification gates) tries to make an inherently

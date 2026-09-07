@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 15 — Next Experiment 2 (FINAL_REPORT.md): measure how
 //! common cross-cutting concepts actually are in physis-core's REAL
 //! 730-entry ontology, not another hand-built toy corpus. Every dataset

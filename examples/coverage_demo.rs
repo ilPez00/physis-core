@@ -42,8 +42,8 @@ fn main() {
         // records ARE the ontology entries, every record scores 1.000 against
         // itself, nothing is uncovered, and every candidate scores zero — the
         // case `nothing_uncovered_means_no_candidate_can_gain` documents.
-        let mut kept: std::collections::HashMap<(String, String), Vec<(String, Vec<f32>)>> =
-            std::collections::HashMap::new();
+        type CellEntries = std::collections::HashMap<(String, String), Vec<(String, Vec<f32>)>>;
+        let mut kept: CellEntries = std::collections::HashMap::new();
         let mut records: Vec<(String, Vec<f32>)> = Vec::new();
         for (i, d) in defs.iter().enumerate() {
             let e = embedder.embed(&text_of(d));

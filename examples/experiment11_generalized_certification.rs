@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 11 — find a certification signal that catches "balanced but
 //! wrong" AND correctly accepts "unbalanced but right", closing Iteration
 //! 10's open problem: size-balance ratio (validated in Iteration 9) missed
@@ -95,7 +98,7 @@ fn cluster_centroids(embeddings: &[Vec<f32>], assignment: &[usize]) -> [Vec<f32>
     for c in 0..2 {
         if counts[c] == 0 { continue; }
         let norm: f32 = centroids[c].iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
-        for d in 0..dim { centroids[c][d] /= norm; }
+        for v in &mut centroids[c] { *v /= norm; }
     }
     centroids
 }

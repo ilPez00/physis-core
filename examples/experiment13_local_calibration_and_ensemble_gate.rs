@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 13 — the two next-experiments flagged after Iteration 12:
 //!
 //! Part A: does LOCAL, split calibration fix the granularity-degradation

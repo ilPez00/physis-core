@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 19 — Roadmap item 15 (user-proposed): use a SECOND,
 //! architecturally different embedder not to pick a winner (Iteration
 //! 18 already showed BGE and MiniLM land in the same rough range), but

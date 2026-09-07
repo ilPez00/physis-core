@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 10 — closing the three gaps flagged after Iteration 9, on one
 //! corpus that has BOTH real hierarchy AND cross-cutting structure at once.
 //!

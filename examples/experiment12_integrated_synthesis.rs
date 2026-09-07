@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 12 — the integrated end-to-end synthesis mission: does
 //! "preserve full membership, certify, recurse only when trustworthy"
 //! outperform properly-calibrated raw-cosine baselines on a corpus with
@@ -263,7 +266,7 @@ fn run_pipeline<F: Fn(&str) -> Vec<f32>>(representation: &'static str, embed: F)
 
     // ── Baseline A: raw cosine argmax over the 6 known fine cells ──
     let argmax_cat = |sims: &HashMap<&'static str, f32>| -> &'static str {
-        *sims.iter().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0
+        sims.iter().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0
     };
     let mut a_hits = 0usize;
     for (i, s) in pure_sims.iter().enumerate() { if argmax_cat(s) == fine_true[i] { a_hits += 1; } }

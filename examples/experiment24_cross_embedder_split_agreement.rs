@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 24 — roadmap item 11: cross-embedder AGREEMENT as a
 //! certification signal for CLUSTERING SPLITS — a different question
 //! from item 15 (cross-embedder corroboration for MULTI-MEMBERSHIP
@@ -157,7 +160,7 @@ fn main() {
         };
         println!("Both embedders loaded.\n");
 
-        struct Case { name: &'static str, correct: bool, minilm_emb: Vec<Vec<f32>>, bge_emb: Vec<Vec<f32>>, given_partition: Vec<usize> }
+        struct Case { name: &'static str, correct: bool, _minilm_emb: Vec<Vec<f32>>, bge_emb: Vec<Vec<f32>>, given_partition: Vec<usize> }
 
         let a_minilm: Vec<Vec<f32>> = DATASET_A.iter().map(|(_, s, _)| minilm.embed(s)).collect();
         let a_bge: Vec<Vec<f32>> = DATASET_A.iter().map(|(_, s, _)| bge.embed(s)).collect();
@@ -180,17 +183,15 @@ fn main() {
         let mech_bge: Vec<Vec<f32>> = MECHANICAL_BRANCH.iter().map(|(_, s)| bge.embed(s)).collect();
         let mech_real = kmeans(&mech_minilm, 2, 30);
 
-        let cases = vec![
-            Case { name: "1: GOOD-balanced (Dataset A true 8v7)", correct: true, minilm_emb: a_minilm, bge_emb: a_bge, given_partition: a_true },
-            Case { name: "2: BAD-imbalanced (Dataset A real, 13v2)", correct: false, minilm_emb: DATASET_A.iter().map(|(_, s, _)| minilm.embed(s)).collect(), bge_emb: DATASET_A.iter().map(|(_, s, _)| bge.embed(s)).collect(), given_partition: a_real },
-            Case { name: "3: BAD-balanced (Iter.10 bird branch, 6v4)", correct: false, minilm_emb: bird_minilm, bge_emb: bird_bge, given_partition: bird_real },
-            Case { name: "4: GOOD-imbalanced (true wheel count, 2v10)", correct: true, minilm_emb: veh_minilm, bge_emb: veh_bge, given_partition: veh_true },
-            Case { name: "5: BAD-balanced (Iter.12 economic branch)", correct: false, minilm_emb: econ_minilm, bge_emb: econ_bge, given_partition: econ_real },
-            Case { name: "6: BAD-imbalanced (Iter.12 mechanical branch)", correct: false, minilm_emb: mech_minilm, bge_emb: mech_bge, given_partition: mech_real },
-        ];
+        let cases = [Case { name: "1: GOOD-balanced (Dataset A true 8v7)", correct: true, _minilm_emb: a_minilm, bge_emb: a_bge, given_partition: a_true },
+            Case { name: "2: BAD-imbalanced (Dataset A real, 13v2)", correct: false, _minilm_emb: DATASET_A.iter().map(|(_, s, _)| minilm.embed(s)).collect(), bge_emb: DATASET_A.iter().map(|(_, s, _)| bge.embed(s)).collect(), given_partition: a_real },
+            Case { name: "3: BAD-balanced (Iter.10 bird branch, 6v4)", correct: false, _minilm_emb: bird_minilm, bge_emb: bird_bge, given_partition: bird_real },
+            Case { name: "4: GOOD-imbalanced (true wheel count, 2v10)", correct: true, _minilm_emb: veh_minilm, bge_emb: veh_bge, given_partition: veh_true },
+            Case { name: "5: BAD-balanced (Iter.12 economic branch)", correct: false, _minilm_emb: econ_minilm, bge_emb: econ_bge, given_partition: econ_real },
+            Case { name: "6: BAD-imbalanced (Iter.12 mechanical branch)", correct: false, _minilm_emb: mech_minilm, bge_emb: mech_bge, given_partition: mech_real }];
 
         let case_names: [&[(&str, &str)]; 6] = [
-            &[], &[], &[], &[], &[], &MECHANICAL_BRANCH,
+            &[], &[], &[], &[], &[], MECHANICAL_BRANCH,
         ];
         println!("{:<50} {:>18}", "case", "cross-embedder ARI");
         let mut scored: Vec<(bool, f64)> = Vec::new();

@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 7 — mission Steps 8-9: recursive exploration, and stress-testing it.
 //!
 //! Every prior iteration tested a single, flat level of discovery. This

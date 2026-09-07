@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 17 — a genuinely self-supervised JEPA-style predictor,
 //! this time targeting the DISCOVERED ontology structure's own
 //! representations (train-only cluster centroids) instead of human
@@ -103,17 +106,17 @@ impl Predictor {
     fn forward(&self, x: &[f32]) -> (Vec<f32>, Vec<f32>) {
         // h = U^T x  (k-dim)
         let mut h = vec![0.0f32; self.k];
-        for kk in 0..self.k {
+        for (kk, hk) in h.iter_mut().enumerate() {
             let mut s = 0.0;
-            for d in 0..self.dim { s += self.u[d][kk] * x[d]; }
-            h[kk] = s;
+            for (d, xd) in x.iter().enumerate() { s += self.u[d][kk] * xd; }
+            *hk = s;
         }
         // pred_raw = V h (dim-dim)
         let mut pred_raw = vec![0.0f32; self.dim];
-        for d in 0..self.dim {
+        for (d, pr) in pred_raw.iter_mut().enumerate() {
             let mut s = 0.0;
-            for kk in 0..self.k { s += self.v[d][kk] * h[kk]; }
-            pred_raw[d] = s;
+            for (kk, hk) in h.iter().enumerate() { s += self.v[d][kk] * hk; }
+            *pr = s;
         }
         (pred_raw, h)
     }
@@ -253,7 +256,7 @@ fn run_real_domain_case(embedder: &impl VectorEmbed) {
         let c = labels[i];
         let seen = per_class_seen[c];
         per_class_seen[c] += 1;
-        seen % 5 == 0
+        seen.is_multiple_of(5)
     }).collect();
     let train_idx: Vec<usize> = (0..n).filter(|&i| !held_out[i]).collect();
     let holdout_idx: Vec<usize> = (0..n).filter(|&i| held_out[i]).collect();
@@ -270,7 +273,7 @@ fn run_real_domain_case(embedder: &impl VectorEmbed) {
     let mut predictor = Predictor::new(dim, 16.min(dim));
     let train_xs: Vec<Vec<f32>> = train_idx.iter().map(|&i| embeddings[i].clone()).collect();
     let train_labels: Vec<usize> = train_idx.iter().map(|&i| labels[i]).collect();
-    let mut final_loss = 0.0;
+    let mut final_loss;
     for epoch in 0..800 {
         final_loss = predictor.train_step_nway(&train_xs, &train_labels, &train_centroids, 0.1, 0.3);
         if epoch % 100 == 0 || epoch == 799 { println!("  epoch {epoch}: loss={final_loss:.4}"); }
@@ -308,7 +311,7 @@ fn nearest_centroid_correct(pred_raw: &[f32], own_centroid: &[f32], other_centro
 fn holdout_split(assignment: &[usize]) -> Vec<bool> {
     let n = assignment.len();
     let mut held_out = vec![false; n];
-    for i in 0..n { if i % 3 == 0 { held_out[i] = true; } }
+    for (i, ho) in held_out.iter_mut().enumerate() { if i.is_multiple_of(3) { *ho = true; } }
     for c in 0..2 {
         let members: Vec<usize> = (0..n).filter(|&i| assignment[i] == c).collect();
         let ho_count = members.iter().filter(|&&i| held_out[i]).count();

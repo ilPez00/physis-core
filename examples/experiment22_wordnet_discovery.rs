@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 22 — user-proposed: "word discovery compared to an OWL
 //! database, that only then binds to the embedder." Symbolic, versioned,
 //! deterministic lexical structure (WordNet — same STABILITY property as

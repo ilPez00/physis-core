@@ -30,6 +30,10 @@
 //! Run:
 //!   cargo run -p physis-core --features embed-onnx --release --example experiment39_becoming -- <corpus.json>
 
+
+// NOTE: the no-embed-onnx build is a stub; the imports, struct and helpers
+// above main are intentionally dead there (they serve the embed-onnx path).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 use physis_core::becoming::{classify, Deviation, Trajectory};
 use serde::Deserialize;
 

@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 21 — the concrete build resulting from Iteration 20's
 //! resolution: stop trying to discover new stable fixed points from raw
 //! embedding geometry (it failed decisively under four different

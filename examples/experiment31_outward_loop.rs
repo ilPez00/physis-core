@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 31 — the outward discovery loop: **propose, check, triage.**
 //!
 //! Iteration 30 established the premise: near-neighbour midpoints point at
@@ -240,8 +243,8 @@ fn main() {
             .map(|ms| {
                 let mut acc = vec![0.0f32; 384];
                 for &pi in ms {
-                    for d in 0..384 {
-                        acc[d] += proposals[pi].0[d];
+                    for (d, a) in acc.iter_mut().enumerate() {
+                        *a += proposals[pi].0[d];
                     }
                 }
                 normalize(&acc)

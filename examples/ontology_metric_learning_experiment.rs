@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 4 — does a trained (JEPA-style) predictor improve classification
 //! of physis-core's REAL, existing 70-cell ontology, over the raw cosine
 //! similarity `CellClassifier` actually uses in production?
@@ -61,22 +64,21 @@ impl Predictor {
     }
     fn project(&self, r: &[f32]) -> Vec<f32> {
         let mut z = vec![0.0f32; RANK];
-        for d in 0..self.dim {
-            let rd = r[d];
-            for k in 0..RANK {
-                z[k] += self.u[d * RANK + k] * rd;
+        for (d, rd) in r.iter().enumerate() {
+            for (k, zk) in z.iter_mut().enumerate() {
+                *zk += self.u[d * RANK + k] * rd;
             }
         }
         z
     }
     fn predict_from_z(&self, z: &[f32]) -> Vec<f32> {
         let mut p = vec![0.0f32; self.dim];
-        for d in 0..self.dim {
+        for (d, pd) in p.iter_mut().enumerate() {
             let mut acc = 0.0;
-            for k in 0..RANK {
-                acc += self.v[d * RANK + k] * z[k];
+            for (k, zk) in z.iter().enumerate() {
+                acc += self.v[d * RANK + k] * zk;
             }
-            p[d] = acc;
+            *pd = acc;
         }
         p
     }
@@ -139,24 +141,23 @@ fn train_predictor(train_embeddings: &[Vec<f32>], labels: &[usize], seed: u64) -
             }
             let inv_pos = 1.0 / positives.len() as f32;
             for &pos_idx in &positives {
-                for d in 0..dim {
-                    dloss_dp[d] -= inv_pos * train_embeddings[pos_idx][d];
+                for (d, dp) in dloss_dp.iter_mut().enumerate() {
+                    *dp -= inv_pos * train_embeddings[pos_idx][d];
                 }
             }
-            for d in 0..dim {
-                dloss_dp[d] /= TAU;
+            for dp in dloss_dp.iter_mut() {
+                *dp /= TAU;
             }
 
             for d in 0..dim {
-                for k in 0..RANK {
-                    grad_v[d * RANK + k] += dloss_dp[d] * z[k];
+                for (k, zk) in z.iter().enumerate() {
+                    grad_v[d * RANK + k] += dloss_dp[d] * zk;
                 }
             }
-            let mut dloss_dz = vec![0.0f32; RANK];
-            for d in 0..dim {
-                let g = dloss_dp[d];
-                for k in 0..RANK {
-                    dloss_dz[k] += pred.v[d * RANK + k] * g;
+            let mut dloss_dz = [0.0f32; RANK];
+            for (d, g) in dloss_dp.iter().enumerate() {
+                for (k, dz) in dloss_dz.iter_mut().enumerate() {
+                    *dz += pred.v[d * RANK + k] * g;
                 }
             }
             let r = &train_embeddings[qi];

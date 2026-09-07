@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 8 — mission Dataset D: cross-cutting concepts.
 //!
 //! Every dataset used so far (B: perspectives, A: taxonomy) assumed each
@@ -169,13 +172,13 @@ fn main() {
 
         // Name each cluster by its majority true label among the 21 pure items.
         let mut cluster_label = vec!["?"; 3];
-        for c in 0..3 {
+        for (c, slot) in cluster_label.iter_mut().enumerate() {
             let mut counts = std::collections::HashMap::new();
             for i in 0..PURE.len() {
                 if assignment[i] == c { *counts.entry(PURE[i].2).or_insert(0usize) += 1; }
             }
             if let Some((label, _)) = counts.into_iter().max_by_key(|(_, n)| *n) {
-                cluster_label[c] = label;
+                *slot = label;
             }
         }
         println!("cluster -> majority true label among pure items: {cluster_label:?}\n");

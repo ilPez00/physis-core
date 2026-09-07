@@ -1,3 +1,6 @@
+// NOTE: the no-embed-onnx build is a stub; the analysis helpers below are
+// intentionally dead there (they serve the embed-onnx analysis path only).
+#![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
 //! Experiment 2 — Iteration 2: fix the broken baseline, add fine-grained
 //! ground truth, test across every item as its own reference.
 //!
@@ -166,8 +169,8 @@ fn purity(assignment: &[usize], k: usize, label_of: impl Fn(usize) -> &'static s
     let mut correct = 0usize;
     for c in 0..k {
         let mut counts = std::collections::HashMap::new();
-        for i in 0..n {
-            if assignment[i] == c {
+        for (i, a) in assignment.iter().enumerate() {
+            if *a == c {
                 *counts.entry(label_of(i)).or_insert(0usize) += 1;
             }
         }
@@ -296,7 +299,6 @@ fn main() {
     #[cfg(not(feature = "embed-onnx"))]
     {
         println!("Built without --features embed-onnx; this experiment requires the real embedder. Aborting.");
-        return;
     }
 
     #[cfg(feature = "embed-onnx")]
@@ -314,7 +316,7 @@ fn main() {
         let (mut nc_n, mut nf_n) = (0, 0);
         let (mut delta_wins_c, mut delta_wins_f, mut ties_c, mut ties_f) = (0, 0, 0, 0);
 
-        for i in 0..CORPUS.len() {
+        for (i, item) in CORPUS.iter().enumerate() {
             let naive_c = naive_nn_f1(&embeddings, i, coarse);
             let delta_c = delta_direction_f1(&embeddings, i, delta_threshold, coarse);
             let naive_f = naive_nn_f1(&embeddings, i, fine);
@@ -334,9 +336,9 @@ fn main() {
             }
 
             per_reference.push(PerReferenceResult {
-                reference: CORPUS[i].0,
-                coarse: CORPUS[i].1,
-                fine: CORPUS[i].2,
+                reference: item.0,
+                coarse: item.1,
+                fine: item.2,
                 naive_f1_coarse: naive_c.unwrap_or(f32::NAN),
                 delta_f1_coarse: delta_c.unwrap_or(f32::NAN),
                 naive_f1_fine: naive_f.unwrap_or(f32::NAN),
