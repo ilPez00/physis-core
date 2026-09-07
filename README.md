@@ -12,14 +12,28 @@
 > authors against their own work, from measurements in
 > `research/perspective-discovery/FINAL_REPORT.md` (in the parent project).
 >
-> **What was measured.** Eleven distinct mechanisms for ontology discovery and
-> soundness checking were built and evaluated against controls. All eleven
-> failed. The last surviving candidate — a structural, label-free misfiling
-> detector — was published as beating a geometric baseline (AUC 0.654 vs 0.619).
-> When the injected ground truth was **resampled** rather than taken from a
-> single arbitrary perturbation, it won **1 of 11** trials and lost to plain
-> cosine distance at *p* < 0.01 (paired *t* = −3.08 held-out, −6.06 overall).
-> That headline is withdrawn.
+> **What was measured.** Twelve distinct mechanisms for ontology discovery and
+> soundness checking were built and evaluated. None was shown to work. The last
+> surviving candidate — a structural, label-free misfiling detector — had been
+> published as beating a geometric baseline (AUC 0.654 vs 0.619); when the
+> injected ground truth was **resampled** instead of taken from one arbitrary
+> perturbation, it won **1 of 11** trials and lost to plain cosine distance
+> (paired *t* = −3.08 held-out, −6.06 overall). That headline is withdrawn.
+>
+> **And then the ground truth itself was checked, which should have come first.**
+> A deterministic sample of 60 of the 659 shipped ontology entries, adjudicated
+> against each cell's own definition, found **43.3% clearly filed in the wrong
+> cell** (31.7% clearly right, 25.0% marginal). `CONSTRUCT/WORK` — "pour
+> concrete, frame the wall" — contains Access Control, Database Engineering and
+> a Peirce sign category. So the audit was asking each scorer to find ~35
+> planted misfilings while ~248 real ones sat in the same cells labelled
+> correct, and *penalising* any scorer that flagged them.
+>
+> **The correct status of those twelve mechanisms is therefore UNTESTED, not
+> refuted** — the experiment lacked the power to tell a working scorer from a
+> broken one. What is not in doubt is the conclusion below: the shipped
+> ontology's cell assignments are unreliable, so classification against them is
+> unreliable, whatever the mechanism.
 >
 > **Two cautions for anyone building on this.** A vocabulary-overlap scorer
 > measured **+0.121 AUC over cosine, 11/11 trials, *t* = +12.97** when scored
