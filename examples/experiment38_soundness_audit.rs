@@ -214,6 +214,41 @@ fn main() {
             return;
         }
 
+        // MODE ANCHORS: config/mode_anchors_ontology.json holds exactly one
+        // entry per (domain, mode) cell, with hand-authored hints defining what
+        // that cell MEANS. This is the controlled vocabulary item 34 found
+        // missing — informative about domain x mode by construction, and
+        // authored separately from the 957 corpus entries.
+        //
+        // The anchors are themselves loaded by OntologyLoader, so they are
+        // excluded from the tested entries below; otherwise each anchor would
+        // match its own cell perfectly and inflate the result.
+        let anchor_path = ["physis-core/config", "config", "../config"]
+            .iter()
+            .map(|d| std::path::Path::new(d).join("mode_anchors_ontology.json"))
+            .find(|p| p.exists());
+        let mut anchors: HashMap<(String, String), Vec<String>> = HashMap::new();
+        let mut anchor_names: HashSet<String> = HashSet::new();
+        if let Some(ap) = &anchor_path {
+            if let Ok(txt) = std::fs::read_to_string(ap) {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&txt) {
+                    for e in v["domains"].as_array().into_iter().flatten() {
+                        let (Some(d), Some(m), Some(nm)) =
+                            (e["domain"].as_str(), e["mode"].as_str(), e["name"].as_str())
+                        else { continue };
+                        let mut toks: Vec<String> = words(nm);
+                        for h in e["hints"].as_array().into_iter().flatten() {
+                            if let Some(hs) = h.as_str() { toks.extend(words(hs)); }
+                        }
+                        toks.sort(); toks.dedup();
+                        anchors.insert((d.to_string(), m.to_string()), toks);
+                        anchor_names.insert(nm.to_string());
+                    }
+                }
+            }
+        }
+        println!("mode anchors: {} cells with an authored vocabulary", anchors.len());
+
         let ontology = OntologyLoader::load_all();
         let (mut texts, mut true_cell, mut names) = (Vec::new(), Vec::new(), Vec::new());
         // Structured fields, for the DEPENDENCY-CONSTRAINT scorer. Measured
@@ -223,10 +258,17 @@ fn main() {
         // constraint is statable for half the grid, and this tests whether
         // that half is worth anything against the geometric baseline.
         let mut fields: Vec<(String, String)> = Vec::new();
+        let mut entry_toks: Vec<Vec<String>> = Vec::new();
         for def in ontology.classification_domains() {
             let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
             let mut t = def.name.clone();
             for h in &def.hints { t.push(' '); t.push_str(h); }
+            if anchor_names.contains(&def.name) { continue }
+            entry_toks.push({
+                let mut t = words(&def.name);
+                for h in &def.hints { t.extend(words(h)); }
+                t.sort(); t.dedup(); t
+            });
             names.push(words(&def.name));
             fields.push((
                 def.axis_name.clone().unwrap_or_default(),
@@ -293,7 +335,7 @@ fn main() {
             members.entry(c.clone()).or_default().push(i);
         }
 
-        let mut rows: Vec<(f64, f64, f64, bool, f64)> = Vec::new(); // nonlattice, ancestry, cosine, injected, orphan
+        let mut rows: Vec<(f64, f64, f64, bool, f64, f64)> = Vec::new(); // nonlattice, ancestry, cosine, injected, constraint, anchor_vocab
         let (mut stat_ca, mut stat_mca): (Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new());
         for i in 0..n {
             if anc[i].is_empty() { continue }
@@ -337,7 +379,42 @@ fn main() {
             let ctr = normalize(&acc);
             let cosine = 1.0 - cosine_sim(&emb[i], &ctr) as f64;
 
-            rows.push((nonlattice, ancestry, cosine, injected[i], orphan_rate));
+            // DEPENDENCY CONSTRAINT: is the entry's axis_name / category
+            // attested among the other members of its cell's DOMAIN? Learned
+            // from the PERTURBED assignment, excluding the entry itself, so it
+            // gets exactly the information cosine gets.
+            let dom = &cell[i].0;
+            let (mut axis_seen, mut cat_seen) = (false, false);
+            for j in 0..n {
+                if j == i || &cell[j].0 != dom { continue }
+                if !fields[i].0.is_empty() && fields[j].0 == fields[i].0 { axis_seen = true; }
+                if !fields[i].1.is_empty() && fields[j].1 == fields[i].1 { cat_seen = true; }
+                if axis_seen && cat_seen { break }
+            }
+            let constraint = (!axis_seen) as u8 as f64 + (!cat_seen) as u8 as f64;
+
+            // ANCHOR-VOCAB: purely LEXICAL overlap between the entry and its
+            // cell's authored anchor vocabulary. No embedder. This is the
+            // controlled-vocabulary constraint done properly, where axis_name
+            // (553 free-text values) could not be. Fewer shared markers = more
+            // suspect filing, so the score is negated.
+            let anchor_vocab = match anchors.get(&cell[i]) {
+                Some(av) => {
+                    let (mut x, mut y, mut hit) = (0usize, 0usize, 0usize);
+                    while x < entry_toks[i].len() && y < av.len() {
+                        match entry_toks[i][x].cmp(&av[y]) {
+                            std::cmp::Ordering::Less => x += 1,
+                            std::cmp::Ordering::Greater => y += 1,
+                            std::cmp::Ordering::Equal => { hit += 1; x += 1; y += 1; }
+                        }
+                    }
+                    -(hit as f64)
+                }
+                None => 0.0,
+            };
+            let _ = orphan_rate;
+
+            rows.push((nonlattice, ancestry, cosine, injected[i], constraint, anchor_vocab));
         }
         println!("scored {} entries ({} injected)\n", rows.len(), rows.iter().filter(|r| r.3).count());
         // Is the lattice condition even firing? If almost every pair has no
@@ -351,16 +428,16 @@ fn main() {
         println!();
 
         let a_nl = auc(&rows.iter().map(|r| (r.0, r.3)).collect::<Vec<_>>());
-        let a_or = auc(&rows.iter().map(|r| (r.4, r.3)).collect::<Vec<_>>());
         let a_an = auc(&rows.iter().map(|r| (r.1, r.3)).collect::<Vec<_>>());
         let a_co = auc(&rows.iter().map(|r| (r.2, r.3)).collect::<Vec<_>>());
         let a_cn = auc(&rows.iter().map(|r| (r.4, r.3)).collect::<Vec<_>>());
+        let a_av = auc(&rows.iter().map(|r| (r.5, r.3)).collect::<Vec<_>>());
 
         println!("=== Can each scorer find the injected misfilings? (AUC, 0.5 = chance) ===\n");
         println!("  NON-LATTICE (structural, label-free)   AUC = {a_nl:.3}");
         println!("  ANCESTRY    (structural, label-free)   AUC = {a_an:.3}");
-        println!("  ORPHAN-RATE (no common ancestor)       AUC = {a_or:.3}");
         println!("  CONSTRAINT  (axis_name/category unattested) AUC = {a_cn:.3}");
+        println!("  ANCHOR-VOCAB (lexical, authored per cell)   AUC = {a_av:.3}");
         println!("  COSINE      (geometric baseline)       AUC = {a_co:.3}");
 
         // The question that matters: does structure add anything over cosine?
@@ -427,7 +504,7 @@ fn main() {
         );
 
         println!("\n=== Verdict ===\n");
-        let best_struct = a_nl.max(a_an).max(a_or);
+        let best_struct = a_nl.max(a_an).max(a_cn).max(a_av);
         if best_struct > a_co + 0.03 {
             println!("  The structural audit BEATS the geometric baseline outright");
             println!("  ({best_struct:.3} vs {a_co:.3}). A label-free soundness check is available.");
