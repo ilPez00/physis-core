@@ -2,7 +2,7 @@
 name = "physis-core"
 version = "0.1.18"
 edition = "2021"
-description = "NOT CURRENTLY FUNCTIONAL for its stated purpose: the ontology discovery and filing-soundness checks this engine exists to provide were measured against controls and score at or below plain cosine distance. The primitives (loading, linkage, coverage, becoming's runs test) are tested and deterministic, but `becoming` does not detect meaning change: 51.4% vs a 56.8% baseline on SemEval-2020 Task 1. See README status."
+description = "NOT CURRENTLY FUNCTIONAL for its stated purpose: a sample of the shipped ontology found 43% of entries filed in the wrong cell, so classification and soundness-checking against it are unreliable and score at or below plain cosine distance. The primitives (loading, linkage, coverage, becoming) are tested and deterministic. See README status."
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/ilPez00/physis-core"
