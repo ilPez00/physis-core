@@ -134,6 +134,7 @@
 //! - [`vault`]: Markdown knowledge vault and Git commit history importers.
 //! - [`studio`]: Embedded lightweight web studio GUI and RESTful API endpoints.
 
+pub mod becoming;
 pub mod classify;
 pub mod coherence_dimensions;
 pub mod coherence_query;
