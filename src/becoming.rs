@@ -135,8 +135,18 @@ fn two_means(occs: &[Occurrence]) -> Vec<bool> {
                 changed = true;
             }
         }
-        let a: Vec<&Vec<f32>> = occs.iter().zip(&assign).filter(|(_, &b)| !b).map(|(o, _)| &o.context).collect();
-        let b: Vec<&Vec<f32>> = occs.iter().zip(&assign).filter(|(_, &b)| b).map(|(o, _)| &o.context).collect();
+        let a: Vec<&Vec<f32>> = occs
+            .iter()
+            .zip(&assign)
+            .filter(|(_, &b)| !b)
+            .map(|(o, _)| &o.context)
+            .collect();
+        let b: Vec<&Vec<f32>> = occs
+            .iter()
+            .zip(&assign)
+            .filter(|(_, &b)| b)
+            .map(|(o, _)| &o.context)
+            .collect();
         if a.is_empty() || b.is_empty() {
             break;
         }
@@ -181,8 +191,18 @@ pub fn classify(occs: &[Occurrence]) -> Verdict {
         };
     }
     let assign = two_means(occs);
-    let a: Vec<&Vec<f32>> = occs.iter().zip(&assign).filter(|(_, &b)| !b).map(|(o, _)| &o.context).collect();
-    let b: Vec<&Vec<f32>> = occs.iter().zip(&assign).filter(|(_, &b)| b).map(|(o, _)| &o.context).collect();
+    let a: Vec<&Vec<f32>> = occs
+        .iter()
+        .zip(&assign)
+        .filter(|(_, &b)| !b)
+        .map(|(o, _)| &o.context)
+        .collect();
+    let b: Vec<&Vec<f32>> = occs
+        .iter()
+        .zip(&assign)
+        .filter(|(_, &b)| b)
+        .map(|(o, _)| &o.context)
+        .collect();
     if a.is_empty() || b.is_empty() {
         return Verdict {
             trajectory: Trajectory::Stable,
@@ -210,7 +230,13 @@ pub fn classify(occs: &[Occurrence]) -> Verdict {
         None
     };
 
-    Verdict { trajectory, separation, runs_z: z, change_at, deviations: deviations(occs) }
+    Verdict {
+        trajectory,
+        separation,
+        runs_z: z,
+        change_at,
+        deviations: deviations(occs),
+    }
 }
 
 /// Classify each occurrence as a mistake, a variation, or neither.
@@ -237,10 +263,96 @@ pub fn deviations(occs: &[Occurrence]) -> Vec<Option<Deviation>> {
                 return None;
             }
             // Uptake: does anything LATER look more like this than like the norm?
-            let taken_up = ((i + 1)..n).any(|j| cosine_sim(&occs[i].context, &occs[j].context) > sims[j]);
-            Some(if taken_up { Deviation::Variation } else { Deviation::Mistake })
+            let taken_up =
+                ((i + 1)..n).any(|j| cosine_sim(&occs[i].context, &occs[j].context) > sims[j]);
+            Some(if taken_up {
+                Deviation::Variation
+            } else {
+                Deviation::Mistake
+            })
         })
         .collect()
+}
+
+/// Classify a trajectory from ordered DISCRETE LABELS rather than vectors.
+///
+/// This exists because [`classify`] has a hard limit that Iteration 39 measured:
+/// cluster separation cannot tell "one sense used broadly" from "two senses".
+/// A common word occurs in wildly varied contexts with a single meaning and
+/// scores a large separation; a genuinely ambiguous word can score a small one.
+/// 2-means always returns two clusters, and their distance does not say whether
+/// they are senses.
+///
+/// Labels sidestep that entirely. A label is an exact symbol, so "same" and
+/// "different" are decided rather than measured, and the runs test — which is
+/// the part that actually works — gets a partition it can trust. The caller
+/// supplies the labels from something with a referent: an ontology cell, a
+/// rhythm label from `chronos`, a WSD tag. Anything but a clustering of the
+/// same embeddings whose ambiguity was the question.
+///
+/// `Stable` here means one label dominates; `Becoming` that the two leading
+/// labels are time-separated; `Split` that they interleave.
+pub fn classify_labeled(labels: &[&str]) -> Verdict {
+    let n = labels.len();
+    if n < 6 {
+        return Verdict {
+            trajectory: Trajectory::TooFew,
+            separation: 0.0,
+            runs_z: 0.0,
+            change_at: None,
+            deviations: vec![None; n],
+        };
+    }
+    let mut counts: Vec<(&str, usize)> = Vec::new();
+    for l in labels {
+        match counts.iter_mut().find(|(k, _)| k == l) {
+            Some((_, c)) => *c += 1,
+            None => counts.push((l, 1)),
+        }
+    }
+    // Ties break on the label itself so the verdict never depends on input
+    // order of equally-frequent labels.
+    counts.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+    let top = counts[0];
+    let second = counts.get(1).copied().unwrap_or(("", 0));
+
+    // Dominance stands in for `separation`: if the leading label covers nearly
+    // everything there is no second sense to talk about.
+    let dominance = top.1 as f32 / n as f32;
+    if second.1 == 0 || dominance > 1.0 - MIN_SEPARATION {
+        return Verdict {
+            trajectory: Trajectory::Stable,
+            separation: 1.0 - dominance,
+            runs_z: 0.0,
+            change_at: None,
+            deviations: vec![None; n],
+        };
+    }
+
+    // Runs test over just the two leading labels, in their original order.
+    let seq: Vec<bool> = labels
+        .iter()
+        .filter(|l| **l == top.0 || **l == second.0)
+        .map(|l| *l == second.0)
+        .collect();
+    let z = runs_z(&seq);
+    let trajectory = if z <= RUNS_Z_SEPARATED {
+        Trajectory::Becoming
+    } else {
+        Trajectory::Split
+    };
+    let change_at = if trajectory == Trajectory::Becoming {
+        seq.windows(2).position(|w| w[0] != w[1])
+    } else {
+        None
+    };
+    Verdict {
+        trajectory,
+        separation: 1.0 - dominance,
+        runs_z: z,
+        change_at,
+        deviations: vec![None; n],
+    }
 }
 
 #[cfg(test)]
@@ -252,7 +364,10 @@ mod tests {
         v.iter().map(|x| x / n).collect()
     }
     fn occ(at: i64, v: Vec<f32>) -> Occurrence {
-        Occurrence { at, context: norm(v) }
+        Occurrence {
+            at,
+            context: norm(v),
+        }
     }
     /// Two well-separated senses, laid out in the given order.
     fn build(order: &[u8]) -> Vec<Occurrence> {
@@ -260,7 +375,11 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(i, &c)| {
-                let v = if c == 0 { vec![1.0, 0.0, 0.05] } else { vec![0.0, 1.0, 0.05] };
+                let v = if c == 0 {
+                    vec![1.0, 0.0, 0.05]
+                } else {
+                    vec![0.0, 1.0, 0.05]
+                };
                 occ(i as i64, v)
             })
             .collect()
@@ -301,7 +420,11 @@ mod tests {
         let clumped = [false, false, false, false, true, true, true, true];
         let alternating = [false, true, false, true, false, true, false, true];
         assert!(runs_z(&clumped) < -1.5, "clumped z = {}", runs_z(&clumped));
-        assert!(runs_z(&alternating) > 1.5, "alternating z = {}", runs_z(&alternating));
+        assert!(
+            runs_z(&alternating) > 1.5,
+            "alternating z = {}",
+            runs_z(&alternating)
+        );
     }
 
     #[test]
@@ -310,14 +433,22 @@ mod tests {
         let mut v: Vec<Occurrence> = (0..9).map(|i| occ(i, vec![1.0, 0.01, 0.0])).collect();
         v[4] = occ(4, vec![0.0, 0.0, 1.0]);
         let d = deviations(&v);
-        assert_eq!(d[4], Some(Deviation::Mistake), "unrepeated outlier must be a mistake");
+        assert_eq!(
+            d[4],
+            Some(Deviation::Mistake),
+            "unrepeated outlier must be a mistake"
+        );
 
         // The same oddity, taken up again later.
         let mut w: Vec<Occurrence> = (0..9).map(|i| occ(i, vec![1.0, 0.01, 0.0])).collect();
         w[4] = occ(4, vec![0.0, 0.0, 1.0]);
         w[7] = occ(7, vec![0.0, 0.0, 1.0]);
         let e = deviations(&w);
-        assert_eq!(e[4], Some(Deviation::Variation), "a recurring deviation is owned");
+        assert_eq!(
+            e[4],
+            Some(Deviation::Variation),
+            "a recurring deviation is owned"
+        );
     }
 
     #[test]
@@ -329,6 +460,47 @@ mod tests {
             let again = classify(&occs);
             assert_eq!(first.trajectory, again.trajectory);
             assert_eq!(first.change_at, again.change_at);
+            assert!((first.runs_z - again.runs_z).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn labeled_time_separated_is_a_becoming() {
+        let l = ["a", "a", "a", "a", "a", "b", "b", "b", "b", "b"];
+        let v = classify_labeled(&l);
+        assert_eq!(v.trajectory, Trajectory::Becoming);
+        assert_eq!(v.change_at, Some(4));
+    }
+
+    #[test]
+    fn labeled_interleaved_is_a_split() {
+        // Same labels, same counts — only the order differs.
+        let l = ["a", "b", "a", "b", "a", "b", "a", "b", "a", "b"];
+        assert_eq!(classify_labeled(&l).trajectory, Trajectory::Split);
+    }
+
+    #[test]
+    fn one_dominant_label_is_stable_even_with_stragglers() {
+        let l = ["a", "a", "a", "a", "a", "a", "a", "a", "a", "b"];
+        assert_eq!(classify_labeled(&l).trajectory, Trajectory::Stable);
+    }
+
+    /// The failure `classify` could not avoid: a term used broadly but with one
+    /// meaning. As vectors it separates strongly and is called a Split; as
+    /// labels the single dominant sense is visible and it is Stable.
+    #[test]
+    fn broad_use_of_one_sense_is_stable_under_labels() {
+        let l = ["s", "s", "s", "s", "s", "s", "s", "s", "s", "s", "s", "t"];
+        assert_eq!(classify_labeled(&l).trajectory, Trajectory::Stable);
+    }
+
+    #[test]
+    fn labeled_verdicts_are_reproducible() {
+        let l = ["a", "a", "b", "a", "b", "b", "a", "b", "a", "b"];
+        let first = classify_labeled(&l);
+        for _ in 0..8 {
+            let again = classify_labeled(&l);
+            assert_eq!(first.trajectory, again.trajectory);
             assert!((first.runs_z - again.runs_z).abs() < 1e-12);
         }
     }
