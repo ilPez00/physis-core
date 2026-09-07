@@ -384,7 +384,8 @@ fn main() {
             members.entry(c.clone()).or_default().push(i);
         }
 
-        let mut rows: Vec<(f64, f64, f64, bool, f64, f64, f64, f64)> = Vec::new(); // nonlattice, ancestry, cosine, injected, constraint, anchor_vocab
+        let mut rows: Vec<(f64, f64, f64, bool, f64, f64, f64, f64)> = Vec::new();
+        let mut dump_rows: Vec<(usize, (f64, f64, f64))> = Vec::new(); // nonlattice, ancestry, cosine, injected, constraint, anchor_vocab
         let (mut stat_ca, mut stat_mca): (Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new());
         for i in 0..n {
             if anc[i].is_empty() { continue }
@@ -492,8 +493,24 @@ fn main() {
             let _ = orphan_rate;
 
             rows.push((nonlattice, ancestry, cosine, injected[i], constraint, anchor_vocab, vfreq, vgen));
+            dump_rows.push((i, (cosine, constraint, ancestry)));
         }
         println!("scored {} entries ({} injected)\n", rows.len(), rows.iter().filter(|r| r.3).count());
+
+        // PHYSIS_DUMP: write every scored entry with its fit to its ASSIGNED
+        // cell. With PHYSIS_AUDIT_STRIDE=0 nothing is injected, so this ranks
+        // the corpus's own filing -- physis's scorer pointed at physis's data.
+        if let Ok(dump) = std::env::var("PHYSIS_DUMP") {
+            let mut out = String::from("name\tcell\tcosine\tconstraint\tancestry\n");
+            for (i, r) in dump_rows.iter() {
+                out.push_str(&format!(
+                    "{}\t{}/{}\t{:.4}\t{:.4}\t{:.4}\n",
+                    entry_names[*i], cell[*i].0, cell[*i].1, r.0, r.1, r.2
+                ));
+            }
+            std::fs::write(&dump, out).ok();
+            println!("dumped {} rows to {dump}", dump_rows.len());
+        }
         // Is the lattice condition even firing? If almost every pair has no
         // common ancestor, |MCA|>1 can never discriminate and the whole method
         // is inapplicable rather than merely unhelpful.
