@@ -1,6 +1,6 @@
 [package]
 name = "physis-core"
-version = "0.1.18"
+version = "0.1.19"
 edition = "2021"
 description = "NOT CURRENTLY FUNCTIONAL for its stated purpose: a sample of the shipped ontology found 43% of entries filed in the wrong cell, so classification and soundness-checking against it are unreliable and score at or below plain cosine distance. The primitives (loading, linkage, coverage, becoming) are tested and deterministic. See README status."
 license = "Apache-2.0"

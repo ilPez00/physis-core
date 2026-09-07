@@ -4,6 +4,39 @@ Notable changes to `physis-core`. This file starts at 0.1.15; earlier
 releases predate it and are documented only by their git tags and commit
 history.
 
+## 0.1.19
+
+### Changed — the 0.1.18 reasoning was wrong; the conclusion was not
+
+- **0.1.18 said twelve mechanisms "were evaluated against controls" and failed.
+  That overstated what had been shown.** The evaluation's ground truth was never
+  checked. It has now been.
+
+  A deterministic sample of 60 of the 659 loaded ontology entries, adjudicated
+  against each cell's own anchor definition, finds **43.3% clearly filed in the
+  wrong cell** (31.7% clearly right, 25.0% marginal). `CONSTRUCT/WORK` — "pour
+  concrete, frame the wall, lay bricks" — contains Access Control, Booking &
+  Logistics, Database Engineering and a Peirce sign category. `HEAL/REST` —
+  "rest day, recover, sleep deeply" — contains Firstness, Power Regulation and
+  Semiconductor Cleanroom Environment.
+
+  The audit that rejected those mechanisms injects 35–114 misfilings and asks
+  each scorer to find them. At a 43.3% ambient rate the same 572 entries already
+  hold ~248 real misfilings **labelled correct** — a signal-to-noise ratio of
+  1:7 at the stride the published result used. A scorer that genuinely detects
+  bad filing is *penalised* for flagging them.
+
+  **So those mechanisms are UNTESTED, not refuted.** The experiment lacked the
+  power to distinguish a working scorer from a broken one.
+
+  **The crate's status is unchanged and better supported.** It does not do what
+  it claims — not because twelve approaches were disproven, but because the cell
+  assignments it classifies against are unreliable, which makes classification
+  against them unreliable whatever the mechanism.
+
+  Adjudication data and the re-test plan (Stage 8) live in the parent project at
+  `research/perspective-discovery/`.
+
 ## 0.1.18
 
 ### Changed — status notice, against our own work
