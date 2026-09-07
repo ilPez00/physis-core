@@ -8,6 +8,46 @@ history.
 
 ### Changed — status notice, against our own work
 
+- **`becoming` does not detect meaning change, on an external benchmark.**
+  Added to the status notice rather than left in a research log, because the
+  README listed `becoming` among the primitives that work and a reader could
+  reasonably have taken that as covering the task it is named for.
+
+  The statistic is sound and stays: its runs test separates `AAAAAABBBBBB` from
+  `ABABBABAABAB`, which no clusterer can. What fails is every attempt to give
+  it the sense partition it cannot produce. Measured on **SemEval-2020 Task 1**
+  (37 lemmas, ground truth by the task organisers — the previous evaluation was
+  8 terms chosen by us on our own documentation, which could not have
+  falsified anything): driving `becoming` from n-gram signature families gives
+  **51.4% accuracy against a 56.8% majority-class baseline** and Spearman
+  **0.183** against the graded gold, where published SOTA is 66.5% and 0.518.
+  Below a baseline that never reads the text.
+
+  Diagnosed rather than only scored: substitutability yields a median **57
+  families per term**, `classify_labeled` reads the top two, so 31 of 37 terms
+  return `Split` and `Stable` never fires. Granularity was the missing
+  property, not exactness.
+
+- **Relation typing by substitutability is dead too.** Ranking a word's true
+  Greimas dual against eleven distractors over 12M tokens of CCOHA recovers it
+  **0 of 12 times** (chance expects 1.0). Frequency dominates the rankings.
+  This was the second *symbolic* mechanism to fail after nine geometric ones,
+  so the wall is not a property of embeddings: words filling the same slot are
+  near-synonyms, frequency peers and antonyms alike.
+
+- **The salvage, named specifically.** n-gram signature families are real and
+  survive their controls. Longest-match-with-backoff signatures recur where
+  fixed trigrams do not (**92.0% vs 34.6%** median recurrence), and the long
+  ones are not chance: **41.4%** of real signatures reach length ≥ 4 against
+  **2.6%** when the same tokens are resampled independently, same geometry and
+  same frequencies. Families form without collapsing (largest family 21.1%,
+  35/37 terms). That is a usable collocation vocabulary — and explicitly not a
+  sense inventory.
+
+  A caution that cost a stage: the **recurrence rate itself is mostly a
+  frequency artifact**. The shuffled control reaches 78.7% of the 92.0%
+  headline. Only signature length survives it.
+
 - **The crate is marked NOT CURRENTLY FUNCTIONAL for its stated purpose**, in
   both the package description and the README. Nothing is removed and no API
   changes; what changes is the claim being made.

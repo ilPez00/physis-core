@@ -28,9 +28,37 @@
 > **noise floor of ~0.074 AUC**: single-run margins below that are not
 > interpretable, which invalidates several earlier reported results.
 >
+> **`becoming` is sound as a statistic and does not detect meaning change.**
+> Those are two different claims and only the first is supported. Its runs test
+> separates `AAAAAABBBBBB` from `ABABBABAABAB`, which no clusterer can, and that
+> is unit-tested. But it needs a sense partition it cannot itself produce, and
+> every attempt to supply one has failed. Measured on **SemEval-2020 Task 1**
+> (37 lemmas, gold labels by the task organisers, not by us): driving `becoming`
+> from n-gram signature families scores **51.4% binary accuracy against a 56.8%
+> majority-class baseline**, with Spearman **0.183** against the graded gold —
+> where the task's published state of the art is 66.5% and 0.518. It is below a
+> baseline that ignores the text entirely. Do not use it for lexical semantic
+> change.
+>
+> The failure is diagnosed, not just scored: substitutability yields a median of
+> **57 families per term** while `classify_labeled` reads only the two leading
+> labels, so a verdict rests on ~29% of the evidence and 31 of 37 terms come
+> back `Split`. Exactness was never the missing property; granularity was.
+>
+> Relation typing by the same relation also died: ranking a word's true
+> Greimas dual (from `dual()`'s hand-authored oppositions) against eleven
+> distractors on 12M tokens of CCOHA recovers it **0 of 12 times**, against 1.0
+> expected by chance. High-frequency verbs head nearly every ranking.
+>
 > **What does work, and is safe to use.** The primitives are real, tested and
 > deterministic: ontology loading and the 5×14 semiotic grid, `linkage`,
-> `coverage`, `becoming`, `process`. A production bug in
+> `coverage`, `becoming`'s runs test *given a partition*, `process`. n-gram
+> signature families are also real, and are the salvage from the above: exact
+> longest-match-with-backoff signatures recur where fixed trigrams do not
+> (**92.0% vs 34.6%** median), and the long ones are not reachable by chance —
+> **41.4%** of real signatures reach length ≥ 4 against **2.6%** when the same
+> tokens are resampled independently. They are a usable collocation vocabulary.
+> They are not a sense inventory. A production bug in
 > `classification_domains()` — a sort key that was not a total order, making
 > iteration order non-deterministic across six built-in domains — was found and
 > fixed here, with a regression test verified by sabotage.
