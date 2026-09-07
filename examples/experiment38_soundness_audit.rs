@@ -527,7 +527,7 @@ fn main() {
         // Stratify by cosine and ask whether the structural scores still
         // separate injected from clean WITHIN a stratum.
         println!(
-            "SWEEP stride={stride} mult={mult} half={half} n={} inj={} constraint={a_cn:.3} cosine={a_co:.3} vfreq={a_vf:.3} delta={:+.3}",
+            "SWEEP stride={stride} mult={mult} half={half} n={} inj={} constraint={a_cn:.3} cosine={a_co:.3} vfreq={a_vf:.3} vgen={a_vg:.3} delta={:+.3}",
             rows.len(), rows.iter().filter(|r| r.3).count(), a_cn - a_co
         );
         println!("\n=== Does structure add anything BEYOND cosine? ===\n");
