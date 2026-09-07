@@ -249,6 +249,45 @@ fn main() {
         }
         println!("mode anchors: {} cells with an authored vocabulary", anchors.len());
 
+        // AUTHORED CELL VOCABULARY (scripts/gen_cell_vocab.py). Built from a
+        // deterministic TRAIN half of each cell and scored only on the held-out
+        // half, so a cell's vocabulary is never tested against the entries it
+        // was derived from. `frequency` is the no-LLM arm; `generated` is
+        // qwen3:4b's, present only if that arm ran.
+        let mut vocab_freq: HashMap<(String, String), Vec<String>> = HashMap::new();
+        let mut vocab_gen: HashMap<(String, String), Vec<String>> = HashMap::new();
+        let mut test_names: HashSet<String> = HashSet::new();
+        let vocab_paths: Vec<String> = match std::env::var("PHYSIS_VOCAB") {
+            Ok(v) => vec![v],
+            Err(_) => ["../research/perspective-discovery/cell_vocab_A.json", "cell_vocab_A.json"]
+                .iter().map(|s| s.to_string()).collect(),
+        };
+        for vp in vocab_paths {
+            let Ok(txt) = std::fs::read_to_string(&vp) else { continue };
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(&txt) else { continue };
+            let mut take = |key: &str, into: &mut HashMap<(String, String), Vec<String>>| {
+                for (k, arr) in v[key].as_object().into_iter().flatten() {
+                    let Some((d, m)) = k.split_once('/') else { continue };
+                    let mut t: Vec<String> = arr.as_array().into_iter().flatten()
+                        .filter_map(|x| x.as_str().map(|s| s.to_string())).collect();
+                    t.sort(); t.dedup();
+                    into.insert((d.to_string(), m.to_string()), t);
+                }
+            };
+            take("frequency", &mut vocab_freq);
+            take("generated", &mut vocab_gen);
+            for (_, arr) in v["test_entries"].as_object().into_iter().flatten() {
+                for x in arr.as_array().into_iter().flatten() {
+                    if let Some(n) = x.as_str() { test_names.insert(n.to_string()); }
+                }
+            }
+            println!(
+                "cell vocabulary: {} freq cells, {} generated cells, {} held-out entries ({vp})",
+                vocab_freq.len(), vocab_gen.len(), test_names.len()
+            );
+            break;
+        }
+
         let ontology = OntologyLoader::load_all();
         let (mut texts, mut true_cell, mut names) = (Vec::new(), Vec::new(), Vec::new());
         // Structured fields, for the DEPENDENCY-CONSTRAINT scorer. Measured
@@ -259,6 +298,7 @@ fn main() {
         // that half is worth anything against the geometric baseline.
         let mut fields: Vec<(String, String)> = Vec::new();
         let mut entry_toks: Vec<Vec<String>> = Vec::new();
+        let mut entry_names: Vec<String> = Vec::new();
         for def in ontology.classification_domains() {
             let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
             let mut t = def.name.clone();
@@ -269,6 +309,7 @@ fn main() {
                 for h in &def.hints { t.extend(words(h)); }
                 t.sort(); t.dedup(); t
             });
+            entry_names.push(def.name.clone());
             names.push(words(&def.name));
             fields.push((
                 def.axis_name.clone().unwrap_or_default(),
@@ -308,17 +349,25 @@ fn main() {
             v.dedup();
             v
         };
+        // Injection parameters. The published run is stride 7, mult 13 — these
+        // env vars exist so the SAME corpus can be perturbed many different
+        // ways, which is the only way to tell a real scorer margin from one
+        // subsample's luck.
+        let ev = |k: &str, d: usize| std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d);
+        let stride = ev("PHYSIS_AUDIT_STRIDE", 7);
+        let mult = ev("PHYSIS_AUDIT_MULT", 13);
+        let half = std::env::var("PHYSIS_AUDIT_HALF").unwrap_or_else(|_| "test".into());
         let mut cell = true_cell.clone();
         let mut injected: Vec<bool> = vec![false; n];
         let mut k = 0usize;
         for i in 0..n {
             if anc[i].is_empty() { continue }
             k += 1;
-            if k.is_multiple_of(7) {
+            if stride != 0 && k % stride == 0 {
                 // move to a deterministically-chosen DIFFERENT cell
-                let mut c = cell_names[(i * 13 + 5) % cell_names.len()].clone();
+                let mut c = cell_names[(i * mult + 5) % cell_names.len()].clone();
                 if c == true_cell[i] {
-                    c = cell_names[(i * 13 + 6) % cell_names.len()].clone();
+                    c = cell_names[(i * mult + 6) % cell_names.len()].clone();
                 }
                 if c != true_cell[i] {
                     cell[i] = c;
@@ -335,10 +384,18 @@ fn main() {
             members.entry(c.clone()).or_default().push(i);
         }
 
-        let mut rows: Vec<(f64, f64, f64, bool, f64, f64)> = Vec::new(); // nonlattice, ancestry, cosine, injected, constraint, anchor_vocab
+        let mut rows: Vec<(f64, f64, f64, bool, f64, f64, f64, f64)> = Vec::new(); // nonlattice, ancestry, cosine, injected, constraint, anchor_vocab
         let (mut stat_ca, mut stat_mca): (Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new());
         for i in 0..n {
             if anc[i].is_empty() { continue }
+            // Only the held-out half. A cell's vocabulary was built from the
+            // other half, so scoring a train entry would be self-confirming.
+            let in_test = test_names.contains(&entry_names[i]);
+            match half.as_str() {
+                "test" if !test_names.is_empty() && !in_test => continue,
+                "train" if !test_names.is_empty() && in_test => continue,
+                _ => {}
+            }
             let peers: Vec<usize> = members[&cell[i]].iter().copied().filter(|&j| j != i && !anc[j].is_empty()).collect();
             if peers.len() < 2 { continue }
 
@@ -412,9 +469,29 @@ fn main() {
                 }
                 None => 0.0,
             };
+            // VOCAB scorers: lexical overlap with the cell's AUTHORED vocabulary.
+            // Fewer shared markers = more suspect filing, hence negated.
+            let overlap = |v: &HashMap<(String, String), Vec<String>>| -> f64 {
+                match v.get(&cell[i]) {
+                    Some(av) if !av.is_empty() => {
+                        let (mut x, mut y, mut hit) = (0usize, 0usize, 0usize);
+                        while x < entry_toks[i].len() && y < av.len() {
+                            match entry_toks[i][x].cmp(&av[y]) {
+                                std::cmp::Ordering::Less => x += 1,
+                                std::cmp::Ordering::Greater => y += 1,
+                                std::cmp::Ordering::Equal => { hit += 1; x += 1; y += 1; }
+                            }
+                        }
+                        -(hit as f64)
+                    }
+                    _ => 0.0,
+                }
+            };
+            let vfreq = overlap(&vocab_freq);
+            let vgen = overlap(&vocab_gen);
             let _ = orphan_rate;
 
-            rows.push((nonlattice, ancestry, cosine, injected[i], constraint, anchor_vocab));
+            rows.push((nonlattice, ancestry, cosine, injected[i], constraint, anchor_vocab, vfreq, vgen));
         }
         println!("scored {} entries ({} injected)\n", rows.len(), rows.iter().filter(|r| r.3).count());
         // Is the lattice condition even firing? If almost every pair has no
@@ -432,17 +509,27 @@ fn main() {
         let a_co = auc(&rows.iter().map(|r| (r.2, r.3)).collect::<Vec<_>>());
         let a_cn = auc(&rows.iter().map(|r| (r.4, r.3)).collect::<Vec<_>>());
         let a_av = auc(&rows.iter().map(|r| (r.5, r.3)).collect::<Vec<_>>());
+        let a_vf = auc(&rows.iter().map(|r| (r.6, r.3)).collect::<Vec<_>>());
+        let a_vg = auc(&rows.iter().map(|r| (r.7, r.3)).collect::<Vec<_>>());
 
         println!("=== Can each scorer find the injected misfilings? (AUC, 0.5 = chance) ===\n");
         println!("  NON-LATTICE (structural, label-free)   AUC = {a_nl:.3}");
         println!("  ANCESTRY    (structural, label-free)   AUC = {a_an:.3}");
         println!("  CONSTRAINT  (axis_name/category unattested) AUC = {a_cn:.3}");
         println!("  ANCHOR-VOCAB (lexical, authored per cell)   AUC = {a_av:.3}");
+        println!("  VOCAB-FREQ  (authored from TRAIN half, no LLM) AUC = {a_vf:.3}");
+        if !vocab_gen.is_empty() {
+            println!("  VOCAB-GEN   (qwen3:4b, same inputs)         AUC = {a_vg:.3}");
+        }
         println!("  COSINE      (geometric baseline)       AUC = {a_co:.3}");
 
         // The question that matters: does structure add anything over cosine?
         // Stratify by cosine and ask whether the structural scores still
         // separate injected from clean WITHIN a stratum.
+        println!(
+            "SWEEP stride={stride} mult={mult} half={half} n={} inj={} constraint={a_cn:.3} cosine={a_co:.3} vfreq={a_vf:.3} delta={:+.3}",
+            rows.len(), rows.iter().filter(|r| r.3).count(), a_cn - a_co
+        );
         println!("\n=== Does structure add anything BEYOND cosine? ===\n");
         let mut order: Vec<usize> = (0..rows.len()).collect();
         order.sort_by(|&a, &b| rows[a].2.partial_cmp(&rows[b].2).unwrap());
@@ -504,7 +591,7 @@ fn main() {
         );
 
         println!("\n=== Verdict ===\n");
-        let best_struct = a_nl.max(a_an).max(a_cn).max(a_av);
+        let best_struct = a_nl.max(a_an).max(a_cn).max(a_av).max(a_vf).max(a_vg);
         if best_struct > a_co + 0.03 {
             println!("  The structural audit BEATS the geometric baseline outright");
             println!("  ({best_struct:.3} vs {a_co:.3}). A label-free soundness check is available.");
