@@ -24,7 +24,12 @@
 //!
 //! Arms (same proposals, same hit definition, only the ranking signal
 //! differs — the construction-matched discipline):
-//!   COVERAGE   : rank by candidate_gain over the operational records
+//!   LIFT       : rank by continuous coverage gain over the operational
+//!                records. This experiment is why `CandidateGain::lift`
+//!                exists; 0.1.20 ships it and ranks on it.
+//!   TRAFFIC    : rank by max cosine to ANY record — the popularity control,
+//!                separating "sits where the corpus is busy" from "closes a
+//!                gap the corpus has"
 //!   GEOMETRY   : rank by the proposal's max cosine to known entries
 //!                (how deeply embedded in known territory it is)
 //!   PAIR-SIM   : rank by the parents' cosine with each other
@@ -282,8 +287,71 @@ fn run() {
     let mut rand_idx: Vec<usize> = (0..n).collect();
     rand_idx.shuffle(&mut rng);
 
-    let arms: [(&str, Vec<usize>, &str); 7] = [
+    // ---------- parity with the SHIPPED api ----------
+    // The claim in the report is about `physis_core::coverage`, so the shipped
+    // path has to be run on the same data rather than trusted to agree with the
+    // inline arithmetic above. Known entries grouped into cells become the live
+    // classifier; each proposal becomes a one-entry candidate cell; the records
+    // are the same 6,234 events. `rank_candidates` then does its own thing.
+    let shipped_order: Vec<usize> = {
+        use physis_core::classify::{Cell, CellClassifier};
+        use physis_core::coverage::rank_candidates;
+        use physis_core::models::Facets;
+
+        let mut members: HashMap<(String, String), Vec<usize>> = HashMap::new();
+        for &k in &known {
+            members.entry(cells[k].clone()).or_default().push(k);
+        }
+        let mut keys: Vec<&(String, String)> = members.keys().collect();
+        keys.sort();
+        let live_cells: Vec<Cell> = keys
+            .iter()
+            .map(|k| {
+                let idxs = &members[*k];
+                Cell {
+                    domain: k.0.clone(),
+                    mode: k.1.clone(),
+                    entries: idxs.iter().map(|&i| names[i].clone()).collect(),
+                    facets: idxs.iter().map(|_| Facets::default()).collect(),
+                    embeddings: idxs.iter().map(|&i| emb[i].clone()).collect(),
+                }
+            })
+            .collect();
+        let classifier = CellClassifier::from_cells(live_cells);
+        let cand_cells: Vec<Cell> = proposals
+            .iter()
+            .enumerate()
+            .map(|(pi, (p, _, _))| Cell {
+                domain: "CANDIDATE".to_string(),
+                mode: format!("p{pi}"),
+                entries: vec![format!("p{pi}")],
+                facets: vec![Facets::default()],
+                embeddings: vec![p.clone()],
+            })
+            .collect();
+        let recs: Vec<(String, Vec<f32>)> =
+            rec_emb.iter().enumerate().map(|(i, e)| (i.to_string(), e.clone())).collect();
+
+        let ranked = rank_candidates(&classifier, &cand_cells, &recs, threshold);
+        let max_diff = ranked
+            .iter()
+            .map(|(i, g)| (g.lift as f64 - lift[*i]).abs())
+            .fold(0.0f64, f64::max);
+        let order: Vec<usize> = ranked.iter().map(|(i, _)| *i).collect();
+        let inline_top: HashSet<usize> = order_by(&lift_key).into_iter().take(100).collect();
+        let shipped_top: HashSet<usize> = order.iter().copied().take(100).collect();
+        println!("=== shipped-API parity: physis_core::coverage::rank_candidates ===");
+        println!("  max |shipped lift - inline lift| over {n} candidates: {max_diff:.2e}");
+        println!(
+            "  top-100 agreement: {}/100 identical members\n",
+            inline_top.intersection(&shipped_top).count()
+        );
+        order
+    };
+
+    let arms: [(&str, Vec<usize>, &str); 8] = [
         ("LIFT     ", order_by(&lift_key), "operational: total score lift over the record pile"),
+        ("SHIPPED  ", shipped_order, "the same, through coverage::rank_candidates"),
         ("ISOLATION", order_by(&isol_key), "ontology-only emptiness — the construction-matched control"),
         ("TRAFFIC  ", order_by(&traffic_key), "max cosine to any record — popularity control"),
         ("P25-GAIN ", order_by(&p25_key), "planner rule at the p25 threshold"),

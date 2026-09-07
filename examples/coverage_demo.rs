@@ -96,9 +96,17 @@ fn main() {
             mk("on-an-uncovered-record", target.1.clone()),
         ];
 
-        println!("candidate                     newly covered");
+        // Ordered by lift, the continuous measure — see `coverage`'s module
+        // docs for why that beats ordering on the rescue count.
+        println!("candidate                       lift   newly covered");
         for (i, g) in rank_candidates(&classifier, &candidates, &records, threshold) {
-            println!("  {:<28} {:>3}   useful={}", candidates[i].mode, g.count(), g.is_useful());
+            println!(
+                "  {:<28} {:>5.3}   {:>3}   useful={}",
+                candidates[i].mode,
+                g.lift,
+                g.count(),
+                g.is_useful()
+            );
         }
     }
     #[cfg(not(feature = "embed-onnx"))]

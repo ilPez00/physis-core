@@ -4,6 +4,77 @@ Notable changes to `physis-core`. This file starts at 0.1.15; earlier
 releases predate it and are documented only by their git tags and commit
 history.
 
+## 0.1.20
+
+### Changed — `rank_candidates` orders by lift, not by the rescue count
+
+`coverage::rank_candidates` sorted candidates on `CandidateGain::count()`, the
+number of records crossing the confidence threshold. It now sorts on a new
+continuous field, `CandidateGain::lift`:
+
+```
+lift = Σ over records of max(0, cos(candidate, record) − live(record))
+```
+
+**Measured, not preferred.** 1,638 candidate proposals scored against 6,234
+operational records, with a 10% hold-out of real ontology entries as ground
+truth. Ordering by lift puts a genuine missing concept in **12 of the first 25**
+rows — precision 0.480 against a 0.132 base rate, exact hypergeometric
+p = 2.3e-5 — where ordering by `count()` reaches 0.320.
+
+Four controls sit on the random floor at the head of the list: proposal
+popularity (p = 0.43), the proposer's own geometry (p = 0.23), parent similarity
+(p = 0.23), and how empty that region of the ontology is (p = 0.66). The last is
+the important one — **the ontology's own geometry ranks its own holes at
+chance**, so the ordering information is genuinely coming from the operational
+records.
+
+**Why the old ordering was weak: the threshold rule goes nearly inert on
+operational text.** Records written by a running operation already match the
+live ontology strongly (median best-entry cosine 0.741 on the corpus measured),
+and a candidate interpolated between two existing entries can rarely beat every
+known entry for any record — at that median only 272 of 1,638 candidates rescued
+even one. The 0.1.17 cross-validation looked healthier because its records were
+held-out ontology *entries*, which sit further out and leave the bar reachable.
+Nothing in the API said so. Lift has no bar and degrades smoothly.
+
+`count()` and `is_useful()` are unchanged and remain the *filter* — that is the
+half the t = +12.11 duplicate control validated. Filter on `count()`, order on
+`lift`.
+
+### Added
+
+- `CandidateGain::lift` (`f32`). A duplicate of an existing entry scores exactly
+  `0.0`, for the same reason it rescues nothing: the live score is already a
+  maximum over all entries, so a copy of one cannot exceed it. Covered by a
+  test, along with the degenerate empty-ontology case (lift stays finite).
+
+### Breaking
+
+- `CandidateGain` no longer derives `Eq` — it now holds a float. `PartialEq`,
+  `Debug`, `Clone` and `Default` are unchanged, so `assert_eq!` and `==` still
+  work; only `Eq`-bound generic contexts (`HashSet`, `BTreeMap` keys) are
+  affected.
+- Anything relying on `rank_candidates` returning count-descending order will
+  see a different order. Sort the returned `Vec` on `count()` yourself if you
+  need the old behaviour.
+
+### Documented — what ranking does *not* buy
+
+The ordering was validated against **missing** concepts (a hold-out), never
+against **wrong** ones. Asked instead to score entries against the cell they
+were actually filed in, the same cosine machinery detects real misfilings at
+**AUC 0.410**, with chance inside the confidence interval. Coverage finds gaps;
+it cannot find mistakes, and a ranked worklist is still a worklist. Also stated
+in the module docs and README: the hold-out concepts that validated the ranking
+carry heavy corpus traffic (median max-record cosine 0.793), so this ranks gaps
+the operation already talks about — a concept nobody writes about produces no
+lift and cannot surface at all; and only 75% of candidates lift any record, the
+rest tying at zero.
+
+Full experiment and controls: `research/perspective-discovery/FINAL_REPORT.md`,
+Stage 10, in the physis-pro superproject.
+
 ## 0.1.19
 
 ### Changed — the 0.1.18 reasoning was wrong; the conclusion was not

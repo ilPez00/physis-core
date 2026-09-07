@@ -417,9 +417,9 @@ use physis_core::coverage::{rank_candidates, uncovered};
 // Records the live ontology cannot place confidently.
 let gaps = uncovered(&classifier, &records, threshold);
 
-// Which candidates would rescue them, strongest first.
+// Which candidates are worth reading, strongest first (ordered by lift).
 for (idx, gain) in rank_candidates(&classifier, &candidates, &records, threshold) {
-    println!("candidate {idx} newly covers {} records", gain.count());
+    println!("candidate {idx}: lift {:.3}, newly covers {} records", gain.lift, gain.count());
 }
 ```
 
@@ -447,6 +447,50 @@ It is not fooled by a candidate that adds nothing, and needs neither a human
 nor a lexicon to say so. In that run it reduced **2000 candidates to 141**
 worth reading.
 
+### Two measures: one filters, the other ranks
+
+`CandidateGain` reports the same event twice, because the two were measured
+separately and do different jobs.
+
+| field | what it is | job |
+|---|---|---|
+| `count()` | records that cross the confidence threshold | **filter** — the measure validated at t = +12.11 above |
+| `lift` | `Σ max(0, cos(candidate, record) − live(record))`, threshold-free | **rank** — what `rank_candidates` sorts on |
+
+Ranking by lift was measured against a 10% hold-out of real ontology entries,
+1,638 proposals scored over 6,234 operational records:
+
+| ordering | precision@25 | @50 | @100 | exact p @25 |
+|---|---|---|---|---|
+| **`lift`** | **0.480** | 0.400 | 0.360 | **2.3e-5** |
+| `count()` | 0.320 | 0.300 | 0.200 | 1.2e-2 |
+| proposal popularity | 0.160 | 0.140 | 0.180 | 0.43 |
+| the proposer's own geometry | 0.200 | 0.140 | 0.120 | 0.23 |
+| how empty that region of the ontology is | 0.120 | 0.140 | 0.160 | 0.66 |
+| random | 0.120 | 0.140 | 0.130 | 0.66 |
+
+Base rate 0.132. Twelve of the first twenty-five rows point at a real missing
+concept, against 3.3 expected. The four controls sit on the random floor at the
+head of the list, so the ordering is coming from the records — **the ontology's
+own geometry ranks its own holes at chance.**
+
+**Why the continuous form matters more than it looks.** The threshold rule goes
+nearly inert on operational text. Records written by a running operation already
+match the live ontology strongly (measured median best-entry cosine 0.741), and
+a candidate interpolated between two existing entries can rarely beat *every*
+known entry for *any* record — at that median only 272 of 1,638 candidates
+rescued even one. The 5-fold run above looked healthier because its records were
+held-out ontology *entries*, which sit further out and leave the bar reachable.
+Lift has no bar and degrades smoothly.
+
+Both measures kill a duplicate identically: the live score is already a maximum
+over every entry, so a copy of one cannot exceed it, and its lift is exactly
+`0.0` by construction.
+
+**Read the head, not the tail.** Precision decays 0.480 → 0.360 → 0.193 across
+k = 25 → 100 → 400 and is inside the base rate by 400. This orders a worklist of
+about a hundred; it does not sort a pile into good and bad.
+
 ### Coverage is not correctness
 
 A candidate that swallows records into the *wrong* cell scores exactly like one
@@ -455,9 +499,25 @@ needs labels, and is precisely the question those nine mechanisms failed to
 answer.
 
 **Use this to shrink the pile, then have a person read what survives.** It is a
-filter, not an approver. Pair it with a threshold chosen against your observed
-score distribution: if nothing is uncovered, every candidate scores zero and
-the ranking carries no information.
+filter and an ordering, not an approver. Pair it with a threshold chosen against
+your observed score distribution: if nothing is uncovered, `count()` is
+uniformly zero — `lift` still ranks, but only among candidates the records
+actually pull on.
+
+Ranking does not soften the caveat. The ordering was validated against
+**missing** concepts (a hold-out), never against **wrong** ones. Asked instead
+to score entries against the cell they were actually filed in, the same cosine
+machinery detects real misfilings at **AUC 0.410**, chance inside the confidence
+interval. It finds gaps; it cannot find mistakes.
+
+Two further limits:
+
+- **It ranks gaps the records talk about.** The hold-out concepts that validated
+  it carry heavy corpus traffic (median max-record cosine 0.793). A concept the
+  ontology is missing *and* the operation never writes about produces no lift
+  and cannot surface here, by construction.
+- **Not every candidate is rankable.** 1,236 of 1,638 proposals (75%) lifted any
+  record at all; the rest tie at zero and fall back to candidate order.
 
 ---
 
