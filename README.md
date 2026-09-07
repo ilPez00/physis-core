@@ -4,6 +4,42 @@
 [![Documentation](https://docs.rs/physis-core/badge.svg)](https://docs.rs/physis-core)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
+> ## ⚠️ STATUS: NOT CURRENTLY FUNCTIONAL FOR ITS STATED PURPOSE
+>
+> **Read this before evaluating the crate.** The central claim below — that this
+> engine can discover ontological structure and audit whether things are filed
+> soundly — **has been tested and does not hold.** This notice is written by the
+> authors against their own work, from measurements in
+> `research/perspective-discovery/FINAL_REPORT.md` (in the parent project).
+>
+> **What was measured.** Eleven distinct mechanisms for ontology discovery and
+> soundness checking were built and evaluated against controls. All eleven
+> failed. The last surviving candidate — a structural, label-free misfiling
+> detector — was published as beating a geometric baseline (AUC 0.654 vs 0.619).
+> When the injected ground truth was **resampled** rather than taken from a
+> single arbitrary perturbation, it won **1 of 11** trials and lost to plain
+> cosine distance at *p* < 0.01 (paired *t* = −3.08 held-out, −6.06 overall).
+> That headline is withdrawn.
+>
+> **Two cautions for anyone building on this.** A vocabulary-overlap scorer
+> measured **+0.121 AUC over cosine, 11/11 trials, *t* = +12.97** when scored
+> against the entries it was derived from, and **−0.009, *t* = −1.81** on a
+> held-out half — a 0.130 swing from contamination alone. And this harness has a
+> **noise floor of ~0.074 AUC**: single-run margins below that are not
+> interpretable, which invalidates several earlier reported results.
+>
+> **What does work, and is safe to use.** The primitives are real, tested and
+> deterministic: ontology loading and the 5×14 semiotic grid, `linkage`,
+> `coverage`, `becoming`, `process`. A production bug in
+> `classification_domains()` — a sort key that was not a total order, making
+> iteration order non-deterministic across six built-in domains — was found and
+> fixed here, with a regression test verified by sabotage.
+>
+> **What is not.** Do not use this crate to discover ontologies, to decide
+> whether an entry is filed in the right cell, or as an epistemic audit. For
+> those tasks, on the data tested, **cosine similarity over embeddings is
+> better** — and considerably simpler.
+
 **The lean, high-performance epistemic reasoning engine extracted from the Physis intelligence system.**
 
 > *“An engine that maintains competing interpretations of reality, evaluates their coherence with observations, processes, evidence, and outcomes, and preferentially retains interpretations that continue to work.”*

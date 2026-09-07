@@ -4,6 +4,39 @@ Notable changes to `physis-core`. This file starts at 0.1.15; earlier
 releases predate it and are documented only by their git tags and commit
 history.
 
+## 0.1.18
+
+### Changed — status notice, against our own work
+
+- **The crate is marked NOT CURRENTLY FUNCTIONAL for its stated purpose**, in
+  both the package description and the README. Nothing is removed and no API
+  changes; what changes is the claim being made.
+
+  The engine exists to discover ontological structure and to audit whether
+  records are filed soundly. Eleven mechanisms for that were built and tested
+  against controls, and all eleven failed. The last surviving one — a
+  structural, label-free misfiling detector — had been reported as beating a
+  geometric baseline at AUC 0.654 vs 0.619. That result came from **one**
+  arbitrary injected perturbation. Resampled across eleven, it wins 1 of 11 and
+  loses to plain cosine distance (paired *t* = −3.08 on a held-out half,
+  −6.06 overall). The claim is withdrawn rather than quietly dropped.
+
+  Two numbers worth carrying elsewhere. A vocabulary-overlap scorer measured
+  **+0.121 AUC, 11/11, *t* = +12.97** against the entries it was built from and
+  **−0.009, *t* = −1.81** on a held-out half — a 0.130 swing from contamination
+  alone, and it would have read as a landmark result without a train/test
+  split. And the harness noise floor is **~0.074 AUC**, so single-run margins
+  below that carry no information; several earlier reported results sit inside
+  it.
+
+  What continues to work is unaffected and tested: ontology loading and the
+  5×14 semiotic grid, `linkage`, `coverage`, `becoming`, `process`. For
+  deciding whether an entry belongs in a cell, on the data tested, cosine
+  similarity over embeddings is better and simpler — use that instead.
+
+  Full measurements: `research/perspective-discovery/FINAL_REPORT.md` in the
+  parent project.
+
 ## 0.1.17
 
 ### Added
