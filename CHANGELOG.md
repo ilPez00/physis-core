@@ -4,6 +4,39 @@ Notable changes to `physis-core`. This file starts at 0.1.15; earlier
 releases predate it and are documented only by their git tags and commit
 history.
 
+## 0.1.17
+
+### Added
+
+- **`physis_core::coverage`** — scores whether a candidate cell would let the
+  ontology place records it currently cannot. `discovery` already proposed new
+  entries but had no way to say which proposals were worth keeping; this is
+  that missing half, and deliberately the narrow half.
+
+  `uncovered` lists the records the live ontology cannot place at or above a
+  threshold. `candidate_gain` and `rank_candidates` score candidates by how
+  many of those they would rescue, strongest first, ties broken on index so
+  the ranking is reproducible.
+
+  **Why the check is shaped as an operational question.** A long research
+  track tried nine mechanisms for certifying discovered structure and all nine
+  failed. Every one asked a representational question — is this split correct,
+  does a lexicon recognise it, do many pairs agree on it — and answered it with
+  a statistic computed over the same embedding space that produced the
+  candidate. This instead asks whether adding the candidate changes what the
+  ontology can place, against a corpus external to whatever produced it, so it
+  cannot be satisfied by the geometry agreeing with itself.
+
+  Measured over 5-fold cross-validation on 691 held-out records: re-adding an
+  entry the ontology already contains scores **exactly zero on 2000 of 2000
+  trials**, while genuine interpolations score above zero (Welch t = +12.11).
+  In that run it cut 2000 candidates down to 141 worth reading.
+
+  **Coverage is not correctness.** A candidate that swallows records into a
+  wrong cell scores exactly like one capturing a real gap — both make the
+  records classifiable. Use this to shrink the pile and then have a person read
+  what survives; it is a filter, not an approver.
+
 ## 0.1.16
 
 ### Added

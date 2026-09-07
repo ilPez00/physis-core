@@ -21,6 +21,7 @@
 - [Installation & Cargo Features](#installation--cargo-features)
 - [Determinism & Reproducibility](#determinism--reproducibility)
 - [Cell Linkage](#cell-linkage)
+- [Coverage Impact](#coverage-impact)
 - [Rust API Usage & Code Examples](#rust-api-usage--code-examples)
   - [1. Competing Hypotheses & Evidence Attestation](#1-competing-hypotheses--evidence-attestation)
   - [2. Truth Maintenance & Contradiction Resolution](#2-truth-maintenance--contradiction-resolution)
@@ -324,6 +325,61 @@ No claim is made that any individual item is "genuinely cross-cutting" — an
 earlier thresholded version of this calibrated a similarity delta and
 degenerated into flagging 98% of entries, a rate that carries no information
 beyond "domains overlap".
+
+---
+
+## Coverage Impact
+
+`physis_core::coverage` answers the question [`discovery`](#5-unsupervised-ontology-gap-discovery)
+leaves open: of the entries it proposes, **which are worth keeping?**
+
+```rust
+use physis_core::coverage::{rank_candidates, uncovered};
+
+// Records the live ontology cannot place confidently.
+let gaps = uncovered(&classifier, &records, threshold);
+
+// Which candidates would rescue them, strongest first.
+for (idx, gain) in rank_candidates(&classifier, &candidates, &records, threshold) {
+    println!("candidate {idx} newly covers {} records", gain.count());
+}
+```
+
+### Why the check is an operational question, not a semantic one
+
+Nine mechanisms for certifying discovered structure were tried across a long
+research track and all nine failed. Every one asked a **representational**
+question — is this split correct, does a lexicon recognise it, do many pairs
+agree on it — and answered it with a statistic computed over the same embedding
+space that produced the candidate. The geometry kept grading its own homework.
+
+This asks an **operational** one: does adding the candidate make records
+classifiable that were not? The corpus is external to whatever produced the
+candidate, so the check cannot be satisfied by the geometry agreeing with
+itself.
+
+Measured over 5-fold cross-validation on 691 held-out records:
+
+| candidate | records rescued |
+|---|---|
+| an entry the ontology already has | **0 of 2000 trials** |
+| a genuine interpolation | above zero (Welch t = +12.11) |
+
+It is not fooled by a candidate that adds nothing, and needs neither a human
+nor a lexicon to say so. In that run it reduced **2000 candidates to 141**
+worth reading.
+
+### Coverage is not correctness
+
+A candidate that swallows records into the *wrong* cell scores exactly like one
+capturing a real gap — both make the records classifiable. Distinguishing them
+needs labels, and is precisely the question those nine mechanisms failed to
+answer.
+
+**Use this to shrink the pile, then have a person read what survives.** It is a
+filter, not an approver. Pair it with a threshold chosen against your observed
+score distribution: if nothing is uncovered, every candidate scores zero and
+the ranking carries no information.
 
 ---
 
