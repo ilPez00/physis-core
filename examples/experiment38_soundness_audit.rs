@@ -216,11 +216,22 @@ fn main() {
 
         let ontology = OntologyLoader::load_all();
         let (mut texts, mut true_cell, mut names) = (Vec::new(), Vec::new(), Vec::new());
+        // Structured fields, for the DEPENDENCY-CONSTRAINT scorer. Measured
+        // first (cardinality-matched shuffle control): axis_name and category
+        // carry real signal about DOMAIN (+0.140, +0.111 purity over a
+        // shuffle) and essentially none about MODE (+0.041, +0.023). So a
+        // constraint is statable for half the grid, and this tests whether
+        // that half is worth anything against the geometric baseline.
+        let mut fields: Vec<(String, String)> = Vec::new();
         for def in ontology.classification_domains() {
             let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
             let mut t = def.name.clone();
             for h in &def.hints { t.push(' '); t.push_str(h); }
             names.push(words(&def.name));
+            fields.push((
+                def.axis_name.clone().unwrap_or_default(),
+                def.category.clone().unwrap_or_default(),
+            ));
             texts.push(t);
             true_cell.push((d.clone(), m.clone()));
         }
@@ -343,11 +354,13 @@ fn main() {
         let a_or = auc(&rows.iter().map(|r| (r.4, r.3)).collect::<Vec<_>>());
         let a_an = auc(&rows.iter().map(|r| (r.1, r.3)).collect::<Vec<_>>());
         let a_co = auc(&rows.iter().map(|r| (r.2, r.3)).collect::<Vec<_>>());
+        let a_cn = auc(&rows.iter().map(|r| (r.4, r.3)).collect::<Vec<_>>());
 
         println!("=== Can each scorer find the injected misfilings? (AUC, 0.5 = chance) ===\n");
         println!("  NON-LATTICE (structural, label-free)   AUC = {a_nl:.3}");
         println!("  ANCESTRY    (structural, label-free)   AUC = {a_an:.3}");
         println!("  ORPHAN-RATE (no common ancestor)       AUC = {a_or:.3}");
+        println!("  CONSTRAINT  (axis_name/category unattested) AUC = {a_cn:.3}");
         println!("  COSINE      (geometric baseline)       AUC = {a_co:.3}");
 
         // The question that matters: does structure add anything over cosine?
