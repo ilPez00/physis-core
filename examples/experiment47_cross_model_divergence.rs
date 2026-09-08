@@ -1077,6 +1077,188 @@ fn main() {
             println!("    {name} {m:.3}   vs s1+s2 {dm:+.3}  paired t {t:+.2}  wins {wins}/22");
         }
 
+        // ── E1d: can ANY function of (s1, s2) preserve an edge from the
+        // weaker model? ────────────────────────────────────────────────────
+        // E1 showed support_1 adds nothing on top of support_2 under a LINEAR
+        // combiner, plus min/max/mean. That is not the general claim. Three
+        // things are asked here, in increasing strength:
+        //
+        //   1. an asymmetric weighting sweep  -- does ANY alpha beat alpha=1?
+        //   2. s1's AUC inside each s2 DECILE -- is there a band where the
+        //      weak model helps, that 8 coarse strata averaged away?
+        //   3. a 2-D NON-PARAMETRIC estimator of P(injected | s1, s2), fit on
+        //      TRAIN and scored on TEST. This approximates the best possible
+        //      combiner of those two features, so if it does not beat s2 alone
+        //      then no weighting and no non-linearity can.
+        println!(
+            "\n=== E1d: can any function of (s1, s2) preserve an edge from the weaker model? ===\n"
+        );
+
+        // 1. asymmetric weighting, standardised so the sweep is meaningful
+        println!("  1. Asymmetric weighting  score = -(a*z2 + (1-a)*z1), held out, mean of 22\n");
+        let alphas = [0.0f64, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+        let mut alpha_auc = vec![Vec::new(); alphas.len()];
+        let mut decile_acc: Vec<Vec<f64>> = vec![Vec::new(); 10];
+        let mut decile_pos: Vec<usize> = vec![0; 10];
+        let mut np_auc: Vec<Vec<f64>> = vec![Vec::new(); 5];
+        let bandwidths = [0.15f64, 0.30, 0.60, 1.20, 2.40];
+        let mut s2_auc: Vec<f64> = Vec::new();
+        let mut lin_auc: Vec<f64> = Vec::new();
+
+        for &(stride, mult) in &configs {
+            let rows = score(stride, mult);
+            let tr: Vec<&Row> = rows.iter().filter(|r| !r.in_test).collect();
+            let te: Vec<&Row> = rows.iter().filter(|r| r.in_test).collect();
+            if tr.len() < 20 || te.len() < 20 {
+                continue;
+            }
+            // standardise using TRAIN statistics only
+            let m1 = tr.iter().map(|r| r.s1).sum::<f64>() / tr.len() as f64;
+            let m2 = tr.iter().map(|r| r.s2).sum::<f64>() / tr.len() as f64;
+            let d1 = (tr.iter().map(|r| (r.s1 - m1).powi(2)).sum::<f64>() / tr.len() as f64)
+                .sqrt()
+                .max(1e-9);
+            let d2 = (tr.iter().map(|r| (r.s2 - m2).powi(2)).sum::<f64>() / tr.len() as f64)
+                .sqrt()
+                .max(1e-9);
+            let z1 = |r: &Row| (r.s1 - m1) / d1;
+            let z2 = |r: &Row| (r.s2 - m2) / d2;
+
+            for (ai, &al) in alphas.iter().enumerate() {
+                let sc: Vec<(f64, bool)> = te
+                    .iter()
+                    .map(|r| (-(al * z2(r) + (1.0 - al) * z1(r)), r.injected))
+                    .collect();
+                alpha_auc[ai].push(auc(&sc));
+            }
+            s2_auc.push(auc(&te
+                .iter()
+                .map(|r| (-r.s2, r.injected))
+                .collect::<Vec<_>>()));
+
+            // 2. s1 inside each s2 decile of the TEST half
+            let mut ord: Vec<usize> = (0..te.len()).collect();
+            ord.sort_by(|&a, &b| te[a].s2.partial_cmp(&te[b].s2).unwrap());
+            let per = ord.len() / 10;
+            for d in 0..10 {
+                let lo = d * per;
+                let hi = if d == 9 { ord.len() } else { (d + 1) * per };
+                let bin: Vec<(f64, bool)> = ord[lo..hi]
+                    .iter()
+                    .map(|&k| (-te[k].s1, te[k].injected))
+                    .collect();
+                let pos = bin.iter().filter(|x| x.1).count();
+                if pos > 0 && pos < bin.len() {
+                    decile_acc[d].push(auc(&bin));
+                    decile_pos[d] += pos;
+                }
+            }
+
+            // 3. 2-D non-parametric P(injected | s1, s2): Gaussian-kernel
+            // Nadaraya-Watson over the TRAIN points, evaluated on TEST.
+            for (bi, &h) in bandwidths.iter().enumerate() {
+                let sc: Vec<(f64, bool)> = te
+                    .iter()
+                    .map(|q| {
+                        let (mut num, mut den) = (0.0f64, 0.0f64);
+                        for t in &tr {
+                            let dx = z1(q) - z1(t);
+                            let dy = z2(q) - z2(t);
+                            let w = (-(dx * dx + dy * dy) / (2.0 * h * h)).exp();
+                            den += w;
+                            if t.injected {
+                                num += w;
+                            }
+                        }
+                        (if den > 1e-12 { num / den } else { 0.0 }, q.injected)
+                    })
+                    .collect();
+                np_auc[bi].push(auc(&sc));
+            }
+
+            // linear reference, fit on train
+            let xtr: Vec<Vec<f64>> = tr.iter().map(|r| vec![r.s1, r.s2]).collect();
+            let ytr: Vec<bool> = tr.iter().map(|r| r.injected).collect();
+            let (w, mu, sd) = fit_logistic(&xtr, &ytr, 4000, 0.5);
+            lin_auc.push(auc(&te
+                .iter()
+                .map(|r| (apply_logistic(&w, &mu, &sd, &[r.s1, r.s2]), r.injected))
+                .collect::<Vec<_>>()));
+        }
+
+        let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len().max(1) as f64;
+        let s2m = mean(&s2_auc);
+        println!("     alpha   mean held-out AUC   vs alpha=1 (s2 alone)");
+        for (ai, &al) in alphas.iter().enumerate() {
+            let m = mean(&alpha_auc[ai]);
+            let tag = if al == 1.0 { "   <- s2 alone" } else { "" };
+            println!(
+                "     {al:>5.1}        {m:.3}            {:+.3}{tag}",
+                m - s2m
+            );
+        }
+        let best = alpha_auc.iter().map(|v| mean(v)).fold(f64::MIN, f64::max);
+        println!("\n     best alpha beats s2 alone by {:+.3}", best - s2m);
+
+        println!("\n  2. Is there a BAND of support_2 where support_1 helps?");
+        println!("     (AUC of -s1 inside each support_2 decile of the held-out half)\n");
+        println!("     decile   s2 range      AUC of s1   injected in bin");
+        for d in 0..10 {
+            if decile_acc[d].is_empty() {
+                println!(
+                    "     {:>6}   {:>10}      {:>9}   {:>3}",
+                    d + 1,
+                    "-",
+                    "n/a",
+                    decile_pos[d]
+                );
+                continue;
+            }
+            let m = mean(&decile_acc[d]);
+            let mark = if m > 0.60 {
+                "  <- s1 informative here"
+            } else {
+                ""
+            };
+            println!(
+                "     {:>6}   {:>10}      {m:>9.3}   {:>3}{mark}",
+                d + 1,
+                if d == 0 {
+                    "lowest"
+                } else if d == 9 {
+                    "highest"
+                } else {
+                    ""
+                },
+                decile_pos[d]
+            );
+        }
+
+        println!("\n  3. Best possible combiner: 2-D non-parametric P(injected | s1, s2)");
+        println!("     fit on TRAIN, scored on TEST, mean over the 22 configurations\n");
+        println!("     estimator                       mean held-out AUC   vs s2 alone");
+        println!("     support_2 alone                       {s2m:.3}          --");
+        println!(
+            "     linear logistic (s1, s2)              {:.3}          {:+.3}",
+            mean(&lin_auc),
+            mean(&lin_auc) - s2m
+        );
+        for (bi, &h) in bandwidths.iter().enumerate() {
+            let m = mean(&np_auc[bi]);
+            println!(
+                "     2-D kernel, bandwidth {h:.2}              {m:.3}          {:+.3}",
+                m - s2m
+            );
+        }
+        let bestnp = np_auc.iter().map(|v| mean(v)).fold(f64::MIN, f64::max);
+        println!(
+            "\n     best non-parametric beats s2 alone by {:+.3}",
+            bestnp - s2m
+        );
+        println!("     (a 2-D non-parametric estimator approximates the BEST function of");
+        println!("      these two features, so this bounds every weighting and every");
+        println!("      non-linearity at once -- it is not one more hand-picked formula.)");
+
         // ── PHYSIS_E1_POINTS: every scored row at the published configuration,
         // for the graphical inspector. Scores only — no mechanism depends on it.
         {
