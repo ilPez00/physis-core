@@ -24,16 +24,31 @@
 > A deterministic sample of 60 of the 659 shipped ontology entries, adjudicated
 > against each cell's own definition, found **43.3% clearly filed in the wrong
 > cell** (31.7% clearly right, 25.0% marginal). `CONSTRUCT/WORK` — "pour
-> concrete, frame the wall" — contains Access Control, Database Engineering and
+> concrete, frame the wall" — contained Access Control, Database Engineering and
 > a Peirce sign category. So the audit was asking each scorer to find ~35
 > planted misfilings while ~248 real ones sat in the same cells labelled
 > correct, and *penalising* any scorer that flagged them.
 >
 > **The correct status of those twelve mechanisms is therefore UNTESTED, not
 > refuted** — the experiment lacked the power to tell a working scorer from a
-> broken one. What is not in doubt is the conclusion below: the shipped
-> ontology's cell assignments are unreliable, so classification against them is
-> unreliable, whatever the mechanism.
+> broken one. They have not been re-run.
+>
+> **The corpus itself has now been regenerated (0.1.21).** The root cause was
+> that the *domain* axis had no written definition anywhere, while all 70 cell
+> anchors were phrased in a single register each (HEAL="rest day, sleep deeply",
+> CONSTRUCT="pour concrete, frame the wall") — a human-daily-life vocabulary
+> against a corpus that is mostly machine telemetry, agent architectures and
+> office documents. `docs/GRID_AXES.md` now defines the five domains
+> (condition / structure / output / relation / knowledge), the anchors were
+> rewritten to span human, machine and organisational registers, and all 661
+> entries were re-filed against that contract by a rater who could not see the
+> old assignment. **513 entries (77.6%) moved; occupied cells went 35/70 to
+> 57/70.** Independently of the rater: the share of entries whose own cell
+> anchor is in the worse half of all 70 fell **31.8% → 16.2%**, and on the 585
+> entries whose hints do not leak their old cell, **34.5% → 16.9%**. The
+> re-audit under the original protocol reports 6.6% clearly misfiled, but that
+> is a self-grade — see `research/perspective-discovery/`, Stage 11, which says
+> so plainly and gives the independent numbers instead.
 >
 > **Two cautions for anyone building on this.** A vocabulary-overlap scorer
 > measured **+0.121 AUC over cosine, 11/11 trials, *t* = +12.97** when scored

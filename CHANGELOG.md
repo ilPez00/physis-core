@@ -4,6 +4,83 @@ Notable changes to `physis-core`. This file starts at 0.1.15; earlier
 releases predate it and are documented only by their git tags and commit
 history.
 
+## 0.1.21
+
+### Changed — Gate 0: the corpus was regenerated, and the domain axis finally has a definition
+
+A 2026-09-07 audit (see 0.1.19) found **43.3% of a deterministic sample filed in
+the wrong cell**. This release fixes the cause rather than the symptom.
+
+**The root cause was a missing definition.** The fourteen modes have been
+documented since they were designed — the activity-energy axis, DESTROY
+completing the Greimas opposition against CREATE, PLAN converging against
+BRAINSTORM. The five *domains* were defined nowhere in the codebase. 730 entries
+had been filed against five words whose meaning was never written down.
+
+Worse, the 70 anchors that stand in for that definition were each phrased in a
+single register: HEAL spoke only about bodies ("rest day, recover, sleep
+deeply"), CONSTRUCT only about building sites ("pour concrete, frame the wall"),
+BOND only about friendships. That is a human-daily-life vocabulary, and the
+corpus it has to classify is mostly machine telemetry, agent architectures,
+office documents and semiotics. `Coolant & Lubrication` in HEAL/REST was not
+obviously wrong; it was wrong *against an anchor that says "sleep deeply"* and
+right against the idea those words stood in for.
+
+**Added: `docs/GRID_AXES.md`**, the missing contract. The domain axis says what
+is acted on — HEAL=condition, CONSTRUCT=structure, FABRICATE=output,
+BOND=relation, STUDY=knowledge — and the mode axis says what act. It also
+separates WALK from MAINTAIN, which the old anchors had made near-synonyms
+(`CONSTRUCT/WALK` "Steady Upkeep" against `CONSTRUCT/MAINTAIN` "Building
+Maintenance" shared almost all their meaning): WALK is the rhythm of normal
+operation, MAINTAIN is work done against decay.
+
+**All 70 anchors rewritten** to that contract, each spanning human, machine and
+organisational registers, with hints kept mode-pure and domain-pure — the
+register varies in the noun, never the verb. The classifier embeds `name +
+hints` and nothing else, so a cell that only speaks one register cannot attract
+the others' records.
+
+Removing the register cheat could only have made cells more confusable. Measured,
+it did the opposite:
+
+| anchor separation | old | new |
+|---|---|---|
+| mean off-diagonal cosine | 0.6885 | **0.6631** |
+| pairs above 0.85 | 25 | **10** |
+| pairs above 0.90 | 5 | **0** |
+| mean nearest-neighbour cosine | 0.8489 | **0.8207** |
+
+**All 661 non-anchor entries re-filed** against the contract by a rater who was
+shown name, category and hints with the existing assignment withheld. **513
+(77.6%) moved. Occupied cells went 35/70 to 57/70.**
+
+Independent of the rater — neither filing was made with embeddings, so the
+embedder is a separate instrument — the share of entries whose own cell anchor
+sits in the worse half of all 70 cells:
+
+| | old anchors | new anchors |
+|---|---|---|
+| **old filing** | 31.8% | 31.8% |
+| **new filing** | 18.2% | **16.2%** |
+
+The new filing wins even judged against the *old* anchors, which is the stronger
+test. On the 585 entries whose hints do not narrate their old cell, 34.5% →
+16.9%, and the share whose own anchor is the nearest of all 70 goes 6.0% →
+16.8%. Note what this table also says: **the anchor rewrite contributes almost
+nothing to fit** (31.8% → 31.8%); its value is separation and register coverage,
+and the re-filing does the work.
+
+**What is NOT claimed.** The twelve discovery and soundness-checking mechanisms
+evaluated against the old corpus are still UNTESTED — they have not been re-run
+on this one. And the re-audit under the original protocol (6.6% clearly
+misfiled, against 43.3%) is a **self-grade**: the rater who scored it also
+produced the filing. It is published for checking, not offered as independent
+evidence; the two numbers above are.
+
+Full method, controls and raw records:
+`research/perspective-discovery/FINAL_REPORT.md` (Stage 11),
+`refiling_gate0.tsv` (all 661 before/after), `cell_adjudication_regenerated.tsv`.
+
 ## 0.1.20
 
 ### Changed — `rank_candidates` orders by lift, not by the rescue count
