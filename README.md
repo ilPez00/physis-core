@@ -29,9 +29,16 @@
 > planted misfilings while ~248 real ones sat in the same cells labelled
 > correct, and *penalising* any scorer that flagged them.
 >
-> **The correct status of those twelve mechanisms is therefore UNTESTED, not
+> **The correct status of those twelve mechanisms was therefore UNTESTED, not
 > refuted** — the experiment lacked the power to tell a working scorer from a
-> broken one. They have not been re-run.
+> broken one. **They have since been re-run on the regenerated corpus (below),
+> and most are now genuinely refuted:** CONSTRAINT still loses to plain cosine,
+> 2 wins in 22 configurations, paired *t* = −5.58, while both scorers gain
+> ~0.085 AUC — the corpus really was suppressing detection, and fixing it did
+> not close the gap. Non-lattice auditing scores *below* chance (0.459) and adds
+> nothing once cosine is held constant (0.480). Plain cosine distance to the
+> cell centroid beat every structural alternative tried against it, on a clean
+> corpus and a dirty one alike.
 >
 > **The corpus itself has now been regenerated (0.1.21).** The root cause was
 > that the *domain* axis had no written definition anywhere, while all 70 cell
