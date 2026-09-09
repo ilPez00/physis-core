@@ -512,6 +512,28 @@ impl Hypothesis {
     }
 }
 
+// ── P0 (G7): invalidate-don't-delete query discipline ─────────────────────
+//
+// Superseded hypotheses are never removed from the store; they stay readable
+// for history (with revision timestamps) while current queries exclude them.
+// These views are additive — no existing signature changes.
+
+/// Live-belief view: every hypothesis except `Superseded`.
+pub fn current_hypotheses(
+    hyps: &std::collections::HashMap<String, Hypothesis>,
+) -> Vec<&Hypothesis> {
+    hyps.values()
+        .filter(|h| h.status != HypothesisStatus::Superseded)
+        .collect()
+}
+
+/// History-inclusive view: all hypotheses, including superseded ones.
+pub fn hypotheses_including_history(
+    hyps: &std::collections::HashMap<String, Hypothesis>,
+) -> Vec<&Hypothesis> {
+    hyps.values().collect()
+}
+
 #[cfg(test)]
 mod resolution_tests {
     use super::*;

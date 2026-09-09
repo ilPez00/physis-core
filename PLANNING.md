@@ -335,3 +335,113 @@ See `STRIPE_LICENSE_GUIDE.md` for integrating Stripe to sell physis-core license
 
 ---
 *This plan builds on the pricing, advertisement, and referral concepts already captured in `PLANNING.md`. All tasks are deliberately small enough to be completed in a single work‑day, allowing rapid iteration and early revenue.*
+
+---
+
+## 7. Epistemic revision track — Atlas + Graphiti (2026-09-09)
+
+> Detail: `../docs/ATLAS_GRAPHITI_INTEGRATION_PLAN.md` (§§0–6). Background:
+> `../docs/resources.md` §§9–11. Index with per-item gates; adds no domain or mode, touches neither §0 nor §1.
+
+### 7.0 Principle (offline Rust/sled, no new deps)
+
+Take patterns, protocols, test shapes — never dependencies. No graph DB, no LLM
+service, no Python runtime, no phone-home: offline Rust over sled + in-process
+embeddings. **§2b applies throughout: coverage filters and ranks; it does not
+verify.** Anything claiming a filing is *sound* on geometry alone is BLOCKED by
+E14–E18 (cosine 0.519, CONSTRAINT 0.536, ANCESTRY 0.534).
+
+### 7.1 Atlas takes → core symbols (gate per item, in order)
+
+- **A7 — no-perturbation invariant.** `delta_engine.rs` (`evaluate_mutation`,
+  `classify_delta`) + `hypothesis.rs` (`recompute_fitness`): zero-shift wave
+  leaves fitness bit-identical, emits no transition. Gate: `zero_shift_wave_leaves_fitness_untouched` passes before any other 7.x item.
+- **A2 — DependsOn-only walk.** `relation.rs` (`TypedEdge`, `RelationType`) +
+  `delta_engine.rs` (`find_neighbors`, `build_adjacency`, `dfs_collect`,
+  `MAX_PROPAGATION_DEPTH=5`): declared DependsOn edges only, justification-hop
+  counting, cycle recording; kills the GAMMA=0.85 arrival wave. Gate: `midchain_revision_revises_exact_dependents` (exact dependents, BFS order).
+- **A6 — named weights + term breakdown.** `delta_engine.rs` (GAMMA,
+  DEGRADATION_THRESHOLD, MIN_IMPACT, MAX_PROPAGATION_DEPTH) +
+  `hypothesis.rs` (`recompute_fitness` 0.20/0.15/0.15/0.25/0.25 + penalties):
+  every recompute names its terms. Gate: `fitness_recompute_reports_term_breakdown`; tuning as separate scored configs — GATED on frozen defaults.
+- **A1 — Ripple reassessment pass.** `delta_engine.rs` (`evaluate_mutation`,
+  `OntologyDeltaReport`) + `hypothesis.rs` (`transition_to`,
+  `recompute_fitness`) + `epistemic.rs` (`FitnessShifted`, `StatusTransition`):
+  dependents recomputed per step, proposals before writes. Gate: seeded chains
+  where the walk must beat the cosine wave — GATED on that comparison, else the walk ships as a named flag.
+- **A5 — adjudication routing.** `contradiction.rs` (`Contradiction::new`,
+  `ResolutionStatus::Open`) + `epistemic.rs` (`ContradictionDetected`):
+  small-Δ recomputes; large-Δ/contradiction/high-authority stays Open with
+  rationale, explicit approve/reject/adjust/synthesize only. Gate: `large_delta_routes_to_open_with_rationale` (record before any queue surface).
+- **A3 — AGM shape gate.** `hypothesis.rs` (`HypothesisStatus` ×9,
+  `transition_to`) + `epistemic.rs` (`StatusTransition`): shape taxonomy as
+  tests, no Cypher; K*4/K*6 weak-form. Gate: `agm_shape_gate` at published N/N
+  AND each test fails on ≥1 naive implementation — GATED on that mutation check.
+- **A4 — hash-chained provenance.** `provenance.rs` (`ProvenanceLink`,
+  `ProvenanceChain::summary`) + `explanation.rs` (`provenance_chain`,
+  `human_readable_summary`): content hash + previous-link hash per link; verify
+  reports the first break with sequence coordinates. Gate: `ledger_tamper_breaks_chain_at_sequence`.
+
+### 7.2 Graphiti takes → core symbols (gate per item, in order)
+
+- **G7 — invalidate-don't-delete.** `hypothesis.rs` (`Superseded`) +
+  `contradiction.rs` + `temporal.rs` (`valid_until`): superseded stays
+  history-readable with timestamps, excluded from current queries. Gate:
+  `superseded_items_stay_queryable_for_history`; retention/compaction stated first — GATED on that note.
+  **Retention/compaction story (stated 2026-09-09, before data gets large):**
+  nothing in physis-core deletes automatically — the same rule as telemetry,
+  by architecture rather than config. Superseded/Failed hypotheses accumulate
+  in sled until an explicit, separately-audited compaction entry point exists
+  (deferred to P2, alongside G3/G6, so it can ride the audit trail instead of
+  preceding it). When it lands, compaction may remove only items whose full
+  revision history has been exported to the provenance ledger first (G4's
+  intake ids), and every removal records its own ledger event. Until then the
+  bounded-growth mechanism is `current_hypotheses` keeping live sets small —
+  history grows, and that is stated, not hidden.
+- **G1 — expired_at leg (fields only first).** `temporal.rs`
+  (`TemporalValidity`, `permanent`/`from`/`during`, `is_valid_at`,
+  `overlaps`): system invalidation leg + backfill-vs-arrival split. Gate:
+  `temporal_triple_serialises`. Dead weight until queries filter on it — fields-only until G6.
+- **G2 — (resolved, invalidated, new) ingest triple.** `delta_engine.rs`
+  (`evaluate_mutation`, `OntologyMutation`, `OntologyDeltaReport`) +
+  `hypothesis.rs` (`add_supporting_evidence`, `add_contradicting_evidence`):
+  deterministic judgment (overlap+recency, every call logged) before fitness
+  update. Gate: `ingest_returns_resolved_invalidated_new`; GATED on 50 hand-built pairs above chance — below that, flag-only, never auto-invalidates.
+- **G3 — episode + watermark trail.** `epistemic.rs` (`EpistemicAuditTrail`,
+  `EpistemicEvent`, `history_for`) + `history.rs`: ordered replayable intake
+  with arrival-vs-assertion times + per-stream high-water mark. Gate: `late_evidence_replays_to_same_state`.
+- **G4 — per-link intake ids.** `provenance.rs` + `explanation.rs`: every
+  derived link cites intake-record ids; newest-N + first-seen cap stated, never
+  silent. Gate: seeded-chain explanations cite intake ids, not source names.
+- **G6 — point-in-time queries.** `epistemic.rs` (`reconstruct_status_at`) +
+  `temporal.rs` (`is_valid_at`): "believed at T?" / "valid during [a,b]?" from
+  the triple + trail; status encoding normalized here. Gate:
+  `point_in_time_matches_audit_trail` — GATED on beating current `is_valid_at` filtering; parity means cut.
+- **G5 — BM25+RRF beside cosine.** `rag.rs` (`TokenFixedRetriever`,
+  `TokenCounter`) + `propose.rs`: RRF fusion, budget packing and
+  propose-does-not-verify kept, cosine-only kept as baseline. Gate:
+  `hybrid_fusion_vs_cosine_baseline` — GATED on a frozen-baseline probe-set
+  comparison; a negative ships recorded (disabled), not failed. Any *verifies* claim is BLOCKED by E14–E18.
+
+### 7.3 NOT taking (with reason per item)
+
+- Graph DB substrate (Neo4j/FalkorDB/Cypher/APOC) — breaks the offline contract.
+- LLM extraction/judging/reranking — nondeterministic, key-gated, the 0.519 failure mode; BLOCKED as a judge by §2b, allowed nowhere near verdicts.
+- Telemetry default-on — no phone-home by architecture, not config.
+- Suspect inference code (hyperresolution mutating nogoods; TODO-flagged nogood order) — author-flagged non-standard.
+- Full AGM K* tail as proof; paid rerankers first; dead surface + BMB 1.000 — weak-form tests / portable BM25+RRF first / honest cells only.
+
+### 7.4 Order P0/P1/P2
+
+- **P0 (invariants + history):** A7, G7, G1-fields. No scoring change — the point.
+- **P1 (revision + ingest):** A2, A6, G2, A5-rationale-only.
+- **P2 (time, retrieval, gate):** G3, G4, G6, G5, A3, A4. Each item ships only
+  behind its §7.1/§7.2 gate; a failed gate blocks the next item, never bends it.
+
+### 7.5 Falsifiers (no number without its null)
+
+A1 fails if mid-chain accuracy does not beat the cosine wave. A5/G7 fail if
+pairs are unrecoverable after retraction. G1/G6 fail if belief-at-T is no
+better than `is_valid_at` filtering. G5 fails if fusion does not beat
+cosine-only; A3 fails on tautologies; A4 fails if verify survives a payload
+edit. Every claim carries its null (permuted-labels or cosine-only) — §2b's proposer (top-3 0.712 vs 0.136 null) is the model.

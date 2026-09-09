@@ -427,6 +427,24 @@ pub fn evaluate_mutation(
 ) -> OntologyDeltaReport {
     ctx.mutation_log.push(mutation.clone());
 
+    // A7 no-perturbation invariant: a zero-shift EmbeddingShift (old == new)
+    // carries no information, so the wave returns empty without touching any
+    // shadow state — fitness stays bit-identical, zero transitions emitted.
+    if let MutationOp::EmbeddingShift {
+        old_embedding,
+        new_embedding,
+    } = &mutation.operation
+    {
+        if old_embedding == new_embedding {
+            return OntologyDeltaReport {
+                mutation_source: mutation,
+                affected_nodes: Vec::new(),
+                hypothesis_status_shifts: Vec::new(),
+                net_coherence_delta: 0.0,
+            };
+        }
+    }
+
     let target_id = mutation.target_node_id.clone();
 
     // Resolve the target node from the effective (base or shadow) view.

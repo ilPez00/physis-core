@@ -20,6 +20,12 @@ pub struct TemporalValidity {
     /// Optional event that triggered the validity (e.g. "startup", "intervention").
     #[serde(default)]
     pub trigger: Option<String>,
+    /// System-recorded invalidation time (Graphiti `expired_at` leg): when the
+    /// record itself was superseded, distinct from `valid_until` (when the
+    /// claim stopped being true). None = never invalidated. Fields-only in
+    /// P0 — no query semantics read this yet (that is P2/G6).
+    #[serde(default)]
+    pub expired_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl TemporalValidity {
@@ -29,6 +35,7 @@ impl TemporalValidity {
             valid_from: None,
             valid_until: None,
             trigger: None,
+            expired_at: None,
         }
     }
 
@@ -38,6 +45,7 @@ impl TemporalValidity {
             valid_from: Some(instant),
             valid_until: None,
             trigger: None,
+            expired_at: None,
         }
     }
 
@@ -50,6 +58,7 @@ impl TemporalValidity {
             valid_from: Some(start),
             valid_until: Some(end),
             trigger: None,
+            expired_at: None,
         }
     }
 
