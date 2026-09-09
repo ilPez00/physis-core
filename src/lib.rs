@@ -183,9 +183,10 @@ pub use coherence_query::{
 pub use contradiction::{Contradiction, ContradictionParty, ResolutionStatus};
 pub use core::PhysisCore;
 pub use delta_engine::{
-    evaluate_mutation, EvaluationContext, HypothesisTransition, MutationOp, NodeDelta,
-    OntologyDeltaReport, OntologyMutation, RevisionWalk, WalkStep, DEGRADATION_THRESHOLD, GAMMA,
-    MAX_PROPAGATION_DEPTH, MAX_REVISION_WALK_NODES, MIN_IMPACT,
+    evaluate_mutation, route_transition, AdjudicationDecision, AdjudicationRoute,
+    EvaluationContext, HypothesisTransition, MutationOp, NodeDelta, OntologyDeltaReport,
+    OntologyMutation, RevisionWalk, WalkStep, ADJUDICATION_STRATEGIC_FLOOR, DEGRADATION_THRESHOLD,
+    GAMMA, MAX_PROPAGATION_DEPTH, MAX_REVISION_WALK_NODES, MIN_IMPACT,
 };
 pub use discovery::{discover, DiscoveryConfig, DiscoveryReport, ProposedDomain};
 pub use embed::{RandomProjectionEmbedder, VectorEmbed};

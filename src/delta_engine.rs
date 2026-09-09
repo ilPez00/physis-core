@@ -32,6 +32,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::contradiction::ResolutionStatus;
 use crate::hypothesis::{Evidence, Hypothesis, HypothesisStatus};
 use crate::models::{cosine_sim, CoherenceNode, Score};
 use crate::relation::{RelationType, TypedEdge};
@@ -389,6 +390,10 @@ pub struct OntologyDeltaReport {
     /// `None` only when no walk ran (zero-shift early return).
     #[serde(default)]
     pub revision_walk: Option<RevisionWalk>,
+    /// A5: routing decisions for every proposed demotion (rationale record
+    /// only; no queue surface ships in P1).
+    #[serde(default)]
+    pub adjudications: Vec<AdjudicationDecision>,
 }
 
 /// One node visited by the A2 DependsOn revision walk.
@@ -423,6 +428,58 @@ pub struct RevisionWalk {
     /// Hypothesis ids selected for revision, in revision order (walk BFS
     /// order when the walk drove the selection; breadth order on fallback).
     pub revised_hypotheses: Vec<String>,
+}
+
+/// A5 (Atlas take, `adjudication.py`): distance beyond the degradation
+/// threshold over which the engine stops applying a demotion and defers to
+/// review with a recorded rationale (Atlas
+/// `CONFIDENCE_DELTA_STRATEGIC_FLOOR = 0.15` — same number, same meaning).
+pub const ADJUDICATION_STRATEGIC_FLOOR: Score = 0.15;
+
+/// A5: how a proposed status demotion is routed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AdjudicationRoute {
+    /// Small Δ beyond ϵ: applied as before.
+    AutoApply,
+    /// Large Δ: the demotion is proposed, not applied — rationale recorded,
+    /// resolution stays Open until explicit human action.
+    StrategicReview,
+    /// Certified beliefs are core-protected: flagged, never auto-demoted
+    /// (Atlas "flag without acting").
+    CoreProtected,
+}
+
+/// A5 (rationale record only — P1 ships no queue surface): one routing
+/// decision, recorded on the report for every proposed demotion whatever
+/// the route. The approve/reject/adjust/synthesize flow is a later item.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdjudicationDecision {
+    pub hypothesis_id: String,
+    pub route: AdjudicationRoute,
+    /// The status the engine would have applied. Unapplied for
+    /// `StrategicReview` / `CoreProtected`.
+    pub proposed_status: HypothesisStatus,
+    pub coherence_delta: Score,
+    /// `Open` for the review routes (recorded before any queue surface);
+    /// `APreferred` when the engine resolved in favour of the observation.
+    pub resolution: ResolutionStatus,
+    pub rationale: String,
+}
+
+/// A5: route a proposed demotion. Certified is core-protected regardless
+/// of Δ; beyond ϵ + the strategic floor the engine defers to review;
+/// between ϵ and ϵ + floor it applies as before.
+pub fn route_transition(
+    prev_status: HypothesisStatus,
+    coherence_delta: Score,
+) -> AdjudicationRoute {
+    if prev_status == HypothesisStatus::Certified {
+        AdjudicationRoute::CoreProtected
+    } else if coherence_delta > DEGRADATION_THRESHOLD + ADJUDICATION_STRATEGIC_FLOOR {
+        AdjudicationRoute::StrategicReview
+    } else {
+        AdjudicationRoute::AutoApply
+    }
 }
 
 // ── Core Propagation ─────────────────────────────────────────────────────
@@ -553,6 +610,7 @@ pub fn evaluate_mutation(
                 hypothesis_status_shifts: Vec::new(),
                 net_coherence_delta: 0.0,
                 revision_walk: None,
+                adjudications: Vec::new(),
             };
         }
     }
@@ -680,6 +738,7 @@ pub fn evaluate_mutation(
     };
     walk.revised_hypotheses = hyp_ids.clone();
 
+    let mut adjudications: Vec<AdjudicationDecision> = Vec::new();
     for hyp_id in &hyp_ids {
         // Capture pre-mutation values from the effective (base or shadow) view
         let (prev_coherence, prev_fitness, prev_status) = {
@@ -700,51 +759,94 @@ pub fn evaluate_mutation(
         if coherence_delta > DEGRADATION_THRESHOLD
             && matches!(
                 prev_status,
-                HypothesisStatus::Supported | HypothesisStatus::Confirmed
+                HypothesisStatus::Supported
+                    | HypothesisStatus::Confirmed
+                    | HypothesisStatus::Certified
             )
         {
             let new_status = HypothesisStatus::Contradicted;
-
-            // Insert contradicting evidence automatically
-            let evidence = Evidence::contradicts(
-                &mutation.id,
-                format!(
-                    "Node '{}' embedding shifted; semantic alignment degraded \
-                     by {:.4} (coherence {:.4} → {:.4}). Fitness change: {:.4}.",
-                    target_id,
-                    coherence_delta,
-                    prev_coherence,
-                    updated.coherence,
-                    prev_fitness - updated.fitness,
-                ),
+            let route = route_transition(prev_status, coherence_delta);
+            let rationale = format!(
+                "Semantic degradation Δcoherence={:.4} exceeds ε={} (mutation {}): \
+                 coherence {:.4} → {:.4}, fitness {:.4} → {:.4}",
+                coherence_delta,
+                DEGRADATION_THRESHOLD,
+                mutation.id,
+                prev_coherence,
+                updated.coherence,
+                prev_fitness,
+                updated.fitness,
             );
+
+            // The degradation is recorded fact on every route: evidence
+            // lands, fitness absorbs it. What differs by route is whether
+            // the *status* may move without a human.
+            let evidence = Evidence::contradicts(&mutation.id, rationale.clone());
             updated.contradicting_evidence.push(evidence);
             updated.recompute_fitness();
 
-            hypothesis_transitions.push(HypothesisTransition {
-                hypothesis_id: updated.id.clone(),
-                previous_status: prev_status,
-                new_status,
-                trigger_reason: format!(
-                    "Semantic degradation exceeded threshold ϵ={} \
-                     (Δcoherence={:.4})",
-                    DEGRADATION_THRESHOLD, coherence_delta,
-                ),
-            });
+            match route {
+                AdjudicationRoute::AutoApply => {
+                    hypothesis_transitions.push(HypothesisTransition {
+                        hypothesis_id: updated.id.clone(),
+                        previous_status: prev_status,
+                        new_status,
+                        trigger_reason: format!(
+                            "Semantic degradation exceeded threshold ε={} \
+                             (Δcoherence={:.4})",
+                            DEGRADATION_THRESHOLD, coherence_delta,
+                        ),
+                    });
 
-            // Reflect the transition on the shadow hypothesis
-            updated.status = new_status;
-            updated.revised_at = Utc::now();
-            updated.revision_history.push(crate::hypothesis::Revision {
-                timestamp: Utc::now(),
-                description: format!(
-                    "Auto-transitioned to Contradicted by delta engine (mutation {})",
-                    mutation.id
-                ),
-                previous_status: prev_status,
-                new_status,
-                trigger: Some(mutation.id.clone()),
-            });
+                    // Reflect the transition on the shadow hypothesis
+                    updated.status = new_status;
+                    updated.revised_at = Utc::now();
+                    updated.revision_history.push(crate::hypothesis::Revision {
+                        timestamp: Utc::now(),
+                        description: format!(
+                            "Auto-transitioned to Contradicted by delta engine (mutation {})",
+                            mutation.id
+                        ),
+                        previous_status: prev_status,
+                        new_status,
+                        trigger: Some(mutation.id.clone()),
+                    });
+                    adjudications.push(AdjudicationDecision {
+                        hypothesis_id: updated.id.clone(),
+                        route,
+                        proposed_status: new_status,
+                        coherence_delta,
+                        resolution: ResolutionStatus::APreferred,
+                        rationale,
+                    });
+                }
+                AdjudicationRoute::StrategicReview | AdjudicationRoute::CoreProtected => {
+                    // A5: the status stays as-is - the demotion is a
+                    // proposal with a recorded rationale; the engine never
+                    // auto-resolves it. The revision entry carries the
+                    // proposal so the trail shows it without a queue surface.
+                    updated.revised_at = Utc::now();
+                    updated.revision_history.push(crate::hypothesis::Revision {
+                        timestamp: Utc::now(),
+                        description: format!(
+                            "Proposed {new_status:?} by delta engine (mutation {}) - \
+                             routed {route:?}, resolution Open: {rationale}",
+                            mutation.id
+                        ),
+                        previous_status: prev_status,
+                        new_status,
+                        trigger: Some(mutation.id.clone()),
+                    });
+                    adjudications.push(AdjudicationDecision {
+                        hypothesis_id: updated.id.clone(),
+                        route,
+                        proposed_status: new_status,
+                        coherence_delta,
+                        resolution: ResolutionStatus::Open,
+                        rationale,
+                    });
+                }
+            }
         }
 
         ctx.shadow_hypotheses.insert(updated.id.clone(), updated);
@@ -756,6 +858,7 @@ pub fn evaluate_mutation(
         hypothesis_status_shifts: hypothesis_transitions,
         net_coherence_delta: net_delta,
         revision_walk: Some(walk),
+        adjudications,
     }
 }
 
@@ -852,6 +955,7 @@ mod tests {
             hypothesis_status_shifts: vec![],
             net_coherence_delta: -0.2,
             revision_walk: None,
+            adjudications: vec![],
         };
 
         let json = serde_json::to_string(&report).unwrap();

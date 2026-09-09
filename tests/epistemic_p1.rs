@@ -212,3 +212,149 @@ fn fitness_recompute_reports_term_breakdown() {
     assert_eq!(CONTRADICTION_PENALTY_PER_ITEM, 0.10);
     assert_eq!(FAILED_PREDICTION_PENALTY_PER_ITEM, 0.15);
 }
+
+// ── A5: adjudication routing (rationale record only) ─────────────────────
+
+use physis_core::contradiction::ResolutionStatus;
+use physis_core::delta_engine::{route_transition, AdjudicationRoute};
+
+#[test]
+fn large_delta_routes_to_open_with_rationale() {
+    // hC starts perfectly aligned with nC; the shift makes them orthogonal
+    // (fit 1.0 → 0.5, Δ = 0.5 > ϵ + floor = 0.40) → StrategicReview.
+    let nodes = vec![node("nC", unit(2))];
+    let mut h_c = hypothesis("hC", "C is observed", "nC", unit(2));
+    h_c.fitness_breakdown.semantic_fit = 1.0;
+    h_c.coherence = 1.0;
+    let fitness_before = h_c.fitness;
+    let hyps = vec![h_c];
+
+    let mut ctx = EvaluationContext::from_base(&nodes, &hyps, &[]);
+    let mutation = OntologyMutation::new(
+        "nC",
+        MutationOp::EmbeddingShift {
+            old_embedding: unit(2),
+            new_embedding: unit(0),
+        },
+    );
+    let report = evaluate_mutation(&mut ctx, mutation);
+
+    // The demotion is proposed, not applied: no transition, status unchanged.
+    assert_eq!(report.hypothesis_status_shifts.len(), 0);
+    assert_eq!(report.adjudications.len(), 1);
+    let dec = &report.adjudications[0];
+    assert_eq!(dec.route, AdjudicationRoute::StrategicReview);
+    assert_eq!(dec.proposed_status, HypothesisStatus::Contradicted);
+    assert_eq!(dec.resolution, ResolutionStatus::Open);
+    assert!(!dec.rationale.is_empty(), "the rationale must be recorded");
+    assert!((dec.coherence_delta - 0.5).abs() < 1e-4);
+
+    // The evidence is recorded fact: fitness moved, the revision trail
+    // carries the proposal, and the status itself did not change.
+    let shadow = ctx.shadow_hypotheses.get("hC").unwrap();
+    assert_eq!(shadow.status, HypothesisStatus::Supported);
+    assert!(shadow.fitness < fitness_before);
+    assert!(shadow
+        .revision_history
+        .iter()
+        .any(|r| r.description.contains("StrategicReview") && !r.description.is_empty()));
+
+    // Base state untouched (shadow-frame isolation).
+    assert_eq!(hyps[0].status, HypothesisStatus::Supported);
+}
+
+#[test]
+fn small_delta_auto_applies_with_decision_recorded() {
+    // Δ = 0.30: above ϵ (0.25), below ϵ + floor (0.40) → AutoApply,
+    // applied exactly as before, with the decision on the report.
+    let nodes = vec![node("nC", unit(0))];
+    let mut h_c = hypothesis("hC", "aligned then degraded", "nC", unit(0));
+    h_c.fitness_breakdown.semantic_fit = 1.0;
+    h_c.coherence = 1.0;
+    let hyps = vec![h_c];
+
+    // cos(hC, new_nC) = 0.4 → semantic fit 1.0 → 0.7.
+    let new_embedding = vec![0.4_f32, 0.916_515_1, 0.0, 0.0];
+    let mut ctx = EvaluationContext::from_base(&nodes, &hyps, &[]);
+    let mutation = OntologyMutation::new(
+        "nC",
+        MutationOp::EmbeddingShift {
+            old_embedding: unit(0),
+            new_embedding,
+        },
+    );
+    let report = evaluate_mutation(&mut ctx, mutation);
+
+    assert_eq!(report.adjudications.len(), 1);
+    let dec = &report.adjudications[0];
+    assert_eq!(dec.route, AdjudicationRoute::AutoApply);
+    assert_eq!(dec.resolution, ResolutionStatus::APreferred);
+    assert!((dec.coherence_delta - 0.3).abs() < 1e-3);
+
+    // Applied as before: transition emitted, status moved in the shadow.
+    assert_eq!(report.hypothesis_status_shifts.len(), 1);
+    assert_eq!(
+        ctx.shadow_hypotheses.get("hC").unwrap().status,
+        HypothesisStatus::Contradicted
+    );
+}
+
+#[test]
+fn certified_is_core_protected() {
+    // A Certified belief is flagged, never auto-demoted — whatever the Δ.
+    let nodes = vec![node("nC", unit(2))];
+    let mut h_c = hypothesis("hC", "certified", "nC", unit(2));
+    h_c.status = HypothesisStatus::Certified;
+    h_c.fitness_breakdown.semantic_fit = 1.0;
+    h_c.coherence = 1.0;
+    let hyps = vec![h_c];
+
+    let mut ctx = EvaluationContext::from_base(&nodes, &hyps, &[]);
+    let mutation = OntologyMutation::new(
+        "nC",
+        MutationOp::EmbeddingShift {
+            old_embedding: unit(2),
+            new_embedding: unit(0),
+        },
+    );
+    let report = evaluate_mutation(&mut ctx, mutation);
+
+    assert_eq!(report.adjudications.len(), 1);
+    let dec = &report.adjudications[0];
+    assert_eq!(dec.route, AdjudicationRoute::CoreProtected);
+    assert_eq!(dec.resolution, ResolutionStatus::Open);
+    assert_eq!(report.hypothesis_status_shifts.len(), 0);
+    assert_eq!(
+        ctx.shadow_hypotheses.get("hC").unwrap().status,
+        HypothesisStatus::Certified
+    );
+}
+
+#[test]
+fn route_transition_boundary_table() {
+    // The routing table, stated directly: ϵ = 0.25, floor = 0.15.
+    use physis_core::delta_engine::{ADJUDICATION_STRATEGIC_FLOOR, DEGRADATION_THRESHOLD};
+    assert_eq!(ADJUDICATION_STRATEGIC_FLOOR, 0.15);
+    assert_eq!(
+        route_transition(HypothesisStatus::Certified, 0.9),
+        AdjudicationRoute::CoreProtected
+    );
+    assert_eq!(
+        route_transition(HypothesisStatus::Supported, DEGRADATION_THRESHOLD + 0.01),
+        AdjudicationRoute::AutoApply
+    );
+    assert_eq!(
+        route_transition(
+            HypothesisStatus::Supported,
+            DEGRADATION_THRESHOLD + ADJUDICATION_STRATEGIC_FLOOR
+        ),
+        AdjudicationRoute::AutoApply
+    );
+    assert_eq!(
+        route_transition(
+            HypothesisStatus::Confirmed,
+            DEGRADATION_THRESHOLD + ADJUDICATION_STRATEGIC_FLOOR + 0.001
+        ),
+        AdjudicationRoute::StrategicReview
+    );
+}

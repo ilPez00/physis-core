@@ -437,14 +437,19 @@ E14–E18 (cosine 0.519, CONSTRAINT 0.536, ANCESTRY 0.534).
   **DONE 2026-09-09** (`tests/epistemic_p0.rs`, all three gates green; G7's
   retention/compaction story stated in §7.2 before the gate).
 - **P1 (revision + ingest):** A2, A6, G2, A5-rationale-only.
-  **A2 + A6 DONE 2026-09-09** (`tests/epistemic_p1.rs`):
+  **A2 + A6 + A5 DONE 2026-09-09** (`tests/epistemic_p1.rs`):
   `midchain_revision_revises_exact_dependents` (DependsOn-only BFS walk,
   cycles recorded, same-cell bystander excluded, logged breadth fallback for
-  sparse graphs), `depends_on_walk_records_cycles_and_terminates`,
-  `fitness_recompute_reports_term_breakdown` (frozen named weights,
-  per-term contributions sum to the composite). **Remaining:** G2 (ingest
-  triple — GATED on 50 hand-built pairs above chance), A5 (rationale
-  record only, no queue surface).
+  sparse graphs), `fitness_recompute_reports_term_breakdown` (frozen named
+  weights, per-term contributions sum to the composite), and the A5 routing
+  (`large_delta_routes_to_open_with_rationale`, `certified_is_core_protected`,
+  `small_delta_auto_applies_with_decision_recorded`,
+  `route_transition_boundary_table`): ϵ + `ADJUDICATION_STRATEGIC_FLOOR`
+  (0.15, Atlas's number) splits AutoApply from StrategicReview; Certified is
+  CoreProtected; every proposed demotion records an `AdjudicationDecision`
+  with rationale and `ResolutionStatus::Open` on the report — rationale
+  record only, no queue surface. **Remaining:** G2 (ingest triple — GATED on
+  50 hand-built pairs above chance, else flag-only).
 - **P2 (time, retrieval, gate):** G3, G4, G6, G5, A3, A4. Each item ships only
   behind its §7.1/§7.2 gate; a failed gate blocks the next item, never bends it.
 

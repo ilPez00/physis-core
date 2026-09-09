@@ -1,8 +1,9 @@
 //! Integration tests for the Dynamic Ontology Delta & Propagation Engine.
 
+use physis_core::contradiction::ResolutionStatus;
 use physis_core::delta_engine::{
-    evaluate_mutation, EvaluationContext, MutationOp, OntologyDeltaReport, OntologyMutation,
-    MAX_PROPAGATION_DEPTH,
+    evaluate_mutation, AdjudicationRoute, EvaluationContext, MutationOp, OntologyDeltaReport,
+    OntologyMutation, MAX_PROPAGATION_DEPTH,
 };
 use physis_core::{
     CoherenceNode, Evidence, EvidencePolarity, Hypothesis, HypothesisStatus, RelationType,
@@ -160,22 +161,22 @@ fn hypothesis_cascade_embedding_shift() {
     let mut ctx = ctx;
     let report = evaluate_mutation(&mut ctx, mutation);
 
-    // Verify the hypothesis transitioned to Contradicted
-    let transition = report
-        .hypothesis_status_shifts
+    // A5: a full reversal (Δ = 1.0, far beyond ϵ + the strategic floor)
+    // routes to StrategicReview — the demotion is proposed with a recorded
+    // rationale, NOT applied. The transition list stays empty.
+    assert!(
+        report.hypothesis_status_shifts.is_empty(),
+        "a maximal-Δ demotion must not auto-transition"
+    );
+    let decision = report
+        .adjudications
         .iter()
-        .find(|t| t.hypothesis_id == hyp_id)
-        .expect("hypothesis must appear in status shifts");
-
-    assert_eq!(
-        transition.previous_status, pre_status,
-        "previous status must be Supported"
-    );
-    assert_eq!(
-        transition.new_status,
-        HypothesisStatus::Contradicted,
-        "hypothesis must transition to Contradicted"
-    );
+        .find(|d| d.hypothesis_id == hyp_id)
+        .expect("proposed demotion must carry an AdjudicationDecision");
+    assert_eq!(decision.route, AdjudicationRoute::StrategicReview);
+    assert_eq!(decision.proposed_status, HypothesisStatus::Contradicted);
+    assert_eq!(decision.resolution, ResolutionStatus::Open);
+    assert!(!decision.rationale.is_empty(), "rationale must be recorded");
 
     // Verify contradicting evidence was added to the shadow hypothesis
     let shadow_hyp = ctx
@@ -195,6 +196,12 @@ fn hypothesis_cascade_embedding_shift() {
         "contradicting evidence must have a claim"
     );
 
+    // The status itself is unchanged on the shadow: routed, not applied.
+    assert_eq!(
+        shadow_hyp.status, pre_status,
+        "a large-Δ demotion stays Open, unapplied"
+    );
+
     // Verify the hypothesis coherence dropped significantly
     assert!(
         shadow_hyp.coherence < hypothesis.coherence,
@@ -202,9 +209,10 @@ fn hypothesis_cascade_embedding_shift() {
     );
 
     println!(
-        "Hypothesis cascade: {} → {:?} (coherence {:.4} → {:.4})",
+        "Hypothesis cascade: {} → proposed {:?}, routed {:?} (coherence {:.4} → {:.4})",
         pre_status.as_str(),
-        transition.new_status,
+        decision.proposed_status,
+        decision.route,
         hypothesis.coherence,
         shadow_hyp.coherence
     );
