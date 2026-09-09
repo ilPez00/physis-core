@@ -1,5 +1,61 @@
 # physis-core Expansion Plan
 
+> ## 0. GATE — read before acting on §1 (added 2026-09-09)
+>
+> **§1 proposes adding 6 domains and 10 modes. Mode expansion is BLOCKED by
+> measurement. Domain expansion is gated on a pre-flight that has never been
+> run for it.** The evidence is in the parent project
+> (`research/RESEARCH_STATUS.md`, `research/mapper/`), and it was not available
+> when §1 was written.
+>
+> ### Why mode expansion is blocked
+>
+> | finding | measurement |
+> |---|---|
+> | **The existing 14 modes already contain 5 starved classes** | BRAINSTORM **n = 1**, DESTROY 4, LIFT 11, PLAY 12, GUIDE 13 (E22) |
+> | A class below ~20 entries is *unmeasured*, not weak | a well-populated mode cut to 3 entries scores F1 **0.06**; n ≈ 20 → F1 0.26–0.49 (E7) |
+> | The pre-flight already STOPs the *current* grid | 35 of 57 classes below 6 training entries (E8) |
+> | **The mode axis is not a coherent object at any granularity** | merging makes it worse (−0.187 at k = 5 vs domain's −0.007, E27); clustering finds *subject matter*, and the current labels beat every discovered carve (E29) |
+>
+> §1 would take mode from 14 to 24 classes on a corpus that cannot populate 14.
+> **Adding classes to an incoherent axis compounds the incoherence**; it does not
+> resolve it. The standing rule from the research track is **populate first,
+> expand second**, and it is not satisfied.
+>
+> ### Why domain expansion is only gated, not blocked
+>
+> Domain is in much better shape and the difference is measured: it is a clean
+> low-rank object — **4 dimensions carry it losslessly** (E26), all 5 classes are
+> well populated (82–140 entries), and a proposer reaches **top-2 0.837** on it
+> against 0.678 for mode (E21). Going to 11 domains is *plausible*, and untested.
+>
+> **Before adding any domain:** run `research/mapper/preflight.py`, honour it
+> (house rule 4, overridden once and recorded as a mistake), and re-check that
+> the domain axis still compresses to *k−1* dimensions. If it stops compressing,
+> the new domains are not carving anything.
+>
+> ### What to fix in the existing grid first
+>
+> Both come from the confusion structure, not from taste (E22):
+>
+> 1. **`FABRICATE` ↔ `CONSTRUCT` confuse at 0.22/0.21, symmetric** — one
+>    distinction wearing two names, and the cleanest merge candidate in the grid.
+>    Merge, or write the sentence that separates them.
+> 2. **`WORK`/`CREATE`/`MAINTAIN`/`SENSE` hold 68% of entries with ample
+>    population and do not separate.** This is where the mode axis actually
+>    fails, and no representation fixes four definitions that carve nothing
+>    apart. It is definitional work and it is a human call — E29 showed the
+>    machine has nothing further to offer here.
+> 3. **`WALK`** has n = 27, comparable to LEARN (36) and PLAN (35), and scores
+>    top-1 **0.18**. The corpus gave it a fair trial and it failed. Redefine or
+>    retire — and unlike the starved classes, the evidence supports saying so.
+>
+> **Caveat on transfer:** these numbers were measured on the parent project's
+> 658-entry mapper corpus against a blind re-filing, using the same 5×14 grid.
+> The grid is shared; the corpus is not. The sparsity and coherence findings are
+> about the grid and transfer directly. Absolute accuracies would differ on a
+> different corpus.
+
 ## 1. Domain & Mode Expansion
 
 The base 5×14 semiotic grid (HEAL/CONSTRUCT/FABRICATE/BOND/STUDY × 14 modes) is intentionally a **base layer**. New dimensions are added as **additive packs**, not by bloating the grid.
@@ -118,6 +174,62 @@ let loader = OntologyLoader::load_from_str(&include_str!("../config/govern_decid
 ```
 
 ---
+
+## 2b. What to port from `physis-pro` (added 2026-09-09)
+
+The boundary in the README holds — *Core stays Core* — so this is a short list,
+and it is short on purpose. A pro module earns a place in core only if it is
+**epistemic**, **dependency-light**, and **measured**.
+
+### Port: the filing proposer
+
+**The one positive the research track has produced.** Every certification
+mechanism was refuted (E12–E18, all at chance on real misfilings), because they
+asked the machine to *judge*. Asked instead to *propose* — narrow 57 cells to a
+shortlist a person chooses from — the same geometry works:
+
+| at 436 human decisions | top-1 | top-3 | top-5 |
+|---|---:|---:|---:|
+| **proposer** | 0.447 | **0.712** | 0.791 |
+| permuted (the null) | 0.036 | 0.136 | 0.233 |
+| `old_cell`→`new_cell` lookup | 0.184 | 0.368 | 0.474 |
+
+Two pieces, both tiny:
+
+1. **Hint weighting at α = 0.5** — `v = normalise(v_name + 0.5·(v_hints −
+   v_name))`. One line, and worth **+0.054 top-3** over the current
+   representation, unanimous across 24 paired splits, *t* = +12.13 (E24/E28).
+   This is a change to how core already embeds entries and costs nothing.
+2. **Top-k cell proposal from accumulated decisions** — nearest-centroid over
+   cells built from filings a user has already confirmed. Pure vector arithmetic;
+   no new dependency.
+
+**Ship it as a proposer, never as a validator.** Standing rule: *coverage filters
+and ranks; it does not verify.* The same applies here — the shortlist is for a
+person to choose from, and core's own README notice is right that the audit
+claim does not hold.
+
+### Do not port
+
+The industrial suite (MQTT/Modbus/OPC-UA, OEE, Gantt, shifts, Spanner, RBAC,
+licensing, multi-tenancy, the operations console) — that is the boundary working
+as designed. Also not the `mapper` research harness: it is experiment code, it
+belongs with its data in the parent project, and core should carry the *result*
+rather than the apparatus.
+
+### Also: the README's status notice needs one correction
+
+The notice says twelve mechanisms were tested and **none was shown to work**.
+That was true when written and is now imprecise in one direction:
+
+- **Unchanged and still correct:** nothing here certifies that a filing is
+  *sound*. Every scorer sits at chance on real misfilings (cosine 0.519,
+  CONSTRAINT 0.536, ANCESTRY 0.534), and ANCHORVOC's apparent win was an
+  entry-length artifact.
+- **New, and it should be stated:** *proposing* a filing, given decisions a
+  person has already made, does work and survives a construction-matched null.
+
+The notice's honesty is the reason to keep it accurate in both directions.
 
 ## 3. Getting Started Guide
 
