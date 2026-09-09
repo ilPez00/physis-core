@@ -20,6 +20,31 @@ use crate::coherence_dimensions::CoherenceProfile;
 use crate::models::Score;
 use crate::temporal::TemporalValidity;
 
+// ── A6 (Atlas take, ReassessWeights): the fitness parameter set ──────────
+//
+// Named, documented, frozen. Every benchmark run can name its weights, and
+// tuning happens as separate scored configs — never by editing these in
+// place (A6 gate: tuning is GATED on frozen defaults).
+
+/// Weight of `semantic_fit` in the composite.
+pub const FITNESS_WEIGHT_SEMANTIC_FIT: Score = 0.20;
+/// Weight of `ontological_fit` in the composite.
+pub const FITNESS_WEIGHT_ONTOLOGICAL_FIT: Score = 0.15;
+/// Weight of `logical_consistency` in the composite.
+pub const FITNESS_WEIGHT_LOGICAL_CONSISTENCY: Score = 0.15;
+/// Weight of `empirical_support` in the composite.
+pub const FITNESS_WEIGHT_EMPIRICAL_SUPPORT: Score = 0.25;
+/// Weight of `predictive_success` in the composite.
+pub const FITNESS_WEIGHT_PREDICTIVE_SUCCESS: Score = 0.25;
+/// Fitness penalty per contradicting evidence item.
+pub const CONTRADICTION_PENALTY_PER_ITEM: Score = 0.10;
+/// Upper bound on the total contradiction penalty.
+pub const CONTRADICTION_PENALTY_CAP: Score = 0.40;
+/// Fitness penalty per resolved-wrong prediction.
+pub const FAILED_PREDICTION_PENALTY_PER_ITEM: Score = 0.15;
+/// Upper bound on the total failed-prediction penalty.
+pub const FAILED_PREDICTION_PENALTY_CAP: Score = 0.50;
+
 /// Closed status machine for a hypothesis.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HypothesisStatus {
@@ -402,17 +427,19 @@ impl Hypothesis {
                 .filter(|p| p.correct == Some(false))
                 .count() as Score;
             let s_ratio = succ / resolved_preds.len() as Score;
-            let f_penalty = (fail * 0.15).min(0.5);
+            let f_penalty = (fail * FAILED_PREDICTION_PENALTY_PER_ITEM)
+                .min(FAILED_PREDICTION_PENALTY_CAP);
             (s_ratio, f_penalty)
         };
 
-        let contra_penalty = (contradict_len * 0.1).min(0.4);
+        let contra_penalty =
+            (contradict_len * CONTRADICTION_PENALTY_PER_ITEM).min(CONTRADICTION_PENALTY_CAP);
 
-        let composite = (0.20 * self.fitness_breakdown.semantic_fit
-            + 0.15 * self.fitness_breakdown.ontological_fit
-            + 0.15 * self.fitness_breakdown.logical_consistency
-            + 0.25 * empirical
-            + 0.25 * pred_success
+        let composite = (FITNESS_WEIGHT_SEMANTIC_FIT * self.fitness_breakdown.semantic_fit
+            + FITNESS_WEIGHT_ONTOLOGICAL_FIT * self.fitness_breakdown.ontological_fit
+            + FITNESS_WEIGHT_LOGICAL_CONSISTENCY * self.fitness_breakdown.logical_consistency
+            + FITNESS_WEIGHT_EMPIRICAL_SUPPORT * empirical
+            + FITNESS_WEIGHT_PREDICTIVE_SUCCESS * pred_success
             - contra_penalty
             - failed_preds_penalty)
             .clamp(0.0, 1.0);
@@ -430,6 +457,41 @@ impl Hypothesis {
         };
 
         self.fitness = composite;
+    }
+
+    /// A6: every recompute names its terms — the per-term contribution to
+    /// the composite (`weight × term`, penalties negative), in composite
+    /// order. The contributions sum to [`Hypothesis::fitness`] wherever the
+    /// `[0, 1]` clamp does not bite; the clamp is the only nonlinearity.
+    pub fn fitness_term_breakdown(&self) -> Vec<(&'static str, Score)> {
+        let b = &self.fitness_breakdown;
+        vec![
+            (
+                "semantic_fit",
+                FITNESS_WEIGHT_SEMANTIC_FIT * b.semantic_fit,
+            ),
+            (
+                "ontological_fit",
+                FITNESS_WEIGHT_ONTOLOGICAL_FIT * b.ontological_fit,
+            ),
+            (
+                "logical_consistency",
+                FITNESS_WEIGHT_LOGICAL_CONSISTENCY * b.logical_consistency,
+            ),
+            (
+                "empirical_support",
+                FITNESS_WEIGHT_EMPIRICAL_SUPPORT * b.empirical_support,
+            ),
+            (
+                "predictive_success",
+                FITNESS_WEIGHT_PREDICTIVE_SUCCESS * b.predictive_success,
+            ),
+            ("contradiction_penalty", -b.contradiction_penalty),
+            (
+                "failed_prediction_penalty",
+                -b.failed_prediction_penalty,
+            ),
+        ]
     }
 
     /// Resolve a pending prediction: record what actually happened and whether

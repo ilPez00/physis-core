@@ -434,7 +434,17 @@ E14–E18 (cosine 0.519, CONSTRAINT 0.536, ANCESTRY 0.534).
 ### 7.4 Order P0/P1/P2
 
 - **P0 (invariants + history):** A7, G7, G1-fields. No scoring change — the point.
+  **DONE 2026-09-09** (`tests/epistemic_p0.rs`, all three gates green; G7's
+  retention/compaction story stated in §7.2 before the gate).
 - **P1 (revision + ingest):** A2, A6, G2, A5-rationale-only.
+  **A2 + A6 DONE 2026-09-09** (`tests/epistemic_p1.rs`):
+  `midchain_revision_revises_exact_dependents` (DependsOn-only BFS walk,
+  cycles recorded, same-cell bystander excluded, logged breadth fallback for
+  sparse graphs), `depends_on_walk_records_cycles_and_terminates`,
+  `fitness_recompute_reports_term_breakdown` (frozen named weights,
+  per-term contributions sum to the composite). **Remaining:** G2 (ingest
+  triple — GATED on 50 hand-built pairs above chance), A5 (rationale
+  record only, no queue surface).
 - **P2 (time, retrieval, gate):** G3, G4, G6, G5, A3, A4. Each item ships only
   behind its §7.1/§7.2 gate; a failed gate blocks the next item, never bends it.
 

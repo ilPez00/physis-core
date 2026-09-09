@@ -184,8 +184,8 @@ pub use contradiction::{Contradiction, ContradictionParty, ResolutionStatus};
 pub use core::PhysisCore;
 pub use delta_engine::{
     evaluate_mutation, EvaluationContext, HypothesisTransition, MutationOp, NodeDelta,
-    OntologyDeltaReport, OntologyMutation, DEGRADATION_THRESHOLD, GAMMA, MAX_PROPAGATION_DEPTH,
-    MIN_IMPACT,
+    OntologyDeltaReport, OntologyMutation, RevisionWalk, WalkStep, DEGRADATION_THRESHOLD, GAMMA,
+    MAX_PROPAGATION_DEPTH, MAX_REVISION_WALK_NODES, MIN_IMPACT,
 };
 pub use discovery::{discover, DiscoveryConfig, DiscoveryReport, ProposedDomain};
 pub use embed::{RandomProjectionEmbedder, VectorEmbed};
@@ -194,7 +194,11 @@ pub use explanation::{ExplanationReport, HistoricalPrecedent};
 pub use history::importer_for as history_importer_for;
 pub use hypothesis::{
     Evidence, EvidencePolarity, FitnessBreakdown, Hypothesis, HypothesisStatus, Prediction,
-    Revision,
+    Revision, CONTRADICTION_PENALTY_CAP, CONTRADICTION_PENALTY_PER_ITEM,
+    FAILED_PREDICTION_PENALTY_CAP, FAILED_PREDICTION_PENALTY_PER_ITEM,
+    FITNESS_WEIGHT_EMPIRICAL_SUPPORT, FITNESS_WEIGHT_LOGICAL_CONSISTENCY,
+    FITNESS_WEIGHT_ONTOLOGICAL_FIT, FITNESS_WEIGHT_PREDICTIVE_SUCCESS,
+    FITNESS_WEIGHT_SEMANTIC_FIT,
 };
 pub use models::*;
 pub use ontology::OntologyLoader;

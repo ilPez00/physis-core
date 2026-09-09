@@ -17,15 +17,24 @@
 //!
 //! Only nodes within the propagation radius (depth ≤ [`MAX_PROPAGATION_DEPTH`]
 //! and impact ≥ [`MIN_IMPACT`]) are evaluated and reported.
+//!
+//! ## Revision selection (A2, Atlas take)
+//!
+//! The breadth wave reports *node* coherence deltas only. Which *hypotheses*
+//! are revised is selected by the declared `DependsOn` closure of the mutated
+//! node ([`EvaluationContext::depends_on_walk`]) — a shared cell pin, a label
+//! prefix, or a similar embedding no longer pulls a hypothesis into revision.
+//! Graphs that declare no `DependsOn` edges fall back to the breadth-affected
+//! selection, logged in [`RevisionWalk::fallback_breadth_used`].
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::hypothesis::{Evidence, Hypothesis, HypothesisStatus};
 use crate::models::{cosine_sim, CoherenceNode, Score};
-use crate::relation::TypedEdge;
+use crate::relation::{RelationType, TypedEdge};
 
 /// Decay factor γ for impact attenuation during topological propagation.
 pub const GAMMA: f32 = 0.85;
@@ -40,6 +49,11 @@ pub const MAX_PROPAGATION_DEPTH: usize = 5;
 
 /// Minimum impact factor below which propagation stops.
 pub const MIN_IMPACT: f32 = 0.01;
+
+/// A2 (Atlas take): hard cap on visited nodes for the DependsOn revision
+/// walk (Atlas `MAX_NODES_DEFAULT = 5000`). The walk truncates at the cap
+/// and says so via [`RevisionWalk::truncated`] — never silently.
+pub const MAX_REVISION_WALK_NODES: usize = 5000;
 
 // ── Mutation & Shadows ───────────────────────────────────────────────────
 
@@ -283,6 +297,65 @@ impl<'a> EvaluationContext<'a> {
         }
         adjacency
     }
+
+    /// A2 (Atlas take): BFS over *declared* `DependsOn` edges only — no cell
+    /// pins, no label-prefix links, no cosine. Visited-set termination, cycle
+    /// recording, hop and node caps. This is a proposal-order, not a write.
+    pub fn depends_on_walk(&self, mutated_id: &str) -> RevisionWalk {
+        // Reverse index: for a mutated target T, its dependents are the
+        // sources S of edges S DependsOn T. Sorted for determinism.
+        let mut dependents_of: HashMap<&str, Vec<&str>> = HashMap::new();
+        for edge in self.edges {
+            if edge.relation_type == RelationType::DependsOn {
+                dependents_of
+                    .entry(edge.target_id.as_str())
+                    .or_default()
+                    .push(edge.source_id.as_str());
+            }
+        }
+        for list in dependents_of.values_mut() {
+            list.sort_unstable();
+            list.dedup();
+        }
+
+        let mut walk = RevisionWalk::default();
+        let mut visited: HashSet<String> = HashSet::new();
+        let mut queue: VecDeque<(String, usize)> = VecDeque::new();
+        visited.insert(mutated_id.to_string());
+        queue.push_back((mutated_id.to_string(), 0));
+
+        while let Some((node_id, hops)) = queue.pop_front() {
+            if walk.steps.len() >= MAX_REVISION_WALK_NODES {
+                walk.truncated = true;
+                break;
+            }
+            walk.steps.push(WalkStep {
+                node_id: node_id.clone(),
+                hops,
+            });
+            if hops > 0 {
+                walk.dependents.push(WalkStep {
+                    node_id: node_id.clone(),
+                    hops,
+                });
+            }
+            if hops >= MAX_PROPAGATION_DEPTH {
+                continue; // children would exceed the hop cap
+            }
+            if let Some(dependents) = dependents_of.get(node_id.as_str()) {
+                for dep in dependents {
+                    if visited.contains(*dep) {
+                        // Cycle: record the closing edge, never re-enqueue.
+                        walk.cycles.push([node_id.clone(), dep.to_string()]);
+                        continue;
+                    }
+                    visited.insert(dep.to_string());
+                    queue.push_back((dep.to_string(), hops + 1));
+                }
+            }
+        }
+        walk
+    }
 }
 
 // ── Report Structures ────────────────────────────────────────────────────
@@ -312,6 +385,44 @@ pub struct OntologyDeltaReport {
     pub affected_nodes: Vec<NodeDelta>,
     pub hypothesis_status_shifts: Vec<HypothesisTransition>,
     pub net_coherence_delta: f32,
+    /// A2: the DependsOn revision walk that selected the revised hypotheses.
+    /// `None` only when no walk ran (zero-shift early return).
+    #[serde(default)]
+    pub revision_walk: Option<RevisionWalk>,
+}
+
+/// One node visited by the A2 DependsOn revision walk.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WalkStep {
+    pub node_id: String,
+    /// Justification hops from the mutated node (0 = the mutated node itself).
+    pub hops: usize,
+}
+
+/// A2 (Atlas take): result of the DependsOn-only revision walk.
+///
+/// An edge `S DependsOn T` means S's standing depends on T, so dependents of
+/// the mutated node M are the sources of M-incoming DependsOn edges. The walk
+/// is BFS shallow-first with a visited set; proposals are not writes — the
+/// caller decides whether to commit.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RevisionWalk {
+    /// The mutated node (hops 0) and every dependent reached, BFS order.
+    pub steps: Vec<WalkStep>,
+    /// The reached dependents (hops ≥ 1), BFS order — a subset of `steps`.
+    pub dependents: Vec<WalkStep>,
+    /// DependsOn edges that closed back onto an already-visited node, as
+    /// `[dependent_id, already_visited_id]` in encounter order.
+    pub cycles: Vec<[String; 2]>,
+    /// True if the walk stopped early at [`MAX_REVISION_WALK_NODES`].
+    pub truncated: bool,
+    /// True if the graph declared no DependsOn dependents and the engine
+    /// fell back to the breadth-affected selection. Logged, never silent
+    /// (A2 risk note: sparse DependsOn graphs must not go blind).
+    pub fallback_breadth_used: bool,
+    /// Hypothesis ids selected for revision, in revision order (walk BFS
+    /// order when the walk drove the selection; breadth order on fallback).
+    pub revised_hypotheses: Vec<String>,
 }
 
 // ── Core Propagation ─────────────────────────────────────────────────────
@@ -441,6 +552,7 @@ pub fn evaluate_mutation(
                 affected_nodes: Vec::new(),
                 hypothesis_status_shifts: Vec::new(),
                 net_coherence_delta: 0.0,
+                revision_walk: None,
             };
         }
     }
@@ -522,17 +634,51 @@ pub fn evaluate_mutation(
     let mut hypothesis_transitions: Vec<HypothesisTransition> = Vec::new();
     let affected_node_ids: Vec<String> = affected.iter().map(|(id, _)| id.clone()).collect();
 
-    // Collect IDs of hypotheses that reference any affected node
-    let hyp_ids: Vec<String> = ctx
-        .effective_hypotheses_all()
-        .into_iter()
-        .filter(|h| {
-            h.ontology_refs
+    // ── A2 (Atlas take): revision selection by declared dependency ───────
+    //
+    // Hypothesis revision is selected by the DependsOn closure of the
+    // mutated node, NOT by the breadth wave above. Mere arrival — a similar
+    // embedding, a shared cell pin, a label prefix — must not shift a
+    // hypothesis; only a declared DependsOn edge justifies a revision. The
+    // breadth wave keeps its node-coherence reporting job; it no longer
+    // selects hypotheses. If the graph declares no DependsOn dependents the
+    // engine falls back to the previous breadth-affected selection and logs
+    // it (`fallback_breadth_used`) — a sparse DependsOn graph must not go
+    // blind (A2 risk note).
+    let mut walk = ctx.depends_on_walk(&target_id);
+    let has_declared_dependents = !walk.dependents.is_empty();
+    walk.fallback_breadth_used = !has_declared_dependents;
+
+    let hyp_ids: Vec<String> = if has_declared_dependents {
+        let all_hyps = ctx.effective_hypotheses_all();
+        let mut ordered: Vec<String> = Vec::new();
+        for step in &walk.steps {
+            let mut matching: Vec<String> = all_hyps
                 .iter()
-                .any(|r| affected_node_ids.contains(r))
-        })
-        .map(|h| h.id.clone())
-        .collect();
+                .filter(|h| h.ontology_refs.iter().any(|r| r == &step.node_id))
+                .map(|h| h.id.clone())
+                .collect();
+            matching.sort();
+            for id in matching {
+                if !ordered.contains(&id) {
+                    ordered.push(id);
+                }
+            }
+        }
+        ordered
+    } else {
+        // Logged fallback: the previous breadth-affected behaviour.
+        ctx.effective_hypotheses_all()
+            .into_iter()
+            .filter(|h| {
+                h.ontology_refs
+                    .iter()
+                    .any(|r| affected_node_ids.contains(r))
+            })
+            .map(|h| h.id.clone())
+            .collect()
+    };
+    walk.revised_hypotheses = hyp_ids.clone();
 
     for hyp_id in &hyp_ids {
         // Capture pre-mutation values from the effective (base or shadow) view
@@ -609,6 +755,7 @@ pub fn evaluate_mutation(
         affected_nodes: node_deltas,
         hypothesis_status_shifts: hypothesis_transitions,
         net_coherence_delta: net_delta,
+        revision_walk: Some(walk),
     }
 }
 
@@ -704,6 +851,7 @@ mod tests {
             }],
             hypothesis_status_shifts: vec![],
             net_coherence_delta: -0.2,
+            revision_walk: None,
         };
 
         let json = serde_json::to_string(&report).unwrap();
