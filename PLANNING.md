@@ -455,3 +455,50 @@ pairs are unrecoverable after retraction. G1/G6 fail if belief-at-T is no
 better than `is_valid_at` filtering. G5 fails if fusion does not beat
 cosine-only; A3 fails on tautologies; A4 fails if verify survives a payload
 edit. Every claim carries its null (permuted-labels or cosine-only) — §2b's proposer (top-3 0.712 vs 0.136 null) is the model.
+
+### 7.6 Formal semantics track — operator separation + provisional fixed point (2026-09-09)
+
+> Source: `../physis_resources.txt` §"Formal semantics track" (Triune
+> Continuum × Kripke × Physis). Framing for this section's machinery; plan
+> detail in `../PLAN.md` Phase 23. Adds no domain or mode; touches neither
+> §0 nor §1.
+
+**The separation this section states:** semantic construction (Γ:
+`embed` → `classify` → `propose`, additive, partial — never forces
+TRUE/FALSE) is not epistemic revision (R: `transition_to` →
+`recompute_fitness` → the epistemic trail), and neither is truth.
+`delta_engine.rs` is the one place Γ and R still share a function
+(`evaluate_mutation` both computes semantic proposals and derives status
+transitions); 23.1 is the work of making that boundary explicit, not of
+inventing new machinery.
+
+**Symbol audit for `h = ⟨e, τ, π, σ, ρ, κ⟩`:** every component already has a
+home in this crate — e = embedding; τ = `ontology_refs`/`cell_pin`;
+π = `provenance.rs` + `Revision` (G4 closes it); σ = `HypothesisStatus` ×9 +
+fitness; ρ = `revision_history` (G3 closes it); κ = `TemporalValidity`
+(P0 added the `expired_at` leg; G6 closes it). The tuple is an audit lens,
+not a new struct — no new type is planned for it.
+
+**Standing non-claim:** this crate is not a Kripke truth theory. Its
+"fixed point" is *locally stable under currently available evidence and
+context* (PHYSIS_STEP stage 10: report `locally stable` vs `revised`),
+never metaphysical truth — and distinct from E20's geometric fixed points
+(density maxima in the similarity graph): same word, different object,
+cross-reference only.
+
+**P3 items, each behind its gate (order: after P2, which supplies the G3/G6
+vocabulary these invariants need to be honest):**
+
+- **23.1** `gamma_report_carries_no_status_writes` — semantic proposals ride
+  the report; status changes derivable only through the R-side trail.
+  Mutation-tested: a naive implementation that writes status in
+  `evaluate_mutation` must fail it.
+- **23.2** `interpretations_never_shrink_on_ingest` — `I_t ⊆ I_{t+1}`;
+  deprecation is state/provenance (the Γ-side face of G7), never deletion.
+- **23.3** `stable_status_matches_zero_delta_and_evidence_window` — the
+  provisional fixed-point status; falsifier: claims stability while any
+  κ-window evidence is unresolved.
+- **23.4** replay candidates from Failed/Inert/Contradicted structures;
+  proposals cite the ledger events that motivated them; nothing replayed
+  is deleted (the dream hook).
+- **23.5** the critical experiment (in `../PLAN.md` §22.5/23.3) — the paper.
