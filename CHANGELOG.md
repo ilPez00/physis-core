@@ -71,6 +71,20 @@ behind a named gate test in `tests/epistemic_p0.rs` / `tests/epistemic_p1.rs`.
   serde-default keeps old stored JSON deserialising
   (`legacy_trails_replay_by_arrival_unchanged`,
   `trail_serialises_with_g3_fields_and_reads_old_json`).
+- **23.6 temporal dream** (new module `dream.rs`):
+  `dream_over_history(&trail, &mutations, lookback)` replays the audit
+  trail in assertion order and **proposes edits to retired branches** —
+  re-activate a retained superseded/failed/inert hypothesis whose pattern
+  re-presented itself in later observations, restore a severed DependsOn
+  connection whose target re-confirmed, retire a connection whose target
+  accumulated ≥ `RETIRE_AFTER_CONTRADICTIONS` (2) contradictions. Every
+  `RetrospectiveProposal` cites the historical event/mutation ids that
+  motivated it; the dream takes the trail by shared reference and cannot
+  write — proposals only, the caller decides
+  (`dream_proposes_reactivation_from_retained_branches`,
+  `dream_proposes_restoring_severed_connections`,
+  `dream_proposes_retiring_repeatedly_contradicted_connections`,
+  `dream_stays_silent_without_reconfirmation`, `dream_never_writes`).
 
 ### Changed
 

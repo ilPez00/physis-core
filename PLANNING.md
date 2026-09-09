@@ -521,3 +521,18 @@ vocabulary these invariants need to be honest):**
   proposals cite the ledger events that motivated them; nothing replayed
   is deleted (the dream hook).
 - **23.5** the critical experiment (in `../PLAN.md` §22.5/23.3) — the paper.
+- **23.6** temporal dream (`dream.rs`, DONE 2026-09-09 — see below):
+  retrospective proposals over the time machine. Retired branches were
+  retained (G7), so they can be **re-proposed**: a superseded/failed/inert
+  hypothesis whose pattern re-presents itself → `ReactivateHypothesis`; a
+  severed DependsOn connection whose target re-confirmed →
+  `RestoreConnection`; a connection whose target keeps contradicting →
+  `RetireConnection`. Every `RetrospectiveProposal` cites the historical
+  event/mutation ids that motivated it; the dream takes the trail by shared
+  reference and cannot write. Gates:
+  `dream_proposes_reactivation_from_retained_branches`,
+  `dream_proposes_restoring_severed_connections`,
+  `dream_proposes_retiring_repeatedly_contradicted_connections`,
+  `dream_never_writes`. Interaction evidence + the timelessness constraint
+  (clocks live only in the trail/replay layer) recorded in `../PLAN.md`
+  §23.5, from `../mindalogue.md`.

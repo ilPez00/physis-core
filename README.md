@@ -698,6 +698,28 @@ timestamps. `TemporalValidity` gains the system-invalidation leg `expired_at`
 — fields only; query semantics are a later item. Gate tests:
 `superseded_items_stay_queryable_for_history`, `temporal_triple_serialises`.
 
+### Temporal dream: the past re-proposes itself (23.6)
+
+Retired branches are retained (G7), so the time machine can do more than
+replay them — `dream::dream_over_history(&trail, &mutations, lookback)`
+replays in assertion order (G3) and returns `RetrospectiveProposal`s:
+
+- **ReactivateHypothesis** — a superseded/failed/inert branch whose pattern
+  re-presented itself in later observations;
+- **RestoreConnection** — a severed DependsOn connection whose target has
+  since re-confirmed;
+- **RetireConnection** — a connection whose target keeps contradicting.
+
+Every proposal cites the historical event/mutation ids that motivated it;
+the dream takes the trail by shared reference and **cannot write** — the
+caller decides. Many things already happened, and may re-present
+themselves; the dream is how the past speaks. Clocks live only in the
+trail/replay layer: coherence, classification, and hypothesis state stay
+timeless. Gate tests: `dream_proposes_reactivation_from_retained_branches`,
+`dream_proposes_restoring_severed_connections`,
+`dream_proposes_retiring_repeatedly_contradicted_connections`,
+`dream_stays_silent_without_reconfirmation`, `dream_never_writes`.
+
 **Honesty constraints carry.** The machinery proposes, carries, and defers;
 it does not verify. Nothing here upgrades the measured numbers (cosine
 0.519 ≈ chance on real misfilings; propose top-3 0.712 proposes, never

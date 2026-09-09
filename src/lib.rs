@@ -162,6 +162,7 @@ pub mod core;
 pub mod coverage;
 pub mod delta_engine;
 pub mod discovery;
+pub mod dream;
 pub mod edition;
 pub mod embed;
 pub mod epistemic;
@@ -212,6 +213,7 @@ pub use embed::{RandomProjectionEmbedder, VectorEmbed};
 pub use epistemic::{
     EpistemicAuditTrail, EpistemicEvent, EpistemicEventType, HighWaterMark, IntakeReceipt,
 };
+pub use dream::{dream_over_history, ProposalKind, RetrospectiveProposal, RETIRE_AFTER_CONTRADICTIONS};
 pub use explanation::{ExplanationReport, HistoricalPrecedent};
 pub use history::importer_for as history_importer_for;
 pub use hypothesis::{
