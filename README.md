@@ -141,6 +141,7 @@
 - [Cell Linkage](#cell-linkage)
 - [Proposing a Filing](#proposing-a-filing)
 - [Coverage Impact](#coverage-impact)
+- [Epistemic Revision: the Delta Engine](#epistemic-revision-the-delta-engine)
 - [Rust API Usage & Code Examples](#rust-api-usage--code-examples)
   - [1. Competing Hypotheses & Evidence Attestation](#1-competing-hypotheses--evidence-attestation)
   - [2. Truth Maintenance & Contradiction Resolution](#2-truth-maintenance--contradiction-resolution)
@@ -627,6 +628,80 @@ Two further limits:
   and cannot surface here, by construction.
 - **Not every candidate is rankable.** 1,236 of 1,638 proposals (75%) lifted any
   record at all; the rest tie at zero and fall back to candidate order.
+
+---
+
+## Epistemic Revision: the Delta Engine
+
+When a node mutates, `delta_engine` evaluates the cascade in an isolated
+shadow frame and reports what *would* change; the caller commits. Since
+0.1.22 the engine also carries the epistemic-revision track — patterns taken
+from Atlas (Ripple / AGM / adjudication) and Graphiti (temporal legs, ingest
+discipline) as behavior and tests, never as dependencies. Every item ships
+behind a named gate test; every claim keeps its null.
+
+### No-perturbation invariant (A7)
+
+A zero `EmbeddingShift` carries no information: the wave returns empty,
+fitness stays bit-identical, zero transitions. Gate test:
+`zero_shift_wave_leaves_fitness_untouched`.
+
+### Revision selection by declared dependency (A2)
+
+Which hypotheses are revised is decided by the **DependsOn closure** of the
+mutated node (`EvaluationContext::depends_on_walk` — BFS shallow-first,
+justification-hop counting, cycle recording, depth cap 5, node cap 5000),
+not by the breadth wave. A shared cell pin, a label prefix, or a similar
+embedding no longer pulls a hypothesis into revision on mere arrival.
+Graphs that declare no DependsOn edges fall back to the breadth-affected
+selection, and the report says so (`RevisionWalk::fallback_breadth_used`).
+Gate test: `midchain_revision_revises_exact_dependents`.
+
+### Named fitness weights + per-term breakdown (A6)
+
+The composite weights are published frozen constants
+(`FITNESS_WEIGHT_SEMANTIC_FIT` 0.20, `FITNESS_WEIGHT_ONTOLOGICAL_FIT` 0.15,
+`FITNESS_WEIGHT_LOGICAL_CONSISTENCY` 0.15, `FITNESS_WEIGHT_EMPIRICAL_SUPPORT`
+0.25, `FITNESS_WEIGHT_PREDICTIVE_SUCCESS` 0.25, plus the penalty schedules),
+and `Hypothesis::fitness_term_breakdown()` reports `weight × term` per
+recompute; the contributions sum to the fitness wherever the `[0, 1]` clamp
+does not bite. Tuning is a separate scored config, never an in-place edit.
+Gate test: `fitness_recompute_reports_term_breakdown`.
+
+### Adjudication routing (A5)
+
+A proposed demotion is **routed, not blindly applied** (`route_transition`):
+
+| route | when | effect |
+|---|---|---|
+| `AutoApply` | ϵ < Δ ≤ ϵ + 0.15 | applied as before; decision recorded |
+| `StrategicReview` | Δ > ϵ + 0.15 | **proposed, not applied** — status unchanged, `ResolutionStatus::Open`, rationale recorded |
+| `CoreProtected` | status `Certified` | flagged, never auto-demoted |
+
+Every proposed demotion carries an `AdjudicationDecision` (route, proposed
+status, Δ, resolution, rationale) on `OntologyDeltaReport::adjudications`
+and in the hypothesis revision trail — rationale record only; the
+approve / reject / adjust / synthesize queue is a later item. The
+degradation itself is recorded fact on every route: evidence lands, fitness
+absorbs it. Gate tests: `large_delta_routes_to_open_with_rationale`,
+`certified_is_core_protected`,
+`small_delta_auto_applies_with_decision_recorded`,
+`route_transition_boundary_table`.
+
+### Invalidate-don't-delete (G7) + the expired_at leg (G1)
+
+Superseded hypotheses are never removed:
+`hypothesis::current_hypotheses` excludes them from live queries,
+`hypothesis::hypotheses_including_history` keeps them readable with revision
+timestamps. `TemporalValidity` gains the system-invalidation leg `expired_at`
+(distinct from `valid_until`, which is when the claim stopped being *true*)
+— fields only; query semantics are a later item. Gate tests:
+`superseded_items_stay_queryable_for_history`, `temporal_triple_serialises`.
+
+**Honesty constraints carry.** The machinery proposes, carries, and defers;
+it does not verify. Nothing here upgrades the measured numbers (cosine
+0.519 ≈ chance on real misfilings; propose top-3 0.712 proposes, never
+verifies).
 
 ---
 

@@ -4,6 +4,75 @@ Notable changes to `physis-core`. This file starts at 0.1.15; earlier
 releases predate it and are documented only by their git tags and commit
 history.
 
+## 0.1.22
+
+### Added — the epistemic revision track (Atlas + Graphiti patterns, P0 + P1)
+
+The delta engine gains the epistemic-revision machinery specified in
+`PLANNING.md` §7 and `../docs/ATLAS_GRAPHITI_INTEGRATION_PLAN.md`:
+patterns, protocols and test shapes taken from Atlas (Ripple, AGM,
+adjudication) and Graphiti (temporal legs, ingest discipline) — never
+dependencies. Offline Rust over sled, no new crates. Every item ships
+behind a named gate test in `tests/epistemic_p0.rs` / `tests/epistemic_p1.rs`.
+
+**P0 — invariants + history (no scoring change):**
+
+- **A7 no-perturbation invariant** (`delta_engine::evaluate_mutation`): a
+  zero `EmbeddingShift` returns an empty wave without touching shadow state
+  — fitness bit-identical, zero transitions
+  (`zero_shift_wave_leaves_fitness_untouched`).
+- **G7 invalidate-don't-delete** (`hypothesis::current_hypotheses`,
+  `hypothesis::hypotheses_including_history`): superseded hypotheses stay
+  history-readable and out of current queries; retention/compaction stated
+  before the gate — no automatic deletion, audited compaction deferred
+  (`superseded_items_stay_queryable_for_history`).
+- **G1 `expired_at` leg** (`temporal::TemporalValidity`): the
+  system-invalidation time, distinct from `valid_until`; fields only,
+  serde-default keeps old stored JSON deserialising
+  (`temporal_triple_serialises`).
+
+**P1 — revision correctness:**
+
+- **A2 DependsOn-only revision walk** (`EvaluationContext::depends_on_walk`,
+  `RevisionWalk` on `OntologyDeltaReport::revision_walk`): hypothesis
+  revision is selected by the declared DependsOn closure (BFS, hop counts,
+  cycle recording, depth cap 5, node cap 5000 with flagged truncation), not
+  by the breadth wave — mere arrival no longer shifts a hypothesis. Sparse
+  graphs fall back to the breadth-affected selection, logged via
+  `fallback_breadth_used`
+  (`midchain_revision_revises_exact_dependents`,
+  `depends_on_walk_records_cycles_and_terminates`).
+- **A6 named fitness weights** (`hypothesis::FITNESS_WEIGHT_*`,
+  `Hypothesis::fitness_term_breakdown`): the composite weights and penalty
+  schedules are published frozen constants; every recompute names its terms
+  and the contributions sum to the fitness wherever the clamp does not bite
+  (`fitness_recompute_reports_term_breakdown`).
+- **A5 adjudication routing** (`delta_engine::route_transition`,
+  `AdjudicationDecision` on `OntologyDeltaReport::adjudications`): proposed
+  demotions are routed, not blindly applied — `AutoApply` between ϵ and
+  ϵ + `ADJUDICATION_STRATEGIC_FLOOR` (0.15, Atlas's number),
+  `StrategicReview` beyond it (proposal + rationale + `ResolutionStatus::Open`,
+  status unchanged), `CoreProtected` for `Certified` beliefs (flagged,
+  never auto-demoted). Rationale record only; no queue surface
+  (`large_delta_routes_to_open_with_rationale`,
+  `certified_is_core_protected`,
+  `small_delta_auto_applies_with_decision_recorded`,
+  `route_transition_boundary_table`).
+
+### Changed
+
+- **Behavior**: a demotion with Δcoherence > ϵ + 0.15 no longer auto-applies.
+  `test_delta_engine::hypothesis_cascade_embedding_shift` was updated to the
+  new contract (its scenario is a full reversal, Δ = 1.0 → StrategicReview).
+- The `hypothesis` re-export list now includes the fitness constants;
+  `delta_engine` re-exports `RevisionWalk`, `WalkStep`, `AdjudicationRoute`,
+  `AdjudicationDecision`, `route_transition`, `MAX_REVISION_WALK_NODES`,
+  `ADJUDICATION_STRATEGIC_FLOOR`.
+
+**Honesty constraints carry**: the machinery proposes, carries, and defers;
+it does not verify. No number moved (cosine 0.519 ≈ chance; propose top-3
+0.712 proposes, never verifies).
+
 ## 0.1.21
 
 ### Changed — Gate 0: the corpus was regenerated, and the domain axis finally has a definition

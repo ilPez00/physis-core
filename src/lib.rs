@@ -32,6 +32,25 @@
 //!
 //! ---
 //!
+//! ## Epistemic Revision Track (0.1.22)
+//!
+//! The [`delta_engine`] carries the revision machinery of the epistemic
+//! track: a **no-perturbation invariant** (a zero embedding shift moves
+//! nothing), **revision selection by declared dependency**
+//! ([`delta_engine::EvaluationContext::depends_on_walk`] — the DependsOn
+//! closure, not the breadth wave), **named frozen fitness weights** with a
+//! per-term breakdown ([`hypothesis::Hypothesis::fitness_term_breakdown`]),
+//! and **adjudication routing** ([`delta_engine::route_transition`]): a
+//! proposed demotion is applied, deferred to review with a recorded
+//! rationale, or refused for core-protected (`Certified`) beliefs — every
+//! decision recorded with its rationale. Superseded beliefs are never
+//! deleted; they stay history-readable
+//! ([`hypothesis::current_hypotheses`] vs
+//! [`hypothesis::hypotheses_including_history`]) and
+//! [`temporal::TemporalValidity`] carries the system-invalidation leg
+//! `expired_at`. Each behavior ships behind a named gate test; the
+//! machinery proposes, carries, and defers — it does not verify.
+//!
 //! ## Architectural Overview
 //!
 //! ```text
