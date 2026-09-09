@@ -140,9 +140,13 @@ fn status_from_tracker(
     target: Option<f64>,
     progress: Option<f64>,
 ) -> BehaviourStatus {
+    // No value recorded AND no explicit progress → we cannot judge attainment;
+    // that is inert (neutral), not a failure. Treating an unrecorded day as a
+    // failed one would let gaps in the log masquerade as evidence.
     if value.is_none() && target.is_none() && progress.is_none() {
         return BehaviourStatus::Inert;
     }
+    // Explicit progress (0..1) wins; otherwise the value/target ratio.
     let ratio = progress
         .or_else(|| {
             value

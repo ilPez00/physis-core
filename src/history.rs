@@ -1,5 +1,11 @@
 //! Personal-history importers — browser bookmarks/history, RSS /
 //! read-later lists, and chat/message exports reduced to [`VaultDoc`]s.
+//!
+//! Pure parsers only: each takes a text export and returns docs. Callers
+//! register them as labeled nodes with the shared embedder — the same
+//! "source → embed → register labeled node" path the vault importer uses —
+//! which is what keeps a personal log recallable by content rather than by
+//! filename.
 
 use crate::vault::VaultDoc;
 use std::path::Path;
@@ -20,7 +26,11 @@ pub fn importer_for(path: &Path) -> Option<fn(&str) -> Vec<VaultDoc>> {
     }
 }
 
-/// Netscape bookmark file (`<!DOCTYPE NETSCAPE-Bookmark-file-1>`).
+/// Netscape bookmark file: `<!DOCTYPE NETSCAPE-Bookmark-file-1>` — the export
+/// format shared by Firefox and Chromium.
+///
+/// Each `<A HREF="…">Title</A>` becomes a doc (title = link text, body = URL).
+/// Folder lines give context, but the links are the retrievable units.
 pub fn parse_bookmarks_html(html: &str) -> Vec<VaultDoc> {
     let mut docs = Vec::new();
     let mut depth = 0usize;
