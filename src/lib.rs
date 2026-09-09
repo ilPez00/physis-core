@@ -153,6 +153,7 @@ pub mod hypothesis;
 pub mod models;
 pub mod ontology;
 pub mod praxis;
+pub mod propose;
 pub mod process;
 pub mod provenance;
 pub mod experiments;

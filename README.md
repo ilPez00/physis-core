@@ -4,13 +4,31 @@
 [![Documentation](https://docs.rs/physis-core/badge.svg)](https://docs.rs/physis-core)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-> ## ⚠️ STATUS: NOT CURRENTLY FUNCTIONAL FOR ITS STATED PURPOSE
+> ## ⚠️ STATUS: IT CANNOT AUDIT A FILING. IT CAN PROPOSE ONE.
 >
 > **Read this before evaluating the crate.** The central claim below — that this
-> engine can discover ontological structure and audit whether things are filed
-> soundly — **has been tested and does not hold.** This notice is written by the
+> engine can discover ontological structure and **audit whether things are filed
+> soundly** — **has been tested and does not hold.** This notice is written by the
 > authors against their own work, from measurements in
-> `research/perspective-discovery/FINAL_REPORT.md` (in the parent project).
+> `research/perspective-discovery/FINAL_REPORT.md` and
+> `research/RESEARCH_STATUS.md` (in the parent project).
+>
+> **Updated 2026-09-09, in both directions.** The audit verdict below is
+> unchanged and still correct. What has changed is that one thing now *does*
+> work, and saying so is part of the same honesty:
+>
+> | question | verdict |
+> |---|---|
+> | Can it certify that an entry **belongs** where it is filed? | **NO.** On real misfilings every scorer is at chance — cosine 0.519, a constraint check 0.536, an ancestry check 0.534. A vocabulary scorer that looked like a win at 0.664 was measuring entry length. |
+> | Can it discover ontological structure from geometry? | **NO.** Cross-embedder ARI ≈ 0.10. |
+> | Can it **propose** a filing — narrow 70 cells to a shortlist a person picks from? | **YES, measured.** Top-3 **0.712** against a permuted-label null of 0.136 and an `old→new` lookup table of 0.368. See [`propose`](https://docs.rs/physis-core/latest/physis_core/propose/). |
+>
+> **The distinction is the whole point, and it is not a hedge.** The proposer's
+> top-1 (≈ 0.45) is the *same accuracy* this project had already recorded as a
+> failure. The geometry did not improve. Returning three candidates for a person
+> to choose from, instead of one answer presented as correct, is the entire
+> difference. **A shortlist is not a verdict** — treat it as triage, never as
+> certification.
 >
 > **What was measured.** Twelve distinct mechanisms for ontology discovery and
 > soundness checking were built and evaluated. None was shown to work. The last
@@ -121,6 +139,7 @@
 - [Installation & Cargo Features](#installation--cargo-features)
 - [Determinism & Reproducibility](#determinism--reproducibility)
 - [Cell Linkage](#cell-linkage)
+- [Proposing a Filing](#proposing-a-filing)
 - [Coverage Impact](#coverage-impact)
 - [Rust API Usage & Code Examples](#rust-api-usage--code-examples)
   - [1. Competing Hypotheses & Evidence Attestation](#1-competing-hypotheses--evidence-attestation)
@@ -262,6 +281,7 @@ Cross-referenced across **14 Operational Modes**:
 - **`hypothesis`**: Competing hypothesis data structures, evidence polarities, and revision histories.
 - **`ontology`**: Embedded loader for 33 built-in domain ontologies (human grid, machine process, AI agents, office operations).
 - **`praxis`**: Behavioral tracking records with success/inert/failure feedback loops.
+- **`propose`**: Filing **proposal** — learns from filings a person has confirmed and returns the few cells worth looking at first. Top-3 0.712 against a permuted-label null of 0.136. It is triage, not certification; see the status notice.
 - **`process`**: Industrial and operational state machines, task sequences, and cycle tracking; measurements flag their own deviation from a constraint's `[min, max]` band with a normalized 0..1 severity.
 - **`provenance`**: Cryptographic SHA-256 provenance chains connecting source data to final inferences.
 - **`quality`**: Quality feedback tracker with cell-level *and* per-agent penalties/boosts, plus contextual fitness weighting — an agent that keeps producing bad output for a domain gets demoted the same way a cell does.
@@ -425,6 +445,73 @@ No claim is made that any individual item is "genuinely cross-cutting" — an
 earlier thresholded version of this calibrated a similarity delta and
 degenerated into flagging 98% of entries, a rate that carries no information
 beyond "domains overlap".
+
+---
+
+## Proposing a Filing
+
+`physis_core::propose` is the only mechanism here that survived a
+construction-matched control, and it does so by asking a narrower question than
+the rest of this crate originally asked. It does **not** decide whether an entry
+belongs somewhere. It learns from filings a person has already confirmed and
+hands back the few cells worth looking at first.
+
+```rust
+use physis_core::embed::RandomProjectionEmbedder;
+use physis_core::propose::{embed_entry, Proposer, DEFAULT_HINT_WEIGHT};
+
+let embedder = RandomProjectionEmbedder::new(256);
+
+// Filings a person already confirmed. Real use accumulates these as they work.
+let confirmed = [
+    ("HEAL", "REST", "Sleep Hygiene", vec!["circadian".to_string()]),
+    ("STUDY", "LEARN", "Spaced Repetition", vec!["recall".to_string()]),
+    ("BOND", "CREATE", "Team Charter", vec!["agreement".to_string()]),
+];
+
+let proposer = Proposer::from_decisions(confirmed.iter().map(|(d, m, name, hints)| {
+    (*d, *m, embed_entry(name, hints, &embedder, DEFAULT_HINT_WEIGHT))
+}));
+
+// A new entry: show the person a shortlist, let them choose.
+let entry = embed_entry("Nap Protocol", &["rest".to_string()], &embedder,
+                        DEFAULT_HINT_WEIGHT);
+for p in proposer.propose(&entry, 3) {
+    println!("{}  {:.3}", p.cell(), p.score);
+}
+```
+
+Runnable as `cargo run --example propose_readme`, so the snippet cannot rot.
+
+> **The output of that example is semantically meaningless, deliberately.**
+> `RandomProjectionEmbedder` is deterministic and dependency-free but carries **no
+> semantics** — it hashes tokens into a fixed basis. Run as written, "Nap
+> Protocol" is proposed into `STUDY/LEARN` rather than `HEAL/REST`. The example
+> shows the *plumbing*; the accuracy figures on this page were measured with a
+> real sentence embedder. Use the `onnx` feature for anything you intend to
+> believe.
+
+**Read the shortlist as triage.** At k = 3 the cell a human actually chose was
+present about two times in three on the corpus this was measured against. That
+leaves a third where it is absent — which is why this returns candidates for a
+person rather than a verdict.
+
+### Two things worth knowing before you rely on it
+
+**The `domain` axis is far stronger than `mode`.** Top-2 containment is 0.837
+over five domains against 0.678 over fourteen modes, and the gap is structural:
+domain compresses losslessly into four dimensions, while mode is not a
+low-dimensional object at all. **Propose the domain confidently and expect the
+person to pick the mode.**
+
+**Hints are over-weighted at full strength.** Entries are conventionally embedded
+as `name + hints`, but hints are subject-matter vocabulary — they help `domain`
+and *hurt* `mode`. [`DEFAULT_HINT_WEIGHT`] is `0.5`, which beat both the name
+alone and the full text on both axes, worth +0.054 top-3 over the latter across
+24 paired splits. [`embed_entry`] applies it; it costs one extra embedder call.
+
+[`DEFAULT_HINT_WEIGHT`]: https://docs.rs/physis-core/latest/physis_core/propose/constant.DEFAULT_HINT_WEIGHT.html
+[`embed_entry`]: https://docs.rs/physis-core/latest/physis_core/propose/fn.embed_entry.html
 
 ---
 
