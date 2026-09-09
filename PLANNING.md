@@ -452,6 +452,20 @@ E14–E18 (cosine 0.519, CONSTRAINT 0.536, ANCESTRY 0.534).
   50 hand-built pairs above chance, else flag-only).
 - **P2 (time, retrieval, gate):** G3, G4, G6, G5, A3, A4. Each item ships only
   behind its §7.1/§7.2 gate; a failed gate blocks the next item, never bends it.
+  **G3 DONE 2026-09-09** (`tests/epistemic_p2.rs`): `EpistemicEvent` carries
+  the two clocks — `asserted_at` (episode reference time) vs `timestamp`
+  (arrival / transaction time, the T18 two-clock watermark folded in);
+  `reconstruct_status_at` replays in **assertion order**, so out-of-order
+  intake replays to the in-order state
+  (`late_evidence_replays_to_same_state`); per-stream `HighWaterMark`s
+  advance on both clocks and flag late episodes via
+  `note_intake` → `IntakeReceipt` (`watermark_advances_and_flags_late_episodes`);
+  pre-G3 trails replay unchanged, serde-default keeps old JSON
+  deserialising (`legacy_trails_replay_by_arrival_unchanged`,
+  `trail_serialises_with_g3_fields_and_reads_old_json`). **Remaining in
+  P2:** G4, G6, G5, A3, A4. **A1 note:** unscheduled by design — its gate
+  (beat the cosine wave on seeded chains) is open question Q1's probe;
+  mechanics ship when the probe answers.
 
 ### 7.5 Falsifiers (no number without its null)
 

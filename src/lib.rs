@@ -209,7 +209,9 @@ pub use delta_engine::{
 };
 pub use discovery::{discover, DiscoveryConfig, DiscoveryReport, ProposedDomain};
 pub use embed::{RandomProjectionEmbedder, VectorEmbed};
-pub use epistemic::{EpistemicAuditTrail, EpistemicEvent, EpistemicEventType};
+pub use epistemic::{
+    EpistemicAuditTrail, EpistemicEvent, EpistemicEventType, HighWaterMark, IntakeReceipt,
+};
 pub use explanation::{ExplanationReport, HistoricalPrecedent};
 pub use history::importer_for as history_importer_for;
 pub use hypothesis::{

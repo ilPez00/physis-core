@@ -59,6 +59,19 @@ behind a named gate test in `tests/epistemic_p0.rs` / `tests/epistemic_p1.rs`.
   `small_delta_auto_applies_with_decision_recorded`,
   `route_transition_boundary_table`).
 
+- **G3 episode + watermark trail** (`epistemic.rs`): `EpistemicEvent` gains
+  the two clocks — `asserted_at` (episode reference time, when the source
+  asserted the fact) vs `timestamp` (arrival / transaction time), and
+  `reconstruct_status_at` replays in **assertion order**: out-of-order
+  intake replays to the in-order state
+  (`late_evidence_replays_to_same_state`). Per-stream `HighWaterMark`s
+  advance on both clocks and flag late episodes via `note_intake` →
+  `IntakeReceipt` (`watermark_advances_and_flags_late_episodes`). Pre-G3
+  trails (no `asserted_at`, no watermarks) replay byte-for-byte unchanged;
+  serde-default keeps old stored JSON deserialising
+  (`legacy_trails_replay_by_arrival_unchanged`,
+  `trail_serialises_with_g3_fields_and_reads_old_json`).
+
 ### Changed
 
 - **Behavior**: a demotion with Δcoherence > ϵ + 0.15 no longer auto-applies.

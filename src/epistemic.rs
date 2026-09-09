@@ -60,6 +60,11 @@ pub struct EpistemicEvent {
     /// Confidence or fitness value at this instant.
     #[serde(default)]
     pub metric_value: Option<Score>,
+    /// G3: when the fact was *asserted by its source* (episode reference
+    /// time), distinct from `timestamp` (arrival / transaction time). None
+    /// on pre-G3 events — replay then treats arrival as assertion.
+    #[serde(default)]
+    pub asserted_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl EpistemicEvent {
@@ -78,7 +83,22 @@ impl EpistemicEvent {
             posterior_state: None,
             source: None,
             metric_value: None,
+            asserted_at: None,
         }
+    }
+
+    /// G3: stamp the episode reference time (when the source asserted the
+    /// fact), as opposed to `timestamp` (when the engine received it).
+    pub fn with_asserted_at(mut self, asserted_at: chrono::DateTime<chrono::Utc>) -> Self {
+        self.asserted_at = Some(asserted_at);
+        self
+    }
+
+    /// G3: the replay clock for this event — assertion time when known,
+    /// arrival otherwise (pre-G3 events). Replay is ordered by this key, so
+    /// an out-of-order intake replays to the same state as an in-order one.
+    pub fn assertion_time(&self) -> chrono::DateTime<chrono::Utc> {
+        self.asserted_at.unwrap_or(self.timestamp)
     }
 
     pub fn with_transition(
@@ -106,6 +126,35 @@ impl EpistemicEvent {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EpistemicAuditTrail {
     pub events: Vec<EpistemicEvent>,
+    /// G3: per-stream intake watermarks (see [`HighWaterMark`]).
+    #[serde(default)]
+    pub watermarks: Vec<HighWaterMark>,
+}
+
+/// G3: per-stream intake watermark — the two clocks of the trail.
+///
+/// `last_arrival` is the transaction clock (wall time of the latest intake
+/// for this stream); `last_episode_valid_at` is the episode reference clock
+/// (the newest assertion time seen). A stream that delivers an episode
+/// older than the mark is *late* — the receipt says so, and replay is
+/// ordered by assertion time, so the late episode still lands where it
+/// belongs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HighWaterMark {
+    pub stream_id: String,
+    pub last_arrival: chrono::DateTime<chrono::Utc>,
+    #[serde(default)]
+    pub last_episode_valid_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// G3: what [`EpistemicAuditTrail::note_intake`] reports for one intake.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct IntakeReceipt {
+    pub stream_id: String,
+    /// True when this episode's assertion time predates the mark's.
+    pub late: bool,
+    /// The mark after advancing.
+    pub mark: HighWaterMark,
 }
 
 impl EpistemicAuditTrail {
@@ -115,6 +164,56 @@ impl EpistemicAuditTrail {
 
     pub fn record(&mut self, event: EpistemicEvent) {
         self.events.push(event);
+    }
+
+    /// G3: note an intake on `stream_id`, advancing the per-stream
+    /// watermark. Returns a receipt that flags a *late* episode (assertion
+    /// time older than the mark's). Late arrivals are expected, not errors —
+    /// replay is ordered by assertion time, so they still land where they
+    /// belong. Neither clock moves backwards.
+    pub fn note_intake(
+        &mut self,
+        stream_id: impl Into<String>,
+        arrival: chrono::DateTime<chrono::Utc>,
+        episode_valid_at: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> IntakeReceipt {
+        let stream_id = stream_id.into();
+        let mut late = false;
+        let mark = match self
+            .watermarks
+            .iter_mut()
+            .find(|w| w.stream_id == stream_id)
+        {
+            Some(w) => {
+                if let (Some(prev), Some(v)) = (w.last_episode_valid_at, episode_valid_at) {
+                    if v < prev {
+                        late = true;
+                    }
+                }
+                w.last_arrival = w.last_arrival.max(arrival);
+                if w
+                    .last_episode_valid_at
+                    .map_or(true, |prev| episode_valid_at.map_or(false, |v| v > prev))
+                {
+                    w.last_episode_valid_at = episode_valid_at;
+                }
+                w.clone()
+            }
+            None => {
+                let w = HighWaterMark {
+                    stream_id: stream_id.clone(),
+                    last_arrival: arrival,
+                    last_episode_valid_at: episode_valid_at,
+                };
+                self.watermarks.push(w.clone());
+                w
+            }
+        };
+        IntakeReceipt {
+            stream_id,
+            late,
+            mark,
+        }
     }
 
     /// Retrieve all events relevant to a specific entity ID in chronological order.
@@ -130,25 +229,35 @@ impl EpistemicAuditTrail {
         subject_id: &str,
         when: chrono::DateTime<chrono::Utc>,
     ) -> Option<HypothesisStatus> {
+        // G3: replay in *assertion* order, not arrival order — late
+        // (backfilled) evidence lands where it belongs, so an out-of-order
+        // intake replays to the same state as an in-order one. Ties keep
+        // arrival order (stable sort). Pre-G3 events (no `asserted_at`)
+        // replay by arrival, unchanged.
+        let mut relevant: Vec<&EpistemicEvent> = self
+            .events
+            .iter()
+            .filter(|ev| ev.subject_id == subject_id && ev.assertion_time() <= when)
+            .collect();
+        relevant.sort_by_key(|ev| ev.assertion_time());
+
         let mut last_status: Option<HypothesisStatus> = None;
-        for ev in &self.events {
-            if ev.subject_id == subject_id && ev.timestamp <= when {
-                if ev.event_type == EpistemicEventType::HypothesisGenerated {
-                    last_status = Some(HypothesisStatus::Candidate);
-                }
-                if let Some(ref post) = ev.posterior_state {
-                    match post.to_lowercase().as_str() {
-                        "candidate" => last_status = Some(HypothesisStatus::Candidate),
-                        "supported" => last_status = Some(HypothesisStatus::Supported),
-                        "contradicted" => last_status = Some(HypothesisStatus::Contradicted),
-                        "confirmed" => last_status = Some(HypothesisStatus::Confirmed),
-                        "inert" => last_status = Some(HypothesisStatus::Inert),
-                        "failed" => last_status = Some(HypothesisStatus::Failed),
-                        "superseded" => last_status = Some(HypothesisStatus::Superseded),
-                        "isolated" => last_status = Some(HypothesisStatus::Isolated),
-                        "certified" => last_status = Some(HypothesisStatus::Certified),
-                        _ => {}
-                    }
+        for ev in relevant {
+            if ev.event_type == EpistemicEventType::HypothesisGenerated {
+                last_status = Some(HypothesisStatus::Candidate);
+            }
+            if let Some(ref post) = ev.posterior_state {
+                match post.to_lowercase().as_str() {
+                    "candidate" => last_status = Some(HypothesisStatus::Candidate),
+                    "supported" => last_status = Some(HypothesisStatus::Supported),
+                    "contradicted" => last_status = Some(HypothesisStatus::Contradicted),
+                    "confirmed" => last_status = Some(HypothesisStatus::Confirmed),
+                    "inert" => last_status = Some(HypothesisStatus::Inert),
+                    "failed" => last_status = Some(HypothesisStatus::Failed),
+                    "superseded" => last_status = Some(HypothesisStatus::Superseded),
+                    "isolated" => last_status = Some(HypothesisStatus::Isolated),
+                    "certified" => last_status = Some(HypothesisStatus::Certified),
+                    _ => {}
                 }
             }
         }
