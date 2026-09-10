@@ -205,6 +205,19 @@ impl<'a> EvaluationContext<'a> {
         self.shadow_nodes.get_mut(node_id)
     }
 
+    /// Ensure a hypothesis exists in the shadow frame by cloning from base
+    /// if needed (T3 retractions must stay isolated until committed).
+    /// Returns a mutable reference to the shadow copy.
+    pub fn ensure_shadowed_hypothesis(&mut self, hypothesis_id: &str) -> Option<&mut Hypothesis> {
+        if !self.shadow_hypotheses.contains_key(hypothesis_id) {
+            if let Some(base) = self.base_hypotheses.iter().find(|h| h.id == hypothesis_id) {
+                self.shadow_hypotheses
+                    .insert(hypothesis_id.to_string(), base.clone());
+            }
+        }
+        self.shadow_hypotheses.get_mut(hypothesis_id)
+    }
+
     // ── Coherence computation ───────────────────────────────────────────
 
     /// Recompute the coherence score for a node: the mean cosine similarity to
@@ -480,6 +493,96 @@ pub fn route_transition(
     } else {
         AdjudicationRoute::AutoApply
     }
+}
+
+// ── T3 (JTMS take): evidence retraction with dependent cascade ──────────
+
+/// T3 (JTMS take): the report of an evidence retraction with its dependent
+/// cascade, evaluated in the shadow frame only.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RetractionCascadeReport {
+    pub hypothesis_id: String,
+    /// The retracted evidence source.
+    pub source: String,
+    /// How many evidence items were removed.
+    pub removed: usize,
+    /// Dependent hypotheses re-evaluated in the shadow frame, in A2 walk
+    /// order (the retracted hypothesis itself is excluded — it is the one
+    /// retracted, not a dependent of itself).
+    pub dependents_revised: Vec<String>,
+    /// True when any walk stopped early at [`MAX_REVISION_WALK_NODES`].
+    pub truncated: bool,
+    /// The A2 walk that selected the dependents (proposal order, cycles).
+    pub revision_walk: RevisionWalk,
+}
+
+/// T3 (JTMS take): retract every piece of evidence for `hypothesis_id`
+/// originating from `source` inside the shadow frame, then walk the
+/// declared DependsOn dependents of every node the hypothesis references
+/// and re-evaluate each dependent in shadow ([`Hypothesis::recompute_fitness`]).
+/// Base state is untouched — the caller inspects the report and decides
+/// whether to commit. Returns `None` when the hypothesis does not exist.
+pub fn retract_evidence_with_cascade(
+    ctx: &mut EvaluationContext,
+    hypothesis_id: &str,
+    source: &str,
+) -> Option<RetractionCascadeReport> {
+    let (removed, refs) = {
+        let h = ctx
+            .ensure_shadowed_hypothesis(hypothesis_id)
+            .expect("retract_evidence_with_cascade: hypothesis must exist");
+        (h.retract_evidence(source), h.ontology_refs.clone())
+    };
+
+    // The A2 walk selects dependents of the *nodes* the retracted hypothesis
+    // references; everything selected is re-evaluated in the shadow frame.
+    // The walk itself reports walked *nodes*; the node→hypothesis mapping
+    // mirrors the A2 selection in `evaluate_mutation` (step order, sorted
+    // within a step, deduped across steps).
+    let mut revised: Vec<String> = Vec::new();
+    let mut truncated = false;
+    let mut revision_walk: Option<RevisionWalk> = None;
+    for node_ref in refs {
+        let walk = ctx.depends_on_walk(&node_ref);
+        truncated = truncated || walk.truncated;
+        if revision_walk.is_none() {
+            revision_walk = Some(walk.clone());
+        }
+
+        let all_hyps = ctx.effective_hypotheses_all();
+        let mut selected: Vec<String> = Vec::new();
+        for step in &walk.steps {
+            let mut matching: Vec<String> = all_hyps
+                .iter()
+                .filter(|h| h.ontology_refs.iter().any(|r| r == &step.node_id))
+                .map(|h| h.id.clone())
+                .collect();
+            matching.sort();
+            for hid in matching {
+                if hid != hypothesis_id && !selected.iter().any(|x| *x == hid) {
+                    selected.push(hid);
+                }
+            }
+        }
+
+        for hid in selected {
+            if !revised.iter().any(|x| *x == hid) {
+                revised.push(hid.clone());
+            }
+            if let Some(dh) = ctx.ensure_shadowed_hypothesis(&hid) {
+                dh.recompute_fitness();
+            }
+        }
+    }
+
+    Some(RetractionCascadeReport {
+        hypothesis_id: String::from(hypothesis_id),
+        source: String::from(source),
+        removed,
+        dependents_revised: revised,
+        truncated,
+        revision_walk: revision_walk.unwrap_or(RevisionWalk::default()),
+    })
 }
 
 // ── Core Propagation ─────────────────────────────────────────────────────

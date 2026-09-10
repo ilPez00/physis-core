@@ -103,6 +103,11 @@ pub struct Evidence {
     /// Optional contextual tags (e.g. machine, operator, environment).
     #[serde(default)]
     pub context: Vec<String>,
+    /// G4 (Graphiti take): id of the intake episode that produced this
+    /// link. Citations resolve to the raw intake in the audit trail — not
+    /// just to a free-text source label.
+    #[serde(default)]
+    pub intake_id: Option<String>,
 }
 
 impl Evidence {
@@ -119,6 +124,7 @@ impl Evidence {
             observed_at: Some(chrono::Utc::now()),
             embedding: Vec::new(),
             context: Vec::new(),
+            intake_id: None,
         }
     }
 
@@ -131,11 +137,18 @@ impl Evidence {
             observed_at: Some(chrono::Utc::now()),
             embedding: Vec::new(),
             context: Vec::new(),
+            intake_id: None,
         }
     }
 
     pub fn with_weight(mut self, weight: Score) -> Self {
         self.confidence = weight;
+        self
+    }
+
+    /// G4: stamp which intake episode produced this evidence link.
+    pub fn with_intake_id(mut self, intake_id: impl Into<String>) -> Self {
+        self.intake_id = Some(intake_id.into());
         self
     }
 }
@@ -357,6 +370,55 @@ impl Hypothesis {
 
     pub fn add_contradicting(&mut self, evidence: Evidence) {
         self.add_contradicting_evidence(evidence);
+    }
+
+    /// T3 (JTMS take): retract every piece of evidence whose `source`
+    /// matches, then re-derive this hypothesis without it. Status follows
+    /// the same closed rule as ingestion — Contradicted while contradicting
+    /// evidence remains, else Supported while supporting evidence remains,
+    /// else Candidate — except that a `Certified` hypothesis keeps its
+    /// authority status (a third-party verdict is not undone by an evidence
+    /// removal; the authority registry is T11). Fitness is recomputed from
+    /// what remains; the retraction is recorded in the revision history.
+    /// Returns how many evidence items were removed (0 = nothing matched).
+    pub fn retract_evidence(&mut self, source: &str) -> usize {
+        let before = self.supporting_evidence.len() + self.contradicting_evidence.len();
+        self.supporting_evidence = self
+            .supporting_evidence
+            .iter()
+            .filter(|e| e.source != source)
+            .map(|e| e.clone())
+            .collect();
+        self.contradicting_evidence = self
+            .contradicting_evidence
+            .iter()
+            .filter(|e| e.source != source)
+            .map(|e| e.clone())
+            .collect();
+        let removed = before - (self.supporting_evidence.len() + self.contradicting_evidence.len());
+        if removed == 0 {
+            return 0;
+        }
+        if self.status != HypothesisStatus::Certified {
+            if !self.contradicting_evidence.is_empty() {
+                self.status = HypothesisStatus::Contradicted;
+            } else if !self.supporting_evidence.is_empty() {
+                self.status = HypothesisStatus::Supported;
+            } else {
+                self.status = HypothesisStatus::Candidate;
+            }
+        }
+        self.recompute_fitness();
+        self.revise(format!("Retracted evidence from {}", source), Some(String::from(source)));
+        removed
+    }
+
+    /// G6: is this hypothesis's validity window open at `when`? Both the
+    /// claim's own interval (`valid_from`/`valid_until`) and the system leg
+    /// (`expired_at`) are honoured — a superseded record is still replayable
+    /// in the audit trail but no longer valid at T (invalidate, don't delete).
+    pub fn is_valid_at(&self, when: chrono::DateTime<chrono::Utc>) -> bool {
+        self.temporal.is_valid_at(when)
     }
 
     /// Record a prediction and its outcome.

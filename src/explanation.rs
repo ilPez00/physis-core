@@ -60,6 +60,29 @@ pub struct ExplanationReport {
 }
 
 impl ExplanationReport {
+    /// G4: every intake id cited by this report's evidence, in encounter
+    /// order — each resolves to the ingest episode that produced a link, so
+    /// a reader can jump from an explanation to the raw intake in the audit
+    /// trail.
+    pub fn cited_intake_ids(&self) -> Vec<String> {
+        let mut ids: Vec<String> = Vec::new();
+        for e in &self.supporting_evidence {
+            if let Some(id) = &e.intake_id {
+                if !ids.iter().any(|x| *x == *id) {
+                    ids.push(id.clone());
+                }
+            }
+        }
+        for e in &self.contradicting_evidence {
+            if let Some(id) = &e.intake_id {
+                if !ids.iter().any(|x| *x == *id) {
+                    ids.push(id.clone());
+                }
+            }
+        }
+        ids
+    }
+
     /// Alias for render_ascii.
     pub fn ascii_summary(&self) -> String {
         self.render_ascii()

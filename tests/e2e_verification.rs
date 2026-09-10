@@ -68,6 +68,7 @@ fn test_epistemic_thesis_end_to_end() {
         observed_at: Some(chrono::Utc::now()),
         embedding: vec![],
         context: vec!["spindle_rpm: 12000".to_string()],
+        intake_id: None,
     };
     core.hypotheses
         .get_mut(&id_a)
@@ -83,6 +84,7 @@ fn test_epistemic_thesis_end_to_end() {
         observed_at: Some(chrono::Utc::now()),
         embedding: vec![],
         context: vec!["ambient_temp: 22C".to_string()],
+        intake_id: None,
     };
     core.hypotheses
         .get_mut(&id_b)

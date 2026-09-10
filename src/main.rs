@@ -15,7 +15,9 @@ use physis_core::models::{cosine_sim, Abstraction, Agency, FacetFilter, Lifecycl
 use physis_core::ontology::OntologyLoader;
 use physis_core::praxis::parse_export as parse_praxis_export;
 use physis_core::quality::QualityTracker;
-use physis_core::rag::{count_tokens, RagChunk, RagCorpus, TokenFixedRetriever};
+use physis_core::rag::{
+    count_tokens, Bm25Index, RagChunk, RagCorpus, TokenFixedRetriever,
+};
 use physis_core::store;
 use physis_core::vault::{collect_labels as collect_vault_labels, scan_git_log, scan_vault};
 
@@ -705,6 +707,12 @@ fn run_node_search(query: &str, budget: usize, max: usize) -> anyhow::Result<()>
                 embedding: e.clone(),
             })
             .collect(),
+        bm25: Bm25Index::build(
+            &candidates
+                .iter()
+                .map(|(_, l, _)| l.clone())
+                .collect::<Vec<String>>(),
+        ),
     };
     let result = TokenFixedRetriever::new(budget, max).retrieve(&q_emb, &corpus);
     println!(

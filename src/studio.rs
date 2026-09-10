@@ -1311,6 +1311,12 @@ async fn api_node_search(
                 embedding: e.clone(),
             })
             .collect(),
+        bm25: crate::rag::Bm25Index::build(
+            &candidates
+                .iter()
+                .map(|(_, l, _)| l.clone())
+                .collect::<Vec<String>>(),
+        ),
     };
     let result =
         crate::rag::TokenFixedRetriever::new(req.budget, req.top).retrieve(&q_emb, &corpus);

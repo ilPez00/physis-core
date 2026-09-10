@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hypothesis::HypothesisStatus;
 use crate::models::Score;
+use crate::temporal::TemporalValidity;
 
 /// Types of epistemic events recorded on the timeline.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -65,6 +66,11 @@ pub struct EpistemicEvent {
     /// on pre-G3 events — replay then treats arrival as assertion.
     #[serde(default)]
     pub asserted_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// G4: id of the intake episode recorded by this event — the per-link
+    /// intake id the trail carries so an evidence citation resolves to the
+    /// concrete ingest that produced it.
+    #[serde(default)]
+    pub intake_id: Option<String>,
 }
 
 impl EpistemicEvent {
@@ -84,6 +90,7 @@ impl EpistemicEvent {
             source: None,
             metric_value: None,
             asserted_at: None,
+            intake_id: None,
         }
     }
 
@@ -118,6 +125,12 @@ impl EpistemicEvent {
 
     pub fn with_metric(mut self, metric: Score) -> Self {
         self.metric_value = Some(metric);
+        self
+    }
+
+    /// G4: stamp which intake episode this event recorded.
+    pub fn with_intake_id(mut self, intake_id: impl Into<String>) -> Self {
+        self.intake_id = Some(intake_id.into());
         self
     }
 }
@@ -262,6 +275,31 @@ impl EpistemicAuditTrail {
             }
         }
         last_status
+    }
+
+    /// G6: a point-in-time query — the audited status of `subject_id` at
+    /// `when`, gated by `validity` (which carries the system-invalidation
+    /// `expired_at` leg). The audit trail is the authority for *what was
+    /// believed*; the validity window is the authority for *whether that
+    /// belief was visible at T*. They are allowed to disagree exactly on
+    /// purpose: history keeps superseded and invalidated states, the
+    /// validity surface does not.
+    ///
+    /// `None` therefore means one of two things: the subject had no
+    /// audited status at `when`, or the status existed but the validity
+    /// window (or the system invalidation) closed it. To tell them apart,
+    /// call [`EpistemicAuditTrail::reconstruct_status_at`] — the trail
+    /// still shows the state that the surface no longer exposes.
+    pub fn point_in_time_status_at(
+        &self,
+        subject_id: &str,
+        when: chrono::DateTime<chrono::Utc>,
+        validity: &TemporalValidity,
+    ) -> Option<HypothesisStatus> {
+        if !validity.is_valid_at(when) {
+            return None;
+        }
+        self.reconstruct_status_at(subject_id, when)
     }
 
     /// Format chronological summary for audit reporting.

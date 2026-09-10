@@ -22,8 +22,10 @@ pub struct TemporalValidity {
     pub trigger: Option<String>,
     /// System-recorded invalidation time (Graphiti `expired_at` leg): when the
     /// record itself was superseded, distinct from `valid_until` (when the
-    /// claim stopped being true). None = never invalidated. Fields-only in
-    /// P0 — no query semantics read this yet (that is P2/G6).
+    /// claim stopped being true). None = never invalidated. **P2/G6 reads
+    /// this leg**: a point-in-time query excludes records past
+    /// `expired_at` while the audit trail keeps them replayable (invalidate,
+    /// don't delete).
     #[serde(default)]
     pub expired_at: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -63,6 +65,12 @@ impl TemporalValidity {
     }
 
     /// Is this statement valid at the given instant?
+    ///
+    /// P2/G6: read all three legs. The claim's own interval
+    /// (`valid_from` / `valid_until`) says when the statement was true; the
+    /// system leg (`expired_at`) says when the *record* was superseded. A
+    /// point-in-time query honours both — history keeps the old record, the
+    /// validity surface does not.
     pub fn is_valid_at(&self, when: chrono::DateTime<chrono::Utc>) -> bool {
         if let Some(from) = self.valid_from {
             if when < from {
@@ -71,6 +79,11 @@ impl TemporalValidity {
         }
         if let Some(until) = self.valid_until {
             if when >= until {
+                return false;
+            }
+        }
+        if let Some(expired) = self.expired_at {
+            if when >= expired {
                 return false;
             }
         }

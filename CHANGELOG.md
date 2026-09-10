@@ -4,6 +4,45 @@ Notable changes to `physis-core`. This file starts at 0.1.15; earlier
 releases predate it and are documented only by their git tags and commit
 history.
 
+## 0.1.23
+
+### Added — W1 resource integration (PLAN.md Phase 24 wave 1, 2026-09-10)
+
+**T4 Nixon Diamond benchmark seed** (`tests/epistemic_w1.rs`): the ATMS
+`rules_nixon` scaled to Physis — p and ¬p coexist with their evidence, the
+contradiction is first-class and open, both sides leave a replayable audit
+footprint, and a later human verdict disprefers without destroying
+(`nixon_diamond_retains_both_sides`).
+
+**T3 evidence retraction with JTMS cascade**:
+`hypothesis::Hypothesis::retract_evidence` re-derives a hypothesis without a
+source — status follows the closed ingest rule, fitness recomputes, the
+retraction is an audited revision, and `Certified` survives (authority
+leg; the authority registry itself is T11). `delta_engine::retract_evidence_with_cascade`
+walks the A2 DependsOn closure of the retracted hypothesis's references and
+re-evaluates every selected dependent in the shadow frame — a proposal until
+committed (`evidence_retraction_replays_to_state_without_it`).
+
+**G4 per-link intake ids**: `Evidence::intake_id`, `ProvenanceLink::intake_id`
+and `EpistemicEvent::intake_id` stamp every link and event with the ingest
+episode that produced it; `explanation::ExplanationReport::cited_intake_ids`
+and `provenance::ProvenanceChain::cited_intake_ids` resolve an explanation's
+citations to the concrete raw intakes (`citations_resolve_to_intake_ids`).
+
+**G6 point-in-time queries**: `temporal::TemporalValidity::is_valid_at` now
+reads the `expired_at` system leg (P0 landed it fields-only), and
+`epistemic::EpistemicAuditTrail::point_in_time_status_at` gates the audited
+status by the validity window — the surface can say None where history still
+replays the state; invalidate-don't-delete visible on the surface
+(`point_in_time_matches_audit_trail`).
+
+**G5 hybrid retrieval beside cosine**: `rag::Bm25Index` (dependency-free
+Okapi BM25, k1 = 1.5, b = 0.75), `rag::fuse_rrf` (k = 60 — the same constant
+llm_wiki's `search_project` ships), `rag::rank_hybrid` and
+`rag::measure_hybrid_vs_cosine`. The shipping decision is *derived* from the
+measured verdict; a non-positive measurement ships the fused path disabled
+(`hybrid_fusion_vs_cosine_baseline`, `bm25_index_scores_are_deterministic_and_repeatable`).
+
 ## 0.1.22
 
 ### Added — the epistemic revision track (Atlas + Graphiti patterns, P0 + P1)

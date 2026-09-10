@@ -51,6 +51,33 @@
 //! `expired_at`. Each behavior ships behind a named gate test; the
 //! machinery proposes, carries, and defers — it does not verify.
 //!
+//! ## W1 resource integration (Phase 24 wave 1, 0.1.23)
+//!
+//! - **G4 per-link intake ids** — `Evidence::intake_id`,
+//!   `ProvenanceLink::intake_id` and `EpistemicEvent::intake_id` stamp every
+//!   link and event with the ingest episode that produced it; an
+//!   [`explanation::ExplanationReport::cited_intake_ids`] resolves an
+//!   explanation's citations to the concrete raw intakes (`citations_resolve_to_intake_ids`).
+//! - **G6 point-in-time queries** —
+//!   [`temporal::TemporalValidity::is_valid_at`] now reads the `expired_at`
+//!   system leg (P0 landed it fields-only), and
+//!   [`epistemic::EpistemicAuditTrail::point_in_time_status_at`] gates the
+//!   audited status by the validity window — the surface can say None where
+//!   history still replays the state (`point_in_time_matches_audit_trail`).
+//! - **T3 evidence retraction** — [`hypothesis::Hypothesis::retract_evidence`]
+//!   re-derives a hypothesis without a source (status, fitness, revision
+//!   history; `Certified` is protected), and
+//!   [`delta_engine::retract_evidence_with_cascade`] re-evaluates DependsOn
+//!   dependents in the shadow frame (`evidence_retraction_replays_to_state_without_it`).
+//! - **T4 Nixon Diamond** — the ATMS `rules_nixon` seed is a gate test
+//!   proving contradictory sides retain their evidence and audit footprint
+//!   (`nixon_diamond_retains_both_sides`).
+//! - **G5 hybrid retrieval** — [`rag::Bm25Index`] (dependency-free Okapi
+//!   BM25) beside the cosine baseline, fused by [`rag::fuse_rrf`]; the
+//!   shipping decision is *derived* from a measured verdict
+//!   ([`rag::measure_hybrid_vs_cosine`]) and a negative measurement ships the
+//!   fused path disabled (`hybrid_fusion_vs_cosine_baseline`).
+//!
 //! ## Architectural Overview
 //!
 //! ```text

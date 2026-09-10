@@ -27,6 +27,10 @@ pub struct ProvenanceLink {
     /// Free-text justification or method.
     #[serde(default)]
     pub method: Option<String>,
+    /// G4: id of the intake episode that produced this link — citations
+    /// resolve to the raw intake, not only to a free-text source label.
+    #[serde(default)]
+    pub intake_id: Option<String>,
 }
 
 impl ProvenanceLink {
@@ -38,7 +42,14 @@ impl ProvenanceLink {
             confidence: 1.0,
             raw_reference: None,
             method: None,
+            intake_id: None,
         }
+    }
+
+    /// G4: stamp which intake episode produced this provenance link.
+    pub fn with_intake_id(mut self, intake_id: impl Into<String>) -> Self {
+        self.intake_id = Some(intake_id.into());
+        self
     }
 }
 
@@ -56,6 +67,20 @@ impl ProvenanceChain {
 
     pub fn add_link(&mut self, link: ProvenanceLink) {
         self.links.push(link);
+    }
+
+    /// G4: the distinct intake ids cited across this chain, in encounter
+    /// order — each resolves to the ingest episode that produced a link.
+    pub fn cited_intake_ids(&self) -> Vec<String> {
+        let mut ids: Vec<String> = Vec::new();
+        for l in &self.links {
+            if let Some(id) = &l.intake_id {
+                if !ids.iter().any(|x| *x == *id) {
+                    ids.push(id.clone());
+                }
+            }
+        }
+        ids
     }
 
     /// Short summary for display.

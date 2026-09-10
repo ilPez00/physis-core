@@ -1229,6 +1229,7 @@ mod tests {
             observed_at: Some(chrono::Utc::now()),
             embedding: Vec::new(),
             context: Vec::new(),
+            intake_id: None,
         };
         core.hypothesis_mut(&id)
             .unwrap()
@@ -1292,6 +1293,7 @@ mod tests {
             observed_at: Some(chrono::Utc::now()),
             embedding: Vec::new(),
             context: Vec::new(),
+            intake_id: None,
         });
         h.recompute_fitness();
         let id = core.register_hypothesis(h);

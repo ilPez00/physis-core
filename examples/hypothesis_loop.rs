@@ -35,6 +35,7 @@ fn main() {
         observed_at: Some(chrono::Utc::now()),
         embedding: vec![],
         context: vec!["nozzle_diameter: 0.4mm".to_string()],
+        intake_id: None,
     };
     core.hypotheses
         .get_mut(&id_a)
