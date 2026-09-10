@@ -209,6 +209,7 @@ pub mod rag;
 pub mod relation;
 pub mod store;
 pub mod temporal;
+pub mod transplant;
 pub mod vault;
 
 #[cfg(feature = "studio")]
