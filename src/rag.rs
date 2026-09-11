@@ -492,14 +492,8 @@ pub fn measure_hybrid_vs_cosine(
 ) -> HybridVerdict {
     let cos = rank_by_cosine(query_emb, corpus);
     let hyb = rank_hybrid(corpus, query_emb, query_text);
-    let cosine_top1: Option<usize> = match cos.first() {
-        Some((id, _)) => Some(*id),
-        None => None,
-    };
-    let hybrid_top1: Option<usize> = match hyb.first() {
-        Some((id, _)) => Some(*id),
-        None => None,
-    };
+    let cosine_top1: Option<usize> = cos.first().map(|(id, _)| *id);
+    let hybrid_top1: Option<usize> = hyb.first().map(|(id, _)| *id);
     let improvement =
         if hybrid_top1 == Some(target_doc) && cosine_top1 != Some(target_doc) {
             1.0_f32

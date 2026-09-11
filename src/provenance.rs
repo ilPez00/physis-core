@@ -75,7 +75,7 @@ impl ProvenanceChain {
         let mut ids: Vec<String> = Vec::new();
         for l in &self.links {
             if let Some(id) = &l.intake_id {
-                if !ids.iter().any(|x| *x == *id) {
+                if !ids.contains(id) {
                     ids.push(id.clone());
                 }
             }

@@ -559,14 +559,14 @@ pub fn retract_evidence_with_cascade(
                 .collect();
             matching.sort();
             for hid in matching {
-                if hid != hypothesis_id && !selected.iter().any(|x| *x == hid) {
+                if hid != hypothesis_id && !selected.contains(&hid) {
                     selected.push(hid);
                 }
             }
         }
 
         for hid in selected {
-            if !revised.iter().any(|x| *x == hid) {
+            if !revised.contains(&hid) {
                 revised.push(hid.clone());
             }
             if let Some(dh) = ctx.ensure_shadowed_hypothesis(&hid) {
@@ -581,7 +581,7 @@ pub fn retract_evidence_with_cascade(
         removed,
         dependents_revised: revised,
         truncated,
-        revision_walk: revision_walk.unwrap_or(RevisionWalk::default()),
+        revision_walk: revision_walk.unwrap_or_default(),
     })
 }
 

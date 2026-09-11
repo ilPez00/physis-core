@@ -68,14 +68,14 @@ impl ExplanationReport {
         let mut ids: Vec<String> = Vec::new();
         for e in &self.supporting_evidence {
             if let Some(id) = &e.intake_id {
-                if !ids.iter().any(|x| *x == *id) {
+                if !ids.contains(id) {
                     ids.push(id.clone());
                 }
             }
         }
         for e in &self.contradicting_evidence {
             if let Some(id) = &e.intake_id {
-                if !ids.iter().any(|x| *x == *id) {
+                if !ids.contains(id) {
                     ids.push(id.clone());
                 }
             }

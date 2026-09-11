@@ -192,6 +192,7 @@ pub mod discovery;
 pub mod dream;
 pub mod edition;
 pub mod embed;
+pub mod embed_ngram;
 pub mod epistemic;
 pub mod explanation;
 pub mod history;

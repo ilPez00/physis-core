@@ -206,7 +206,7 @@ impl EpistemicAuditTrail {
                 w.last_arrival = w.last_arrival.max(arrival);
                 if w
                     .last_episode_valid_at
-                    .map_or(true, |prev| episode_valid_at.map_or(false, |v| v > prev))
+                    .is_none_or(|prev| episode_valid_at.is_some_and(|v| v > prev))
                 {
                     w.last_episode_valid_at = episode_valid_at;
                 }

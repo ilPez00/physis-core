@@ -387,13 +387,13 @@ impl Hypothesis {
             .supporting_evidence
             .iter()
             .filter(|e| e.source != source)
-            .map(|e| e.clone())
+            .cloned()
             .collect();
         self.contradicting_evidence = self
             .contradicting_evidence
             .iter()
             .filter(|e| e.source != source)
-            .map(|e| e.clone())
+            .cloned()
             .collect();
         let removed = before - (self.supporting_evidence.len() + self.contradicting_evidence.len());
         if removed == 0 {

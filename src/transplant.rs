@@ -408,6 +408,7 @@ pub fn propose_correspondences(
     let mut used: HashSet<String> = HashSet::new();
 
     for a in &donor.nodes {
+        #[allow(clippy::type_complexity)]
         let mut ranked: Vec<(String, f32, Vec<(MatcherTag, f32)>)> = Vec::new();
         for b in &recipient.nodes {
             if used.contains(&b.rel_path) {
@@ -499,7 +500,7 @@ pub fn build_transplant_plan(
                 .tokens
                 .iter()
                 .filter(|t| !pair.1.tokens.contains(t))
-                .map(|t| t.clone())
+                .cloned()
                 .collect();
             ops.push(TransplantOp::Rewrite {
                 target: pair.1.rel_path.clone(),
