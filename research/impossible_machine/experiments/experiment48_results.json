@@ -1,0 +1,164 @@
+{
+  "field_stats": {
+    "e_psi_final": -745.7088937910157,
+    "e_psi_final_normalized": -1.0545916311814922
+  },
+  "dimension_estimates": [
+    {
+      "method": "box-counting",
+      "d_eff": 0.07628180621793848,
+      "scale_range": [
+        0.10000000000000002,
+        1.0000000000000004e-6
+      ],
+      "scale_dependent": false,
+      "d_by_scale": []
+    },
+    {
+      "method": "DFA (2 - alpha)",
+      "d_eff": 1.0588020503444002,
+      "scale_range": [
+        4.0,
+        256.0
+      ],
+      "scale_dependent": false,
+      "d_by_scale": []
+    },
+    {
+      "method": "correlation (C(r) scaling)",
+      "d_eff": 1.556799193046271,
+      "scale_range": [
+        0.1,
+        0.4
+      ],
+      "scale_dependent": false,
+      "d_by_scale": []
+    }
+  ],
+  "null_models": [
+    {
+      "name": "A: uniform random",
+      "d_eff": 1.0,
+      "d_eff_ci": [
+        0.9,
+        1.1
+      ],
+      "survives": true
+    },
+    {
+      "name": "B: Cramer random primes",
+      "d_eff": 1.2403541860441003,
+      "d_eff_ci": [
+        1.1403541860441002,
+        1.3403541860441004
+      ],
+      "survives": true
+    },
+    {
+      "name": "E: phase-randomized surrogate",
+      "d_eff": 1.3008443443949969,
+      "d_eff_ci": [
+        1.2008443443949968,
+        1.400844344394997
+      ],
+      "survives": true
+    }
+  ],
+  "spectral_constraints": [
+    {
+      "sigma": 0.05,
+      "compatibility": 562.9397240357052,
+      "admissible": false
+    },
+    {
+      "sigma": 0.1,
+      "compatibility": 572.200909700431,
+      "admissible": false
+    },
+    {
+      "sigma": 0.15000000000000002,
+      "compatibility": 580.7647440188031,
+      "admissible": false
+    },
+    {
+      "sigma": 0.2,
+      "compatibility": 588.7563931907566,
+      "admissible": false
+    },
+    {
+      "sigma": 0.25,
+      "compatibility": 596.2606053752966,
+      "admissible": false
+    },
+    {
+      "sigma": 0.3,
+      "compatibility": 603.3378855104149,
+      "admissible": false
+    },
+    {
+      "sigma": 0.35,
+      "compatibility": 610.0338549073006,
+      "admissible": false
+    },
+    {
+      "sigma": 0.39999999999999997,
+      "compatibility": 616.3846671335116,
+      "admissible": false
+    },
+    {
+      "sigma": 0.44999999999999996,
+      "compatibility": 622.4201663118115,
+      "admissible": false
+    },
+    {
+      "sigma": 0.49999999999999994,
+      "compatibility": 628.1657601354265,
+      "admissible": false
+    },
+    {
+      "sigma": 0.5499999999999999,
+      "compatibility": 633.6435616066175,
+      "admissible": false
+    },
+    {
+      "sigma": 0.6,
+      "compatibility": 638.8731126580092,
+      "admissible": false
+    },
+    {
+      "sigma": 0.65,
+      "compatibility": 643.871865827897,
+      "admissible": false
+    },
+    {
+      "sigma": 0.7000000000000001,
+      "compatibility": 648.655522945991,
+      "admissible": false
+    },
+    {
+      "sigma": 0.7500000000000001,
+      "compatibility": 653.2382865565751,
+      "admissible": false
+    },
+    {
+      "sigma": 0.8000000000000002,
+      "compatibility": 657.6330557189234,
+      "admissible": false
+    },
+    {
+      "sigma": 0.8500000000000002,
+      "compatibility": 661.8515844373769,
+      "admissible": false
+    },
+    {
+      "sigma": 0.9000000000000002,
+      "compatibility": 665.9046135290351,
+      "admissible": false
+    }
+  ],
+  "admissible_set": [],
+  "level": 1,
+  "verdict": "LEVEL 1 — arithmetic scaling: nontrivial scale behavior exists, but the dimension estimators disagree — no single intrinsic dimension",
+  "failed_assumption": "the assumption that a single effective dimension describes the prime field",
+  "final_answer": "1. intrinsic dimension? NO (estimators disagree) (box=0.08, dfa=1.06, corr=1.56)\n         2. stable across scales? not established\n         3. genuinely arithmetic (vs nulls)? yes\n         4. constrains sigma? false\n         5. sigma = 1/d? undefined\n         6. if d≈2, derived without RH? NO — d was measured, but the 1/d bridge remains unproven\n         7. actual relation: see spectral_constraints in results.json\n         8. failed assumption: the assumption that a single effective dimension describes the prime field"
+}

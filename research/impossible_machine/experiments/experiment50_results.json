@@ -1,0 +1,208 @@
+{
+  "e50_status": "FAILED",
+  "reproduced_e49": true,
+  "representations_tested": [
+    {
+      "name": "E_psi",
+      "kind": "discovery",
+      "converged_d": 1.401,
+      "window_d": [
+        1.3618897460409027,
+        1.3557102612813496,
+        1.3758097583848456,
+        1.4103450160562798,
+        1.4078197895789955,
+        1.4110315071765918,
+        1.414128211098988,
+        1.3839114999330044
+      ]
+    },
+    {
+      "name": "E_theta",
+      "kind": "discovery",
+      "converged_d": null,
+      "window_d": [
+        1.3313488483945897,
+        1.3492055429402674,
+        1.3856585360529323,
+        1.3954257827930803,
+        1.3992537567514285,
+        1.4118913645300062,
+        1.4355232915459115,
+        1.3859014310583821
+      ]
+    },
+    {
+      "name": "E_pi",
+      "kind": "held-out",
+      "converged_d": null,
+      "window_d": [
+        1.3267412430577594,
+        1.3256122462578266,
+        1.3491735719276141,
+        1.3413567347373931,
+        1.3372128982069666,
+        1.2139906123324549,
+        1.1121299391935902,
+        1.0503290948468311
+      ]
+    },
+    {
+      "name": "Mertens",
+      "kind": "held-out",
+      "converged_d": null,
+      "window_d": [
+        1.2827670292682665,
+        1.2336265132723263,
+        1.2870804111968777,
+        1.2690107221856843,
+        1.2445849106261737,
+        1.267362034615865,
+        1.2630291972616463,
+        1.2495128409689857
+      ]
+    }
+  ],
+  "nulls_tested": [
+    "shuffled-E_psi",
+    "Cramer"
+  ],
+  "candidates": [
+    {
+      "id": "C1_rank_profiles",
+      "complexity": 2,
+      "discovery_value": 0.9523809523809523,
+      "discovery_null_ref": null,
+      "survives_discovery": true,
+      "heldout_values": [
+        [
+          "psi-pi",
+          -0.2619047619047619
+        ],
+        [
+          "theta-mertens",
+          -0.19047619047619047
+        ],
+        [
+          "pi-mertens",
+          0.5
+        ]
+      ],
+      "heldout_survives": false,
+      "specificity_prime": 0.9523809523809523,
+      "specificity_shuffle": -0.40476190476190477,
+      "specificity_cramer": 0.21428571428571427,
+      "arithmetic_specific": true
+    },
+    {
+      "id": "C2_drift_diff",
+      "complexity": 1,
+      "discovery_value": 0.004126205176589116,
+      "discovery_null_ref": null,
+      "survives_discovery": true,
+      "heldout_values": [
+        [
+          "psi-pi",
+          0.04715918255171963
+        ],
+        [
+          "theta-mertens",
+          0.012682501434705427
+        ],
+        [
+          "pi-mertens",
+          0.03860288629360332
+        ]
+      ],
+      "heldout_survives": true,
+      "specificity_prime": 0.004126205176589116,
+      "specificity_shuffle": 0.005766633725099911,
+      "specificity_cramer": 0.013058435572915696,
+      "arithmetic_specific": false
+    },
+    {
+      "id": "C3_null_ordering",
+      "complexity": 1,
+      "discovery_value": 0.0,
+      "discovery_null_ref": null,
+      "survives_discovery": true,
+      "heldout_values": [
+        [
+          "psi-pi",
+          0.0
+        ],
+        [
+          "theta-mertens",
+          null
+        ],
+        [
+          "pi-mertens",
+          null
+        ]
+      ],
+      "heldout_survives": null,
+      "specificity_prime": 0.0,
+      "specificity_shuffle": 1.0,
+      "specificity_cramer": null,
+      "arithmetic_specific": true
+    },
+    {
+      "id": "C4_raw_hurst_rank",
+      "complexity": 2,
+      "discovery_value": 0.7380952380952381,
+      "discovery_null_ref": null,
+      "survives_discovery": true,
+      "heldout_values": [
+        [
+          "psi-pi",
+          -0.5476190476190477
+        ],
+        [
+          "theta-mertens",
+          0.38095238095238093
+        ],
+        [
+          "pi-mertens",
+          -0.2857142857142857
+        ]
+      ],
+      "heldout_survives": false,
+      "specificity_prime": 0.7380952380952381,
+      "specificity_shuffle": 0.0,
+      "specificity_cramer": -0.5952380952380952,
+      "arithmetic_specific": true
+    },
+    {
+      "id": "C5_estimator_order",
+      "complexity": 2,
+      "discovery_value": 1.0,
+      "discovery_null_ref": null,
+      "survives_discovery": true,
+      "heldout_values": [
+        [
+          "psi-pi",
+          0.6666666666666666
+        ],
+        [
+          "theta-mertens",
+          0.619047619047619
+        ],
+        [
+          "pi-mertens",
+          0.6666666666666666
+        ]
+      ],
+      "heldout_survives": false,
+      "specificity_prime": 1.0,
+      "specificity_shuffle": 0.5714285714285714,
+      "specificity_cramer": 0.39999999999999997,
+      "arithmetic_specific": true
+    }
+  ],
+  "representation_equivalence": "partial: some low-complexity structure transfers",
+  "dimension_invariance": "NO — E49 conclusion stands: d is not an invariant of the object",
+  "arithmetic_specificity": "4 candidate(s) distinguish primes from nulls",
+  "relation_to_half": "candidate values (discovery): C1=0.952 C2=0.004 C3=0.000 C4=0.738 C5=1.000; 1/2 emerges independently? NO — recorded honestly; no connection manufactured",
+  "failure_mode": "no candidate is BOTH representation-robust AND arithmetic-specific (Phase IX.2+3 combined): the structure representations share is generic to cumulative-counting series, while the prime-specific structure does not transfer across representations",
+  "next_experiment": "the geometric ontology is representation-bound where it is arithmetic; try ontologies whose primitives are representation-covariant (e.g. measure-theoretic rather than graph-geometric)"
+}

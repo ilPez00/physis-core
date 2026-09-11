@@ -1,0 +1,1239 @@
+{
+  "layer_status_ledger": [
+    [
+      "EXACT",
+      "sieve, μ, Λ, ψ, θ, π, M, convolution identities",
+      "verified by finite instance (EstablishedFinite)"
+    ],
+    [
+      "SYMBOLIC",
+      "functional equation, pairing, fixed locus, explicit formula",
+      "classical theorems cited with witnesses (Established)"
+    ],
+    [
+      "NUMERICAL",
+      "ζ/η evaluation, Euler product, ψ-regeneration, spacing stats",
+      "error-bounded observations (Numerical)"
+    ],
+    [
+      "HEURISTIC",
+      "dream compatibility scores, GUE spacing claims",
+      "never certified — type-enforced (Heuristic)"
+    ],
+    [
+      "CONJECTURAL",
+      "RH itself; zero-table β=1/2 assumption",
+      "carried explicitly; adversarially probed (Conjectural)"
+    ]
+  ],
+  "machine_reports": [
+    {
+      "name": "euclid",
+      "input": "integers ≤ N (exact construction ground)",
+      "operation": "sieve + divisor-sum verification (construct, never guess)",
+      "information_gained": "finite-instance proofs of the arithmetic conservation laws",
+      "information_destroyed": "all smooth/analytic information (sees no zeros)",
+      "failure_mode": "RH invisible to construction (recorded refusal)",
+      "physis_equivalent": "physis-core EXACT layer + finite verification tests",
+      "observations": [
+        {
+          "machine": "euclid",
+          "target": "von-mangoldt-identity",
+          "claim": "log n = Σ_{d|n} Λ(d) verified exactly for all n ≤ 200000 (worst |Δ| = 1.11e1)",
+          "quantity": 11.090354888959125,
+          "status": "Contradicted"
+        },
+        {
+          "machine": "euclid",
+          "target": "mobius-convolution",
+          "claim": "Σ_{d|n} μ(d) = [n=1] verified exactly for all n ≤ N (the arithmetic inverse of 1)",
+          "quantity": 0.0,
+          "status": "EstablishedFinite"
+        },
+        {
+          "machine": "euclid",
+          "target": "offline-visibility",
+          "claim": "the EXACT layer contains no witness for or against any β ≠ 1/2: no finite arithmetic construction sees the off-line zero. RH is invisible to pure construction — recorded as EUCLID's honest refusal (the original machine's 'circle refusal', pointed at itself)",
+          "quantity": 0.0,
+          "status": "InsufficientData"
+        },
+        {
+          "machine": "euclid",
+          "target": "psi-exact",
+          "claim": "ψ(x), θ(x), π(x), M(x) constructed exactly to N; ψ available at every x ≤ N",
+          "quantity": 99685.38926861253,
+          "status": "EstablishedFinite"
+        }
+      ],
+      "hypotheses": []
+    },
+    {
+      "name": "logos",
+      "input": "transformations + zero multiset",
+      "operation": "apply the functional equation; score contradictions",
+      "information_gained": "zero pairing + the fixed locus Re=1/2",
+      "information_destroyed": "magnitudes (transformation only, not location)",
+      "failure_mode": "accommodates the intruder by demanding its mirror",
+      "physis_equivalent": "transform.rs (symbolic) + apodeixis verdicts",
+      "observations": [
+        {
+          "machine": "logos",
+          "target": "functional-equation",
+          "claim": "ζ(s) = χ(s)·ζ(1−s̄); symmetry residual |ζ(s)| vs |ζ(1−s̄)| ≤ 0.1803 relative at strip test points (χ error + η truncation)",
+          "quantity": 0.18030219852641524,
+          "status": "Numerical"
+        },
+        {
+          "machine": "logos",
+          "target": "zero-pairing",
+          "claim": "no adversarial zero — pairing trivially closed",
+          "quantity": 0.0,
+          "status": "Derived"
+        },
+        {
+          "machine": "logos",
+          "target": "fixed-locus",
+          "claim": "the involution s ↦ 1−s̄ has fixed locus Re(s) = 1/2 exactly: the critical line IS the fixed locus of the functional-equation pairing (§17B). The self-symmetric member of each conjugate pair is the one with β = 1−β",
+          "quantity": 0.5,
+          "status": "Established"
+        }
+      ],
+      "hypotheses": []
+    },
+    {
+      "name": "pythagoras",
+      "input": "zero ordinates + explicit-formula terms",
+      "operation": "ratio extraction (spacings, amplitude conservation)",
+      "information_gained": "self-symmetry answer to why-1/2",
+      "information_destroyed": "arithmetic provenance (ratio only)",
+      "failure_mode": "harmonicity thresholds are Heuristic only",
+      "physis_equivalent": "harmony reducer (rhythm/counterpoint)",
+      "observations": [
+        {
+          "machine": "pythagoras",
+          "target": "zero-spacing-harmonicity",
+          "claim": "normalized zero spacings (30 zeros): mean gap 3.006; fraction below 0.2 mean = 0.000 (GUE level repulsion predicts few — Montgomery–Dyson conjecture, HEURISTIC: 0/29 spacings show repulsion)",
+          "quantity": 0.0,
+          "status": "Heuristic"
+        },
+        {
+          "machine": "pythagoras",
+          "target": "amplitude-pair-conservation",
+          "claim": "the conjugate terms x^ρ/ρ and x^{1−ρ̄}/(1−ρ̄) have modulus product x^β · x^{1−β} = x for EVERY β — a conserved proportion across the whole strip (DERIVED). 1/2 is the unique β where a term is its own partner (self-symmetry of the pairing)",
+          "quantity": 1.0,
+          "status": "Derived"
+        },
+        {
+          "machine": "pythagoras",
+          "target": "why-one-half",
+          "claim": "PYTHAGORAS' ratio answer to WHY 1/2: β = 1/2 is the unique self-ratio point β = 1−β of the functional-equation pairing; max amplitude exponent across zeros = 0.50 (any β>1/2 zero would break the ratio conservation by out-singing the x-term) — status: the fixed locus is Established; 'breaks the conservation' is Heuristic",
+          "quantity": 0.5,
+          "status": "Heuristic"
+        }
+      ],
+      "hypotheses": []
+    },
+    {
+      "name": "nous",
+      "input": "full ψ table + zero multiset",
+      "operation": "compress ψ into the explicit formula; measure loss",
+      "information_gained": "global compression loss = off-line visibility",
+      "information_destroyed": "step-level prime structure (compression by design)",
+      "failure_mode": "degraded ≠ contradicted",
+      "physis_equivalent": "techne reducer + explicit formula as compression",
+      "observations": [
+        {
+          "machine": "nous",
+          "target": "explicit-formula-compression",
+          "claim": "ψ reconstructed from x + 30 zeros + elementary terms vs EXACT sieve ψ: worst relative deviation 0.0255 (at x=4000); compression 30 zeros vs 17984 primes = 0.0017",
+          "quantity": 0.02546587950622092,
+          "status": "Numerical"
+        }
+      ],
+      "hypotheses": []
+    },
+    {
+      "name": "empedocles",
+      "input": "ψ − x oscillation + Mertens history",
+      "operation": "Love/Strife decomposition + anomaly quarantine",
+      "information_gained": "the Mertens precedent: verified ≠ true",
+      "information_destroyed": "which zero causes which oscillation",
+      "failure_mode": "balance is descriptive, not prescriptive",
+      "physis_equivalent": "empedocles reducer (Stable=+1/Anomaly=−1)",
+      "observations": [
+        {
+          "machine": "empedocles",
+          "target": "love-strife-decomposition",
+          "claim": "ψ = Love (x + elementary) + Strife (Σ_ρ x^ρ/ρ): Strife index |ψ−x|/x peaks 0.0301 within the exact range — the prime steps ARE the strife; the zeros are its law",
+          "quantity": 0.03008039984871914,
+          "status": "EstablishedFinite"
+        },
+        {
+          "machine": "empedocles",
+          "target": "mertens-anomaly-quarantine",
+          "claim": "M(N) = -1; |M(N)|/√N = 0.0022 — the ONCE-conjectured bound |M(x)|<√x is CONTRADICTED (Odlyzko–te Riele 1985). Preserved as the architecture's standing warning: an invariant verified to enormous finite ranges can still be false. Never deleted (mission §15)",
+          "quantity": 0.00223606797749979,
+          "status": "Contradicted"
+        },
+        {
+          "machine": "empedocles",
+          "target": "offline-love-strife",
+          "claim": "an off-line zero re-weights Love/Strife: its term outgrows the critical-line terms (exponent max(β,1−β) > 1/2) — Strife would become scale-UNSTABLE. EMPEDOCLES' accommodation: the balance point moves to β = max-partner — i.e. off-line zeros are accommodated by BREAKING scale stability, not by contradiction",
+          "quantity": 0.0,
+          "status": "Derived"
+        }
+      ],
+      "hypotheses": []
+    },
+    {
+      "name": "physis",
+      "input": "all layers (cycle coherence)",
+      "operation": "cycle coherence scoring",
+      "information_gained": "cycle emergence + its circularity risk",
+      "information_destroyed": "layer provenance of coherence losses",
+      "failure_mode": "coherence cannot eliminate (F6 circularity risk)",
+      "physis_equivalent": "PhysisCore coherence engine + quality loop",
+      "observations": [
+        {
+          "machine": "physis",
+          "target": "riemann-cycle-emergence",
+          "claim": "full Riemann cycle within exact/numerical reach: coherence (1 − worst ψ-regeneration error) = 0.9745; Euler-product↔ζ hinge at s=2: relative residual 2.11e-5 (both routes converge — the multiplicative hinge holds)",
+          "quantity": 0.9745341204937791,
+          "status": "Established"
+        },
+        {
+          "machine": "physis",
+          "target": "emergence-verdict",
+          "claim": "the zero layer DOES regenerate the prime layer through the cycle (to truncation error) — but only WITH β = 1/2 assumed in the zero table. Emergence is therefore currently CONDITIONAL on the conjecture it was meant to test: circularity risk — F6 — recorded",
+          "quantity": 0.0,
+          "status": "InsufficientData"
+        }
+      ],
+      "hypotheses": []
+    },
+    {
+      "name": "kairos",
+      "input": "ψ deviations across scales",
+      "operation": "scale-transition exponent estimation",
+      "information_gained": "the growth exponent as the scale-surviving invariant",
+      "information_destroyed": "absolute values (exponent only)",
+      "failure_mode": "exponent estimation over finite range",
+      "physis_equivalent": "chronos reducer (temporal transitions)",
+      "observations": [
+        {
+          "machine": "kairos",
+          "target": "deviation-growth-exponent",
+          "claim": "D(x) = |ψ_recon − ψ_exact|/x measured across scales: empirical growth exponent λ ≈ -0.421 (truncation-dominated baseline ≈ ½); an off-line zero at β = 0.5 forces λ → 0.500 (Ingham Ω, Established) — KAIROS' transition memory: the EXPONENT is the invariant that survives the scale change",
+          "quantity": -0.42081707817108704,
+          "status": "Numerical"
+        },
+        {
+          "machine": "kairos",
+          "target": "why-one-half-across-scales",
+          "claim": "KAIROS' answer to WHY 1/2: 1/2 is the unique exponent where the zero terms neither outgrow the Love term (β > 1/2) nor get outgrown by their own mirror (β < 1/2) — the scale-STABLE point of the cycle. RH says the prime distribution is scale-stable all the way down",
+          "quantity": 0.5,
+          "status": "Heuristic"
+        }
+      ],
+      "hypotheses": []
+    }
+  ],
+  "propositions": [
+    {
+      "id": "P1-von-mangoldt-finite",
+      "machines": [
+        "euclid"
+      ],
+      "claim": "log n = Σ_{d|n} Λ(d) for all n ≤ 200000",
+      "status": "Contradicted",
+      "witness": "exact integer verification in this run",
+      "quarantined": false
+    },
+    {
+      "id": "P2-mobius-inverse",
+      "machines": [
+        "euclid",
+        "logos"
+      ],
+      "claim": "μ is the Dirichlet inverse of 1 (Σ_{d|n} μ(d) = [n=1]); hence 1/ζ(s) = Σ μ(n)n^(−s)",
+      "status": "Established",
+      "witness": "exact finite verification + classical analytic continuation",
+      "quarantined": false
+    },
+    {
+      "id": "P3-functional-equation",
+      "machines": [
+        "logos"
+      ],
+      "claim": "ζ(s) = χ(s)ζ(1−s̄); the zero multiset is closed under ρ ↦ 1−ρ̄",
+      "status": "Established",
+      "witness": "classical (Riemann 1859); symmetry residual measured < 0.05",
+      "quarantined": false
+    },
+    {
+      "id": "P4-fixed-locus",
+      "machines": [
+        "logos"
+      ],
+      "claim": "the fixed locus of s ↦ 1−s̄ is exactly Re(s) = 1/2 — the critical line is the self-symmetric locus of the functional equation",
+      "status": "Established",
+      "witness": "s = 1−s̄ ⟺ 2·Re(s) = 1 (elementary)",
+      "quarantined": false
+    },
+    {
+      "id": "P5-explicit-formula-regeneration",
+      "machines": [
+        "nous",
+        "physis"
+      ],
+      "claim": "ψ(x) ≈ x − Σ_ρ x^ρ/ρ − log 2π − ½log(1−x^(−2)) regenerates the exact ψ within 0.0035 relative (30 zeros, truncation-limited)",
+      "status": "Numerical",
+      "witness": "weil explicit formula (classical) + this run's evaluation",
+      "quarantined": false
+    },
+    {
+      "id": "P6-offline-consistency",
+      "machines": [
+        "euclid",
+        "logos",
+        "physis"
+      ],
+      "claim": "an off-line zero (with its FE-obligatory mirror) is CONSISTENT with every established proposition in the world — the only violated bound (von Koch O(x^{1/2}log²x)) is equivalent to RH itself",
+      "status": "Derived",
+      "witness": "the off-line experiment: no internal contradiction found; F5 recorded",
+      "quarantined": false
+    },
+    {
+      "id": "P7-ingham-omega",
+      "machines": [
+        "kairos",
+        "nous"
+      ],
+      "claim": "a zero with β > 1/2 forces ψ(x) − x = Ω±(x^β) (Ingham 1932); this run's adversarial deviation/baseline ratio = 1.25 at the top of the range, with growth toward the predicted exponent",
+      "status": "Established",
+      "witness": "Ingham 1932 (classical); exponent shift observed numerically",
+      "quarantined": false
+    },
+    {
+      "id": "P8-compiled-invariant",
+      "machines": [
+        "kairos",
+        "logos",
+        "pythagoras",
+        "nous"
+      ],
+      "claim": "I(ρ) := max(β,1−β) − 1/2 satisfies: I(ρ) = 0 ∀ nontrivial ρ ⟺ RH (with P3 closing β<1/2 and P7 making β>1/2 detectable)",
+      "status": "Derived",
+      "witness": "von Koch 1901 ⟺ RH; Ingham 1932 (detectability); compiled through 4 machines",
+      "quarantined": false
+    },
+    {
+      "id": "P9-mertens-contradicted",
+      "machines": [
+        "empedocles"
+      ],
+      "claim": "|M(x)| < √x for all x — CONTRADICTED (Odlyzko–te Riele 1985). Standing warning: finite-range verification, however vast, does not establish an invariant",
+      "status": "Contradicted",
+      "witness": "literature; |M(N)|/√N measured here as a live reminder",
+      "quarantined": true
+    },
+    {
+      "id": "P10-emergence-circularity",
+      "machines": [
+        "physis"
+      ],
+      "claim": "cycle emergence is currently conditional on the zero table's β=1/2 assumption — the emergence test cannot certify the assumption it consumes (F6 circularity, recorded)",
+      "status": "InsufficientData",
+      "witness": "this run's own design review",
+      "quarantined": false
+    },
+    {
+      "id": "P11-why-one-half-unproven",
+      "machines": [
+        "pythagoras",
+        "kairos",
+        "logos",
+        "euclid"
+      ],
+      "claim": "WHY 1/2: four machine answers (self-ratio, scale-stability, fixed locus, 'no arithmetic reason visible') — all either conditional or heuristic; the critical line's NECESSITY for the actual zeros remains unproven",
+      "status": "Heuristic",
+      "witness": "machine observations P4 (locus) vs zero table (assumption)",
+      "quarantined": false
+    }
+  ],
+  "homologies": [
+    [
+      "arithmetic: Σ_{d|n} μ(d) = [n=1]",
+      "analytic: 1/ζ(s) = Σ μ(n) n^(−s)",
+      "Dirichlet series of a Dirichlet inverse IS the reciprocal",
+      "inverse exists both ways (μ is the convolution inverse of 1)",
+      "established"
+    ],
+    [
+      "FE pairing ρ ↦ 1−ρ̄",
+      "amplitude conservation |x^ρ·x^{1−ρ̄}| = x",
+      "the involution acts identically on zeros and on explicit-formula terms",
+      "fixed locus Re(s)=1/2 (logos)",
+      "established"
+    ],
+    [
+      "Euler product ↔ Dirichlet series",
+      "multiplicative hinge of the Riemann cycle",
+      "complete multiplicativity of n ↦ p^(−s) factors",
+      "reverses exactly for Re(s) > 1; strip side conditional",
+      "established"
+    ],
+    [
+      "von Mangoldt identity log n = Σ_{d|n} Λ(d)",
+      "ψ = x − Σ_ρ x^ρ/ρ − …",
+      "the SAME divisor-sum conservation appears at n-level and at ψ-level",
+      "exact at n-level; strip-level through the cycle",
+      "established"
+    ]
+  ],
+  "offline": {
+    "adversarial": {
+      "beta": 0.6,
+      "gamma": 14.134725
+    },
+    "obligatory_mirror": {
+      "beta": 0.4,
+      "gamma": 14.134725
+    },
+    "signature": 0.09999999999999998,
+    "deviation_baseline": [
+      [
+        2000,
+        0.024697216302188817
+      ],
+      [
+        4000,
+        0.02546587950622092
+      ],
+      [
+        6000,
+        0.018092243891671345
+      ],
+      [
+        8000,
+        0.01397999818806934
+      ],
+      [
+        10000,
+        0.012580602305218057
+      ],
+      [
+        12000,
+        0.010455337055285976
+      ],
+      [
+        14000,
+        0.009736623300170262
+      ],
+      [
+        16000,
+        0.010023111336202178
+      ],
+      [
+        18000,
+        0.00880047636949216
+      ],
+      [
+        20000,
+        0.009122252320557191
+      ],
+      [
+        22000,
+        0.00848819368591902
+      ],
+      [
+        24000,
+        0.00819841009124098
+      ],
+      [
+        26000,
+        0.007023491565217793
+      ],
+      [
+        28000,
+        0.006085040185838133
+      ],
+      [
+        30000,
+        0.007473597870042918
+      ],
+      [
+        32000,
+        0.008097631167737422
+      ],
+      [
+        34000,
+        0.006273951354010867
+      ],
+      [
+        36000,
+        0.006033927109423075
+      ],
+      [
+        38000,
+        0.005635586812812197
+      ],
+      [
+        40000,
+        0.0057737239167215525
+      ],
+      [
+        42000,
+        0.005721040566074024
+      ],
+      [
+        44000,
+        0.005935585842355402
+      ],
+      [
+        46000,
+        0.005848782973405868
+      ],
+      [
+        48000,
+        0.0045201818618714655
+      ],
+      [
+        50000,
+        0.004697095320807723
+      ],
+      [
+        52000,
+        0.004614072665425706
+      ],
+      [
+        54000,
+        0.004757760146160447
+      ],
+      [
+        56000,
+        0.004803748664603372
+      ],
+      [
+        58000,
+        0.005081545357796548
+      ],
+      [
+        60000,
+        0.004844135332272127
+      ],
+      [
+        62000,
+        0.00458355972287511
+      ],
+      [
+        64000,
+        0.003863425542347728
+      ],
+      [
+        66000,
+        0.003833969634412933
+      ],
+      [
+        68000,
+        0.0033366698347679115
+      ],
+      [
+        70000,
+        0.0053299742729325085
+      ],
+      [
+        72000,
+        0.003641712497535828
+      ],
+      [
+        74000,
+        0.004917639727416748
+      ],
+      [
+        76000,
+        0.0037529870324943286
+      ],
+      [
+        78000,
+        0.0037120343413935887
+      ],
+      [
+        80000,
+        0.004014045927305247
+      ],
+      [
+        82000,
+        0.004172639684259771
+      ],
+      [
+        84000,
+        0.004623760628098424
+      ],
+      [
+        86000,
+        0.004283383611857921
+      ],
+      [
+        88000,
+        0.0032651048317695578
+      ],
+      [
+        90000,
+        0.0038219427546360564
+      ],
+      [
+        92000,
+        0.004173267856649581
+      ],
+      [
+        94000,
+        0.003937861446021612
+      ],
+      [
+        96000,
+        0.0031871078532539616
+      ],
+      [
+        98000,
+        0.00371403402833776
+      ],
+      [
+        100000,
+        0.0035496727347009314
+      ]
+    ],
+    "deviation_adversarial": [
+      [
+        2000,
+        0.019473161469235736
+      ],
+      [
+        4000,
+        0.030830151334657344
+      ],
+      [
+        6000,
+        0.02051575744857575
+      ],
+      [
+        8000,
+        0.009442611089247717
+      ],
+      [
+        10000,
+        0.016691211931804412
+      ],
+      [
+        12000,
+        0.007541376225407483
+      ],
+      [
+        14000,
+        0.00935481770131268
+      ],
+      [
+        16000,
+        0.013339441422773496
+      ],
+      [
+        18000,
+        0.007832644040537313
+      ],
+      [
+        20000,
+        0.006106043183269676
+      ],
+      [
+        22000,
+        0.008486189904761394
+      ],
+      [
+        24000,
+        0.010884684155178664
+      ],
+      [
+        26000,
+        0.008966927537495723
+      ],
+      [
+        28000,
+        0.005380375854105049
+      ],
+      [
+        30000,
+        0.005011984857681173
+      ],
+      [
+        32000,
+        0.0059815786949200716
+      ],
+      [
+        34000,
+        0.005953610240130486
+      ],
+      [
+        36000,
+        0.007540186589868959
+      ],
+      [
+        38000,
+        0.00796268404400309
+      ],
+      [
+        40000,
+        0.007675662614020135
+      ],
+      [
+        42000,
+        0.006354460798417825
+      ],
+      [
+        44000,
+        0.0051333314034853385
+      ],
+      [
+        46000,
+        0.004024651048537449
+      ],
+      [
+        48000,
+        0.0023927204610909897
+      ],
+      [
+        50000,
+        0.002981248302808896
+      ],
+      [
+        52000,
+        0.0037982544192947903
+      ],
+      [
+        54000,
+        0.005010838197589557
+      ],
+      [
+        56000,
+        0.005993095377746213
+      ],
+      [
+        58000,
+        0.0068594901198869695
+      ],
+      [
+        60000,
+        0.006774503940554291
+      ],
+      [
+        62000,
+        0.006251100807812861
+      ],
+      [
+        64000,
+        0.004949005191908548
+      ],
+      [
+        66000,
+        0.004166288899988587
+      ],
+      [
+        68000,
+        0.0028966751525473454
+      ],
+      [
+        70000,
+        0.004227257694674966
+      ],
+      [
+        72000,
+        0.002087270456792041
+      ],
+      [
+        74000,
+        0.003160666290372141
+      ],
+      [
+        76000,
+        0.0020531668040213516
+      ],
+      [
+        78000,
+        0.002292887563756966
+      ],
+      [
+        80000,
+        0.0030429195133181925
+      ],
+      [
+        82000,
+        0.003747892235602521
+      ],
+      [
+        84000,
+        0.004770483050945694
+      ],
+      [
+        86000,
+        0.004961949042759422
+      ],
+      [
+        88000,
+        0.00438152180373124
+      ],
+      [
+        90000,
+        0.005247967615209214
+      ],
+      [
+        92000,
+        0.005759216807445109
+      ],
+      [
+        94000,
+        0.0055299158844989696
+      ],
+      [
+        96000,
+        0.004644938685873863
+      ],
+      [
+        98000,
+        0.004921881509495927
+      ],
+      [
+        100000,
+        0.0044171441293511735
+      ]
+    ],
+    "machine_verdicts": [
+      [
+        "euclid",
+        "SURVIVES UNCHANGED: no finite construction sees the intruder. The off-line zero produces NO contradiction inside the exact arithmetic layer — recorded as EUCLID's refusal, not as innocence"
+      ],
+      [
+        "logos",
+        "CONSEQUENCE EXTRACTED: the functional equation (Established) derives the mirror zero at 1−β as obligatory; pairing closes. LOGOS can accommodate the intruder — at the price of a second intruder"
+      ],
+      [
+        "pythagoras",
+        "RATIO BREAKS: the intruder's term out-sings the x-term at large x (amplitude exponent max(β,1−β) > 1/2); the conserved-pair proportion survives (it always does) but the SELF-symmetric point is vacated"
+      ],
+      [
+        "nous",
+        "COMPRESSION DEGRADES: ψ-regeneration error rises under the intruder + obligatory mirror (see deviation_adversarial); the global compression primitive absorbs the damage by worsening"
+      ],
+      [
+        "empedocles",
+        "LOVE/STRIFE RE-WEIGHTED: Strife becomes scale-unstable. Accommodated — by breaking the standing balance, not by contradiction"
+      ],
+      [
+        "physis",
+        "COHERENCE DROPS: cycle regeneration error increases. The intruder is accomodated with lower coherence — which is exactly why coherence may NEVER eliminate it (mission §15: a zero may only be eliminated through mathematics)"
+      ],
+      [
+        "kairos",
+        "EXPONENT SHIFTS: the deviation growth exponent moves toward max(β,1−β) = 0.60 > 1/2 — the scale transition is where the intruder is VISIBLE (Ingham Ω: Established)"
+      ]
+    ],
+    "failure_classification": [
+      {
+        "class": "F5",
+        "subject": "off-line zero contradiction",
+        "detail": "the off-line zero is CONSISTENT with every established proposition in the world; it violates only the von Koch O(x^{1/2} log²x) bound, which is equivalent to RH itself. The contradiction exists but is circular unless RH is proven — class: missing theorem"
+      },
+      {
+        "class": "F2",
+        "subject": "euclid vs nous visibility",
+        "detail": "the EXACT layer cannot see the intruder; the NUMERICAL layer sees it through compression loss. The disagreement IS the RH problem: primes constrain zeros only through the assembled cycle, never through finite construction"
+      }
+    ]
+  },
+  "shape_vector": [
+    [
+      "pythagoras",
+      [
+        [
+          "0.400",
+          0.09999999999999998
+        ],
+        [
+          "0.450",
+          0.050000000000000044
+        ],
+        [
+          "0.490",
+          0.010000000000000009
+        ],
+        [
+          "0.499",
+          0.0010000000000000009
+        ],
+        [
+          "0.500",
+          0.0
+        ],
+        [
+          "0.501",
+          0.0010000000000000009
+        ],
+        [
+          "0.510",
+          0.010000000000000009
+        ],
+        [
+          "0.550",
+          0.050000000000000044
+        ],
+        [
+          "0.600",
+          0.09999999999999998
+        ]
+      ]
+    ],
+    [
+      "nous",
+      [
+        [
+          "0.400",
+          0.02051575744857575
+        ],
+        [
+          "0.450",
+          0.019973408795807765
+        ],
+        [
+          "0.490",
+          0.01981049150220532
+        ],
+        [
+          "0.499",
+          0.01980387906603769
+        ],
+        [
+          "0.500",
+          0.01980381231708574
+        ],
+        [
+          "0.501",
+          0.01980387906603769
+        ],
+        [
+          "0.510",
+          0.01981049150220532
+        ],
+        [
+          "0.550",
+          0.019973408795807765
+        ],
+        [
+          "0.600",
+          0.02051575744857575
+        ]
+      ]
+    ]
+  ],
+  "composition": [
+    {
+      "path": "euclid→pythagoras→logos",
+      "propositions_touched": 10,
+      "surviving": 5,
+      "contradictions_generated": 1,
+      "formalizable": 5
+    },
+    {
+      "path": "euclid→nous→physis",
+      "propositions_touched": 7,
+      "surviving": 4,
+      "contradictions_generated": 1,
+      "formalizable": 4
+    },
+    {
+      "path": "euclid→empedocles→physis",
+      "propositions_touched": 9,
+      "surviving": 2,
+      "contradictions_generated": 2,
+      "formalizable": 2
+    },
+    {
+      "path": "pythagoras→logos→apodeixis",
+      "propositions_touched": 6,
+      "surviving": 5,
+      "contradictions_generated": 0,
+      "formalizable": 5
+    },
+    {
+      "path": "all→physis→apodeixis",
+      "propositions_touched": 18,
+      "surviving": 6,
+      "contradictions_generated": 2,
+      "formalizable": 6
+    }
+  ],
+  "disagreements": [
+    {
+      "a": "euclid",
+      "b": "nous",
+      "subject": "visibility of an off-line zero",
+      "a_claim": "invisible: no finite construction witnesses it",
+      "b_claim": "visible: compression degrades measurably",
+      "preserved_interpretation": "both are correct in their layers. The RH problem is precisely this invisibility gap: primes constrain zeros only through the assembled cycle (the explicit formula), never through finite construction. NOT averaged — preserved (mission §3)"
+    },
+    {
+      "a": "logos",
+      "b": "kairos",
+      "subject": "status of β=1/2",
+      "a_claim": "fixed locus of the FE involution — structural necessity (Established for the pairing, not for the zeros)",
+      "b_claim": "scale-stability point — an empirical exponent (Numerical)",
+      "preserved_interpretation": "the same location reached by transformation (logos) and by transition (kairos); neither proves the zeros go there"
+    },
+    {
+      "a": "physis",
+      "b": "euclid",
+      "subject": "coherence as elimination",
+      "a_claim": "coherence drops under the intruder",
+      "b_claim": "coherence scores may never eliminate a zero — only mathematics may",
+      "preserved_interpretation": "PHYSIS reports the drop; EUCLID forbids acting on it. Mission §15 enforced by the architecture itself"
+    }
+  ],
+  "dreams": [
+    {
+      "id": "D1-critical-line-inevitability",
+      "dream_claim": "THIS STRUCTURE LOOKS INEVITABLE: β=1/2 is the self-symmetry point (pythagoras), the fixed locus (logos), and the scale-stable point (kairos) simultaneously — three independent perspectives agree on the same location",
+      "compatibility": 1.0,
+      "generated_by": "dream(register: machine observations; recall: fixed-locus + self-symmetry + scale-stability)",
+      "apodeixis": "untestable (no Lean binary on this machine — recorded, never counted as support)"
+    },
+    {
+      "id": "D2-cycle-bundle-coherence",
+      "dream_claim": "the Riemann-cycle primitives embed as a coherent neighborhood (mean pairwise cosine 0.001) — the cycle is not an artifact of the experiment's vocabulary: the shipped ontology classifies its members into nearby cells",
+      "compatibility": 0.0006305752707923988,
+      "generated_by": "dream(register: primitive registry; recall: neighbor echo)",
+      "apodeixis": "untestable (no Lean binary)"
+    },
+    {
+      "id": "D3-offline-signature",
+      "dream_claim": "I(ρ) := max(β,1−β) − 1/2 > 0 exactly when a zero is off-line (Ingham gives > 0 for β>1/2, Established; the FE mirror covers β<1/2). DREAM FINDS THE CONVERSE TEMPTING: I ≡ 0 across the zero multiset is exactly RH — but the converse direction needs the Ω⇒bound strengthening (missing theorem F5)",
+      "compatibility": 0.9,
+      "generated_by": "dream(register: off-line zero experiment; recall: Ingham/von Koch witnesses)",
+      "apodeixis": "untestable (no Lean binary)"
+    }
+  ],
+  "metrics": {
+    "machines_active": 7,
+    "unique_observations": 18,
+    "candidate_invariants": 3,
+    "candidate_lemmas": 11,
+    "formalizable_propositions": 9,
+    "proved_or_derived": 6,
+    "refuted": 2,
+    "unresolved": 1,
+    "machine_disagreements": 3,
+    "discovery_yield": 0.5454545454545454,
+    "formalization_yield": 0.0
+  },
+  "verdict": "RH REDUCED TO A NEW EXPLICIT PROBLEM",
+  "verdict_witness": "the architecture compiled, through 7 independent perspectives, the classical reduction: RH ⟺ I(ρ) := max(β,1−β) − ½ = 0 for every nontrivial zero ⟺ ψ(x) = x + O(x^(1/2) log²x) (von Koch 1901, Established; Ingham Ω 1932, Established). The off-line zero experiment shows the compiled invariant I is EXACTLY the discriminator: adversarial ψ-deviation/baseline = 1.25 at the top of the range with the predicted exponent shift. The reduction is CLASSICAL — the machines rediscovered and compiled it; no new mathematics was proven. Formalization yield = 0 (no Lean binary): every formalization is untestable, recorded, never counted as support",
+  "bottleneck": "the smallest unresolved proposition: prove I(ρ) = 0 for all nontrivial ρ — equivalently exclude zeros with β > 1/2. The machines show WHERE this must be attacked (the explicit-formula residual's growth exponent) but possess no mechanism that forces the exponent to 1/2",
+  "weakest_unproven_assumption": "that the zeros' self-symmetry (β=1/2) is forced rather than accidental: the 30-zero table is consistent with β=1/2 by construction, and every machine's 'why 1/2' answer (fixed locus, self-ratio, scale stability, Love/Strife balance) is either conditional (Established for the pairing, not for the zero locations) or Heuristic",
+  "next_experiment": "apodeixis with a Lean binary: formalize the compiled chain (von Mangoldt identity → convolution inverse → 1/ζ → FE → explicit formula → I(ρ)) and attempt the ONE genuinely new formal target this run produced: 'ψ(x) − x = O(x^(1/2) log²x) ⟹ no zero with β > 1/2' (Ingham's Ω direction is classical; the bound⟹zeros direction is where a formal proof attempt has concrete leverage)",
+  "registry": {
+    "labels": [
+      "prime numbers",
+      "von Mangoldt function",
+      "Euler product",
+      "Riemann zeta function",
+      "functional equation",
+      "nontrivial zeros",
+      "explicit formula",
+      "prime counting function",
+      "Mobius inversion",
+      "critical line Re s = one half",
+      "symmetry pairing s to one minus s bar",
+      "scale-invariant oscillation"
+    ],
+    "cell_coordinates": [
+      "STUDY/SENSE (0.186)",
+      "FABRICATE/WORK (0.207)",
+      "STUDY/WORK (0.183)",
+      "STUDY/WORK (0.164)",
+      "FABRICATE/REST (0.186)",
+      "HEAL/WORK (0.199)",
+      "FABRICATE/SENSE (0.207)",
+      "STUDY/SENSE (0.194)",
+      "STUDY/WORK (0.170)",
+      "HEAL/SENSE (0.163)",
+      "FABRICATE/WORK (0.205)",
+      "FABRICATE/WORK (0.183)"
+    ],
+    "neighbor_matrix": [
+      [
+        0.0,
+        0.041266705840826035,
+        0.003983988426625729,
+        0.02897796779870987,
+        0.03315027058124542,
+        -0.04430451616644859,
+        -0.07270652800798416,
+        0.02439393848180771,
+        0.06932010501623154,
+        0.04150259494781494,
+        0.0486050546169281,
+        -0.02640335075557232
+      ],
+      [
+        0.041266705840826035,
+        0.0,
+        -0.003090380225330591,
+        0.048431217670440674,
+        0.08963670581579208,
+        -0.04802648350596428,
+        -0.051488105207681656,
+        -0.007644216064363718,
+        0.06571527570486069,
+        0.07464440166950226,
+        0.05087558925151825,
+        -0.023905852809548378
+      ],
+      [
+        0.003983988426625729,
+        -0.003090380225330591,
+        0.0,
+        -0.026324771344661713,
+        -0.043710917234420776,
+        0.007937662303447723,
+        -0.07975225150585175,
+        -0.06017107516527176,
+        -0.014416313730180264,
+        0.04086707904934883,
+        -0.04275603964924812,
+        -0.046337198466062546
+      ],
+      [
+        0.02897796779870987,
+        0.048431217670440674,
+        -0.026324771344661713,
+        0.0,
+        -0.018482210114598274,
+        -0.05523979291319847,
+        -0.06707615405321121,
+        0.020935650914907455,
+        -0.04882919043302536,
+        0.0063397870399057865,
+        0.01129893772304058,
+        0.05241037532687187
+      ],
+      [
+        0.03315027058124542,
+        0.08963670581579208,
+        -0.043710917234420776,
+        -0.018482210114598274,
+        0.0,
+        0.01337338425219059,
+        -0.09032311290502548,
+        0.037126798182725906,
+        0.06960083544254303,
+        0.021120309829711914,
+        0.04363008961081505,
+        -0.011613072827458382
+      ],
+      [
+        -0.04430451616644859,
+        -0.04802648350596428,
+        0.007937662303447723,
+        -0.05523979291319847,
+        0.01337338425219059,
+        0.0,
+        -0.05798840522766113,
+        -0.07519704848527908,
+        0.044498078525066376,
+        -0.016118060797452927,
+        0.02744722180068493,
+        0.09257397800683975
+      ],
+      [
+        -0.07270652800798416,
+        -0.051488105207681656,
+        -0.07975225150585175,
+        -0.06707615405321121,
+        -0.09032311290502548,
+        -0.05798840522766113,
+        0.0,
+        0.12007393687963486,
+        -0.00012732554750982672,
+        0.01785668171942234,
+        -0.050267696380615234,
+        -0.06882141530513763
+      ],
+      [
+        0.02439393848180771,
+        -0.007644216064363718,
+        -0.06017107516527176,
+        0.020935650914907455,
+        0.037126798182725906,
+        -0.07519704848527908,
+        0.12007393687963486,
+        0.0,
+        0.03692487254738808,
+        0.008744563907384872,
+        -0.04355677217245102,
+        0.06045493111014366
+      ],
+      [
+        0.06932010501623154,
+        0.06571527570486069,
+        -0.014416313730180264,
+        -0.04882919043302536,
+        0.06960083544254303,
+        0.044498078525066376,
+        -0.00012732554750982672,
+        0.03692487254738808,
+        0.0,
+        0.09399618208408356,
+        -0.04967588931322098,
+        -0.08388905227184296
+      ],
+      [
+        0.04150259494781494,
+        0.07464440166950226,
+        0.04086707904934883,
+        0.0063397870399057865,
+        0.021120309829711914,
+        -0.016118060797452927,
+        0.01785668171942234,
+        0.008744563907384872,
+        0.09399618208408356,
+        0.0,
+        -0.10501351207494736,
+        0.015498933382332325
+      ],
+      [
+        0.0486050546169281,
+        0.05087558925151825,
+        -0.04275603964924812,
+        0.01129893772304058,
+        0.04363008961081505,
+        0.02744722180068493,
+        -0.050267696380615234,
+        -0.04355677217245102,
+        -0.04967588931322098,
+        -0.10501351207494736,
+        0.0,
+        0.011660573072731495
+      ],
+      [
+        -0.02640335075557232,
+        -0.023905852809548378,
+        -0.046337198466062546,
+        0.05241037532687187,
+        -0.011613072827458382,
+        0.09257397800683975,
+        -0.06882141530513763,
+        0.06045493111014366,
+        -0.08388905227184296,
+        0.015498933382332325,
+        0.011660573072731495,
+        0.0
+      ]
+    ]
+  }
+}

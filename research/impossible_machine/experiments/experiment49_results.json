@@ -1,0 +1,183 @@
+{
+  "estimator_convention": "d = 2 - H; four estimators: DFA, R/S, structure functions, information dimension; convergence tolerance delta = 95th percentile moving-block bootstrap spread (data-driven, not chosen)",
+  "controls": [
+    {
+      "name": "sinusoid (smooth, d=1)",
+      "expected": 1.0,
+      "estimates": [
+        1.1658835893450084,
+        1.0426289775826714,
+        1.2525780525513308,
+        1.2147888376072686
+      ],
+      "spread": 0.20994907496865944,
+      "valid": true
+    },
+    {
+      "name": "fBm H=0.7 (d=1.3)",
+      "expected": 1.3,
+      "estimates": [
+        1.290595937938433,
+        null,
+        1.3180160151377005,
+        1.2071030562544935
+      ],
+      "spread": 0.11091295888320696,
+      "valid": true
+    },
+    {
+      "name": "Brownian H=0.5 (d=1.5)",
+      "expected": 1.5,
+      "estimates": [
+        1.4771782439362486,
+        1.030043584840906,
+        1.4852144680328259,
+        1.3582227416137973
+      ],
+      "spread": 0.4551708831919199,
+      "valid": true
+    },
+    {
+      "name": "white noise (fGn conv d=1.5; dust d=2)",
+      "expected": 1.6666666666666667,
+      "estimates": [
+        1.484211821596411,
+        1.442452033229403,
+        1.9987534068432251,
+        1.3778305778946067
+      ],
+      "spread": 0.6209228289486184,
+      "valid": true
+    }
+  ],
+  "machinery_valid": true,
+  "series": [
+    {
+      "name": "prime field: E_psi(u)",
+      "estimates": [
+        1.177651693871419,
+        1.2894564076867494,
+        1.8891725897099132,
+        1.2486873401383662
+      ],
+      "spread": 0.7115208958384942,
+      "delta": 0.8202022149529855,
+      "converged": true,
+      "d_consensus": 1.4012420078516121
+    },
+    {
+      "name": "prime field: E_theta(u)",
+      "estimates": [
+        1.779500156277067,
+        1.0090585583862466,
+        1.7329896463587342,
+        1.2931293459080637
+      ],
+      "spread": 0.7704415978908203,
+      "delta": 0.6893262828415976,
+      "converged": false,
+      "d_consensus": null
+    },
+    {
+      "name": "null: shuffled E_psi (correlations destroyed)",
+      "estimates": [
+        1.4752784392491387,
+        1.4335719960696731,
+        2.0007900725964487,
+        1.3630790020112056
+      ],
+      "spread": 0.6377110705852431,
+      "delta": 0.6383859835128023,
+      "converged": true,
+      "d_consensus": 1.5681798774816165
+    },
+    {
+      "name": "null: Cramer random primes E_psi(u)",
+      "estimates": [
+        1.5897972292993845,
+        1.0069853334938692,
+        1.5809516989568728,
+        1.1924626479195588
+      ],
+      "spread": 0.5828118958055153,
+      "delta": 0.6726370985205243,
+      "converged": true,
+      "d_consensus": 1.3425492274174213
+    }
+  ],
+  "window_profile": [
+    [
+      "window 1",
+      null,
+      1.0,
+      true
+    ],
+    [
+      "window 2",
+      1.3557102612813496,
+      1.0,
+      true
+    ],
+    [
+      "window 3",
+      1.3758097583848456,
+      1.0,
+      true
+    ],
+    [
+      "window 4",
+      1.4103450160562798,
+      1.0,
+      true
+    ],
+    [
+      "window 5",
+      1.4078197895789955,
+      1.0,
+      true
+    ],
+    [
+      "window 6",
+      1.4110315071765918,
+      1.0,
+      true
+    ],
+    [
+      "window 7",
+      1.414128211098988,
+      1.0,
+      true
+    ],
+    [
+      "window 8",
+      1.3839114999330044,
+      1.0,
+      true
+    ]
+  ],
+  "outcome": 4,
+  "outcome_text": "REPRESENTATION-DEPENDENT — one series converged (E_psi: true, E_theta: false) and the other did not; no invariant dimension claim is possible",
+  "candidate_laws": [
+    [
+      "sigma = 1/d",
+      0.7136525984781191
+    ],
+    [
+      "sigma = (d-1)/d",
+      0.2863474015218809
+    ],
+    [
+      "sigma = d/2",
+      0.7006210039258061
+    ],
+    [
+      "sigma = 1/(2d)",
+      0.35682629923905956
+    ],
+    [
+      "sigma = |1 - d/2|",
+      0.29937899607419394
+    ]
+  ],
+  "final_question_answer": "Q: Does the prime sequence admit a representation whose dimensionality is an invariant of the arithmetic object rather than an artifact of the measurement?\\n  A: machinery_valid=true; E_psi converged=true (spread 0.712 vs delta 0.820); E_theta converged=false (spread 0.770 vs delta 0.689); shuffled null converged=true.\\n  classification: REPRESENTATION-DEPENDENT — one series converged (E_psi: true, E_theta: false) and the other did not; no invariant dimension claim is possible"
+}
