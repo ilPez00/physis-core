@@ -2,7 +2,7 @@
 name = "physis-core"
 version = "0.1.24"
 edition = "2021"
-description = "Ontology and classification primitives on a 5x14 semiotic grid. STATUS: the shipped corpus was regenerated in 0.1.21 after a 2026-09-07 audit found 43% of a sample filed in the wrong cell; all 661 entries were re-filed against a newly written domain-axis contract (docs/GRID_AXES.md) and the geometric misfiling proxy halved (31.8% to 16.2%). Twelve discovery and soundness-checking mechanisms evaluated against the OLD corpus remain UNTESTED, not refuted -- they have not been re-run. The primitives (loading, linkage, coverage, becoming) are tested and deterministic. See README status."
+description = "Ontology and classification primitives on a 5x14 semiotic grid. DEMOS: reverse-AI workflows where a small model routes to physis-core commands (classify, quality, RAG, explanation, ontology expansion, n-gram token stream, user-to-action loop) using already-present data — zero marginal cost, fully offline, deterministic, auditable, immediately adaptable from one user correction. See DEMO.md for full workflow scripts. Status: shipped corpus regenerated 2026-09-07 after audit halved geometric misfiling proxy (31.8%); 12 discovery mechanisms UNTESTED, not refuted. Primitives (loading, linkage, coverage, becoming) are tested and deterministic. See README status."
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/ilPez00/physis-core"

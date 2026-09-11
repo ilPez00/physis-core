@@ -92,6 +92,48 @@ pub struct NodeEditOutcome {
     pub coherence_score: Score,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GanttTask {
+    /// Unique task identifier.
+    pub id: String,
+    /// Human-readable task name.
+    pub name: String,
+    /// Start timestamp (ISO 8601).
+    pub start: String,
+    /// End timestamp (ISO 8601).
+    pub end: String,
+    /// Task progress in [0.0, 1.0].
+    pub progress: f32,
+    /// Optional dependencies (task IDs that must complete first).
+    pub depends_on: Vec<String>,
+    /// Optional resource assignment.
+    pub resource: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GanttChart {
+    /// All tasks in the chart.
+    pub tasks: Vec<GanttTask>,
+    /// Optional critical path task IDs.
+    pub critical_path: Vec<String>,
+}
+
+impl GanttChart {
+    /// Create a new empty Gantt chart.
+    pub fn new() -> Self {
+        Self {
+            tasks: Vec::new(),
+            critical_path: Vec::new(),
+        }
+    }
+
+    /// Add a task to the chart.
+    pub fn add_task(mut self, task: GanttTask) -> Self {
+        self.tasks.push(task);
+        self
+    }
+}
+
 impl CoherenceNode {
     pub fn new(embedding: Vec<f32>) -> Self {
         Self {

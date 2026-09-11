@@ -43,6 +43,8 @@ pub struct StudioState {
     /// commands read, so the studio and the CLI share one corpus.
     pub core: PhysisCore,
     pub data_dir: PathBuf,
+    /// Gantt chart for project timeline tracking.
+    pub gantt: Option<GanttChart>,
 }
 
 impl StudioState {
@@ -77,6 +79,7 @@ impl StudioState {
             quality,
             core,
             data_dir,
+            gantt: None,
         }
     }
 
@@ -163,6 +166,7 @@ pub async fn run_with_model(port: u16, model_dir: Option<String>) -> anyhow::Res
         .route("/app.css", get(app_css))
         .route("/app.js", get(app_js))
         .route("/api/health", get(health_json))
+        .route("/api/console", get(console_json))
         .route("/api/edition", get(edition_json))
         .route("/api/ontology", get(ontology_json))
         .route("/api/grid", get(grid_json))
@@ -281,6 +285,23 @@ async fn health_json(State(state): State<Shared>) -> Response {
         "failures": s.quality.failures.len(),
         "penalties": s.quality.cell_penalties.len(),
         "data_dir": s.data_dir.display().to_string(),
+    }))
+    .into_response()
+}
+
+async fn console_json(State(state): State<Shared>) -> Response {
+    let s = state.read().unwrap();
+    Json(serde_json::json!({
+        "ok": true,
+        "gantt": s.gantt.as_ref().map(|g| {
+            (
+                g.tasks.len(),
+                g.critical_path.len(),
+            )
+        }).unwrap_or((0, 0)),
+        "classifier_cells": s.classifier.cell_count(),
+        "ontology_domains": s.ontology.all_domains().len(),
+        "custom_entries": s.custom_entries.len(),
     }))
     .into_response()
 }

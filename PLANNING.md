@@ -181,6 +181,33 @@ The boundary in the README holds — *Core stays Core* — so this is a short li
 and it is short on purpose. A pro module earns a place in core only if it is
 **epistemic**, **dependency-light**, and **measured**.
 
+### 2c. Over-engineering audit (added 2026-09-11)
+
+One-line findings ranked biggest cut first; scope: over-engineering and
+complexity only. Correctness, security, and performance are out of scope.
+
+- `delete  Cargo.lock.bak. nothing. Cargo.lock.bak` — backup lockfile; no tool reads it.
+- `delete  config/engineering_ontology.json.bak. nothing. config/engineering_ontology.json.bak` — backup ontology.
+- `delete  sw_add_domains.py. nothing. sw_add_domains.py` — hardcoded absolute-path script; already excluded from crate.
+- `delete  experiments.rs module. nothing. src/experiments.rs` — `pub mod` exported; zero code, only comment blocks.
+- `delete  .opencode/archive and .opencode/plugins. nothing. .opencode/` — empty directories.
+- `delete  Predicate::as_str(). use {:?} via Debug. src/transform.rs:30-42` — 13-line match; used only in tests; Debug gives same output.
+- `yagni   SyntheticNGramEmbedder (embed_ngram.rs, 46 lines). use RandomProjectionEmbedder + hash_ngrams from embed.rs. src/embed_ngram.rs` — copies ngram hash + random projection verbatim; only referenced by tests.
+- `yagni   PersistCore trait (1 impl). inherent method on PhysisCore. src/main.rs:1437-1447` — single-impl trait, one method.
+- `yagni   TokenCounter trait (1 impl). use count_tokens() directly. src/rag.rs:16-29` — single-impl trait; HeuristicTokenizer just calls count_tokens.
+- `yagni   Dot trait on [f32] (1 impl). inline a.iter().zip(b).map(|(x,y)| x*y).sum(). src/studio_lab.rs:121-129` — single-impl trait, one method.
+- `yagni   IdMatch enum + resolve_hypothesis_id. Option<String> + caller handles ambiguity. src/main.rs:1306-1328` — 3-variant enum + 16-line helper.
+- `shrink  elide_middle + single_line. split_whitespace().collect::<Vec<_>>().join(" ") for single_line; str slicing for elide_middle. src/main.rs:608-640` — 40 → ~15 lines.
+- `shrink  CoherenceProfile::composite(). [CoherenceDimension; 6] array iterate instead of 6x manual field unwinding. src/coherence_dimensions.rs:74-91` — 20 → ~5 lines.
+
+**net: ~-290 source lines, ~75KB dead files, 0 deps removable.** All 18 `src/` deps in Cargo.toml are actively used.
+
+## 2b. What to port from `physis-pro` (added 2026-09-09)
+
+The boundary in the README holds — *Core stays Core* — so this is a short list,
+and it is short on purpose. A pro module earns a place in core only if it is
+**epistemic**, **dependency-light**, and **measured**.
+
 ### Port: the filing proposer
 
 **The one positive the research track has produced.** Every certification
