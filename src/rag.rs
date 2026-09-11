@@ -439,7 +439,11 @@ pub fn fuse_rrf(rankings: &[&[usize]], k: f32) -> Vec<(usize, f32)> {
         }
     }
     let mut out: Vec<(usize, f32)> = acc.into_iter().collect();
-    out.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    out.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.0.cmp(&b.0))
+    });
     out
 }
 

@@ -4,6 +4,16 @@ Notable changes to `physis-core`. This file starts at 0.1.15; earlier
 releases predate it and are documented only by their git tags and commit
 history.
 
+## 0.1.24
+
+### Added — structural transform algebra + n-gram embedder scaffold
+
+- **Transform algebra module** (`transform.rs`): homomorphism engine with
+  TraceStep-gated apply; 4 lib tests plus a 4-test adversarial bench
+  vs similarity/rule baselines.
+- **SyntheticNGramEmbedder scaffold** (`embed_ngram.rs`) plus test-target fix.
+- Version bump only; no API break.
+
 ## 0.1.23
 
 ### Added — W1 resource integration (PLAN.md Phase 24 wave 1, 2026-09-10)

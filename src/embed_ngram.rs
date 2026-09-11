@@ -22,7 +22,7 @@ impl SyntheticNGramEmbedder {
     fn ensure(&self, text: &str) {
         let k = Self::key(text);
         let mut t = self.table.lock().unwrap();
-        if !t.contains_key(&k) {
+        t.entry(k).or_insert_with(|| {
             use rand::{Rng, SeedableRng}; use rand::rngs::StdRng;
             let mut rng = StdRng::seed_from_u64(self.seed ^ k);
             let mut v = Vec::with_capacity(self.dim);
@@ -33,8 +33,8 @@ impl SyntheticNGramEmbedder {
             }
             let n: f32 = v.iter().map(|x| x*x).sum::<f32>().sqrt().max(1e-8);
             v.iter_mut().for_each(|x| *x /= n);
-            t.insert(k, v);
-        }
+            v
+        });
     }
 }
 impl VectorEmbed for SyntheticNGramEmbedder {

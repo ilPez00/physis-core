@@ -211,6 +211,7 @@ pub mod relation;
 pub mod store;
 pub mod temporal;
 pub mod transplant;
+pub mod transform;
 pub mod vault;
 
 #[cfg(feature = "studio")]
@@ -268,6 +269,10 @@ pub use quality::{
 pub use rag::{count_tokens, RagChunk, RagCorpus, RetrievalResult, TokenFixedRetriever};
 pub use relation::{RelationType, TypedEdge};
 pub use temporal::TemporalValidity;
+pub use transform::{
+    ACCEPT_FLOOR, Constraint, ConstraintKind, PatElem, Predicate, PropKind, Proposition,
+    TraceStep, Transform, Triple, TriplePattern, WorldState, apply, find_homomorphisms,
+};
 pub use vault::{collect_labels as collect_vault_labels, scan_vault, VaultDoc};
 
 #[cfg(feature = "studio")]

@@ -4,123 +4,21 @@
 [![Documentation](https://docs.rs/physis-core/badge.svg)](https://docs.rs/physis-core)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-> ## ⚠️ STATUS: IT CANNOT AUDIT A FILING. IT CAN PROPOSE ONE.
+> ## STATUS: measured limits, growing capabilities
 >
-> **Read this before evaluating the crate.** The central claim below — that this
-> engine can discover ontological structure and **audit whether things are filed
-> soundly** — **has been tested and does not hold.** This notice is written by the
-> authors against their own work, from measurements in
-> `research/perspective-discovery/FINAL_REPORT.md` and
-> `research/RESEARCH_STATUS.md` (in the parent project).
+> Filing-certification: **NO** — every scorer at chance on real misfilings (cosine 0.519, constraint 0.536, ancestry 0.534); see `research/perspective-discovery/FINAL_REPORT.md`.
+> Cross-embedder discovery: **NO** — ARI ~0.10 across embedders.
+> Filing-proposal: **YES, measured** — top-3 0.712 vs permuted-label null 0.136 and old→new lookup 0.368; see [`propose`](https://docs.rs/physis-core/latest/physis_core/propose/).
+> A shortlist is not a verdict — triage for a person to pick from, never certification.
+> Geometry did not improve — returning three candidates instead of one verdict is the entire difference.
 >
-> **Updated 2026-09-09, in both directions.** The audit verdict below is
-> unchanged and still correct. What has changed is that one thing now *does*
-> work, and saying so is part of the same honesty:
->
-> | question | verdict |
-> |---|---|
-> | Can it certify that an entry **belongs** where it is filed? | **NO.** On real misfilings every scorer is at chance — cosine 0.519, a constraint check 0.536, an ancestry check 0.534. A vocabulary scorer that looked like a win at 0.664 was measuring entry length. |
-> | Can it discover ontological structure from geometry? | **NO.** Cross-embedder ARI ≈ 0.10. |
-> | Can it **propose** a filing — narrow 70 cells to a shortlist a person picks from? | **YES, measured.** Top-3 **0.712** against a permuted-label null of 0.136 and an `old→new` lookup table of 0.368. See [`propose`](https://docs.rs/physis-core/latest/physis_core/propose/). |
->
-> **The distinction is the whole point, and it is not a hedge.** The proposer's
-> top-1 (≈ 0.45) is the *same accuracy* this project had already recorded as a
-> failure. The geometry did not improve. Returning three candidates for a person
-> to choose from, instead of one answer presented as correct, is the entire
-> difference. **A shortlist is not a verdict** — treat it as triage, never as
-> certification.
->
-> **What was measured.** Twelve distinct mechanisms for ontology discovery and
-> soundness checking were built and evaluated. None was shown to work. The last
-> surviving candidate — a structural, label-free misfiling detector — had been
-> published as beating a geometric baseline (AUC 0.654 vs 0.619); when the
-> injected ground truth was **resampled** instead of taken from one arbitrary
-> perturbation, it won **1 of 11** trials and lost to plain cosine distance
-> (paired *t* = −3.08 held-out, −6.06 overall). That headline is withdrawn.
->
-> **And then the ground truth itself was checked, which should have come first.**
-> A deterministic sample of 60 of the 659 shipped ontology entries, adjudicated
-> against each cell's own definition, found **43.3% clearly filed in the wrong
-> cell** (31.7% clearly right, 25.0% marginal). `CONSTRUCT/WORK` — "pour
-> concrete, frame the wall" — contained Access Control, Database Engineering and
-> a Peirce sign category. So the audit was asking each scorer to find ~35
-> planted misfilings while ~248 real ones sat in the same cells labelled
-> correct, and *penalising* any scorer that flagged them.
->
-> **The correct status of those twelve mechanisms was therefore UNTESTED, not
-> refuted** — the experiment lacked the power to tell a working scorer from a
-> broken one. **They have since been re-run on the regenerated corpus (below),
-> and most are now genuinely refuted:** CONSTRAINT still loses to plain cosine,
-> 2 wins in 22 configurations, paired *t* = −5.58, while both scorers gain
-> ~0.085 AUC — the corpus really was suppressing detection, and fixing it did
-> not close the gap. Non-lattice auditing scores *below* chance (0.459) and adds
-> nothing once cosine is held constant (0.480). Plain cosine distance to the
-> cell centroid beat every structural alternative tried against it, on a clean
-> corpus and a dirty one alike.
->
-> **The corpus itself has now been regenerated (0.1.21).** The root cause was
-> that the *domain* axis had no written definition anywhere, while all 70 cell
-> anchors were phrased in a single register each (HEAL="rest day, sleep deeply",
-> CONSTRUCT="pour concrete, frame the wall") — a human-daily-life vocabulary
-> against a corpus that is mostly machine telemetry, agent architectures and
-> office documents. `docs/GRID_AXES.md` now defines the five domains
-> (condition / structure / output / relation / knowledge), the anchors were
-> rewritten to span human, machine and organisational registers, and all 661
-> entries were re-filed against that contract by a rater who could not see the
-> old assignment. **513 entries (77.6%) moved; occupied cells went 35/70 to
-> 57/70.** Independently of the rater: the share of entries whose own cell
-> anchor is in the worse half of all 70 fell **31.8% → 16.2%**, and on the 585
-> entries whose hints do not leak their old cell, **34.5% → 16.9%**. The
-> re-audit under the original protocol reports 6.6% clearly misfiled, but that
-> is a self-grade — see `research/perspective-discovery/`, Stage 11, which says
-> so plainly and gives the independent numbers instead.
->
-> **Two cautions for anyone building on this.** A vocabulary-overlap scorer
-> measured **+0.121 AUC over cosine, 11/11 trials, *t* = +12.97** when scored
-> against the entries it was derived from, and **−0.009, *t* = −1.81** on a
-> held-out half — a 0.130 swing from contamination alone. And this harness has a
-> **noise floor of ~0.074 AUC**: single-run margins below that are not
-> interpretable, which invalidates several earlier reported results.
->
-> **`becoming` is sound as a statistic and does not detect meaning change.**
-> Those are two different claims and only the first is supported. Its runs test
-> separates `AAAAAABBBBBB` from `ABABBABAABAB`, which no clusterer can, and that
-> is unit-tested. But it needs a sense partition it cannot itself produce, and
-> every attempt to supply one has failed. Measured on **SemEval-2020 Task 1**
-> (37 lemmas, gold labels by the task organisers, not by us): driving `becoming`
-> from n-gram signature families scores **51.4% binary accuracy against a 56.8%
-> majority-class baseline**, with Spearman **0.183** against the graded gold —
-> where the task's published state of the art is 66.5% and 0.518. It is below a
-> baseline that ignores the text entirely. Do not use it for lexical semantic
-> change.
->
-> The failure is diagnosed, not just scored: substitutability yields a median of
-> **57 families per term** while `classify_labeled` reads only the two leading
-> labels, so a verdict rests on ~29% of the evidence and 31 of 37 terms come
-> back `Split`. Exactness was never the missing property; granularity was.
->
-> Relation typing by the same relation also died: ranking a word's true
-> Greimas dual (from `dual()`'s hand-authored oppositions) against eleven
-> distractors on 12M tokens of CCOHA recovers it **0 of 12 times**, against 1.0
-> expected by chance. High-frequency verbs head nearly every ranking.
->
-> **What does work, and is safe to use.** The primitives are real, tested and
-> deterministic: ontology loading and the 5×14 semiotic grid, `linkage`,
-> `coverage`, `becoming`'s runs test *given a partition*, `process`. n-gram
-> signature families are also real, and are the salvage from the above: exact
-> longest-match-with-backoff signatures recur where fixed trigrams do not
-> (**92.0% vs 34.6%** median), and the long ones are not reachable by chance —
-> **41.4%** of real signatures reach length ≥ 4 against **2.6%** when the same
-> tokens are resampled independently. They are a usable collocation vocabulary.
-> They are not a sense inventory. A production bug in
-> `classification_domains()` — a sort key that was not a total order, making
-> iteration order non-deterministic across six built-in domains — was found and
-> fixed here, with a regression test verified by sabotage.
->
-> **What is not.** Do not use this crate to discover ontologies, to decide
-> whether an entry is filed in the right cell, or as an epistemic audit. For
-> those tasks, on the data tested, **cosine similarity over embeddings is
-> better** — and considerably simpler.
+> Capability index:
+> - [`epistemic`](https://docs.rs/physis-core/latest/physis_core/epistemic/) audit trail — competing interpretations with replayable provenance.
+> - [`hybrid BM25+RRF retrieval`](https://docs.rs/physis-core/latest/physis_core/rag/) — dependency-free Okapi BM25 fused with cosine.
+> - [`structural transform algebra`](https://docs.rs/physis-core/latest/physis_core/transform/) — homomorphism engine with TraceStep-gated apply; reasoning notes in `docs/TRANSFORM_REASONING.md` (parent).
+> - [`n-gram embedding scaffold`](https://docs.rs/physis-core/latest/physis_core/embed_ngram/) — collocation vocabulary, not a sense inventory.
+> Full controls and numbers in `research/perspective-discovery/FINAL_REPORT.md`.
+> Honesty preserved: limits above are measured, capabilities below are tested primitives.
 
 **The lean, high-performance epistemic reasoning engine extracted from the Physis intelligence system.**
 
@@ -1433,4 +1331,14 @@ physis-core studio --port 3000 --host 127.0.0.1
 ## License
 
 `physis-core` is dual-licensed under the **Apache License, Version 2.0** ([LICENSE](LICENSE)).
+
+## Structural reasoning (experimental)
+
+Symbolic homomorphism engine (`src/transform.rs`): exact-token variable binding,
+six ops (Generalize/Substitute/Invert/Compose/Project/Analogize), 0/1 coherence
+gates per application. Design notes: [docs/TRANSFORM_REASONING.md](../docs/TRANSFORM_REASONING.md).
+Pinned by 4 lib tests (`reciprocal_resource_exchange_abstraction_transfers`,
+`substitution_preserves_invariants`, `absent_relation_yields_incoherence`,
+`invalid_analogy_rejected`) — run `cargo test -p physis-core transform::`.
+Benchmarks (owner: transform track): `tests/transform_bench.rs`.
 

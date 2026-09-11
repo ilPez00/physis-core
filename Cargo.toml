@@ -1,6 +1,6 @@
 [package]
 name = "physis-core"
-version = "0.1.23"
+version = "0.1.24"
 edition = "2021"
 description = "Ontology and classification primitives on a 5x14 semiotic grid. STATUS: the shipped corpus was regenerated in 0.1.21 after a 2026-09-07 audit found 43% of a sample filed in the wrong cell; all 661 entries were re-filed against a newly written domain-axis contract (docs/GRID_AXES.md) and the geometric misfiling proxy halved (31.8% to 16.2%). Twelve discovery and soundness-checking mechanisms evaluated against the OLD corpus remain UNTESTED, not refuted -- they have not been re-run. The primitives (loading, linkage, coverage, becoming) are tested and deterministic. See README status."
 license = "Apache-2.0"

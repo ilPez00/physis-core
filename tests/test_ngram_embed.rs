@@ -1,8 +1,6 @@
-use physis_core::embed::{VectorEmbed};
-#[path="../src/embed_ngram.rs"]
-mod synthetic;
+use physis_core::embed::VectorEmbed;
+use physis_core::embed_ngram::SyntheticNGramEmbedder;
 #[test] fn ngram_det_365() {
-    use synthetic::SyntheticNGramEmbedder;
     let e = SyntheticNGramEmbedder::new(384, 42);
     let v = e.embed("the quick brown fox");
     assert_eq!(v.len(), 384);
@@ -12,7 +10,6 @@ mod synthetic;
     assert_eq!(v, e.embed("the quick brown fox"));
 }
 #[test] fn ngram_lifts_compute() { // conceptual: lookup is memoized; not projection-per-call
-    use synthetic::SyntheticNGramEmbedder;
     let e = SyntheticNGramEmbedder::new(384, 42);
     let _ = e.embed("any text"); // lookup path verified
 }
