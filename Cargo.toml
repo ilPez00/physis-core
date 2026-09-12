@@ -1,6 +1,6 @@
 [package]
 name = "physis-core"
-version = "0.1.24"
+version = "0.1.25"
 edition = "2021"
 description = "Ontology and classification primitives on a 5x14 semiotic grid. DEMOS: reverse-AI workflows where a small model routes to physis-core commands (classify, quality, RAG, explanation, ontology expansion, n-gram token stream, user-to-action loop) using already-present data — zero marginal cost, fully offline, deterministic, auditable, immediately adaptable from one user correction. See DEMO.md for full workflow scripts. Status: shipped corpus regenerated 2026-09-07 after audit halved geometric misfiling proxy (31.8%); 12 discovery mechanisms UNTESTED, not refuted. Primitives (loading, linkage, coverage, becoming) are tested and deterministic. See README status."
 license = "Apache-2.0"
