@@ -6,7 +6,7 @@
     "context_budget": 300,
     "big_model": null,
     "physis_version": "0.1.26",
-    "git_commit": "275be18",
+    "git_commit": "6e2e054",
     "seed": 7
   },
   "metrics": {
@@ -20,20 +20,24 @@
     "contradictions_found": 1,
     "contradiction_recall": 0.5,
     "map_deterministic": true,
-    "structure_hash": "0890098a13ac37901f1bff9da35c9af8de396e9ff43f1a39b14b7d4bfc92b4e3",
-    "baseline_tokens": 220,
-    "physis_tokens": 166,
-    "context_compression_ratio": 0.24545455,
-    "ngram_build_ms": 2.388987923040986,
-    "ngram_load_ms": 1.6599149676039815,
-    "ngram_lookup_per_sec": 338988.2285342653,
+    "structure_hash": "c79cee20d6110066ed585911101b12ea767dfaf3e13535c8344cd9a5a96aa390",
+    "baseline_tokens": 221,
+    "physis_tokens": 168,
+    "context_compression_ratio": 0.239819,
+    "ngram_build_ms": 0.4861149936914444,
+    "ngram_load_ms": 0.2897949889302254,
+    "ngram_lookup_per_sec": 2798964.5029784027,
     "ngram_disk_bytes": 14874,
     "ngram_ram_estimate_mb": 1,
     "interchange_ok": true,
     "heldout_docs": 15,
     "heldout_score": -1.0077245,
-    "big_model_leg": "not_configured"
+    "big_model_leg": "not_configured",
+    "oracle_cases": [],
+    "oracle_mean_agreement": 0.0,
+    "oracle_evidence_hits": 0,
+    "oracle_evidence_total": 0
   },
   "corpus_hash": "a8ac5be2f5b872735d89b0cc97f86776fcec5eb65d90dffaf296f6d4e330d975",
-  "timestamp": "2026-09-12T10:22:22.700642235+00:00"
+  "timestamp": "2026-09-12T15:22:21.475623644+00:00"
 }

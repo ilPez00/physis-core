@@ -14,7 +14,6 @@
 //! benchmark carries on measuring everything else. Nothing is ever faked.
 
 use serde::{Deserialize, Serialize};
-use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OracleConfig {
@@ -89,7 +88,7 @@ pub fn complete(
     prompt: &str,
     max_tokens: u32,
 ) -> anyhow::Result<(String, f64)> {
-    let started = Instant::now();
+    let started = std::time::Instant::now();
     let body = serde_json::json!({
         "model": cfg.model,
         "temperature": 0,

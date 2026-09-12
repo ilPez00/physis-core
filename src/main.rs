@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use physis_core::classify::{CellClassifier, CellScore};
 use physis_core::contradiction::{Contradiction, ContradictionParty, ResolutionStatus};
 use physis_core::core::PhysisCore;
-use physis_core::embed::{RandomProjectionEmbedder, VectorEmbed};
+use physis_core::embed::VectorEmbed;
 use physis_core::history::import_file as import_history_file;
 use physis_core::hypothesis::{
     Evidence, EvidencePolarity, Hypothesis, HypothesisStatus, Prediction,
@@ -451,8 +451,23 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-fn load_embedder() -> RandomProjectionEmbedder {
-    RandomProjectionEmbedder::new(384)
+/// Resolve the CLI's embedder through the self-test-gated cascade.
+///
+/// Was `RandomProjectionEmbedder::new(384)` unconditionally, which meant every
+/// number this CLI (and the benchmark it drives) ever printed came from a
+/// lexical hash. `embed::select` picks a real model when one is present and
+/// passes the semantic probe, and falls back to random projection *labelled as
+/// such* when it is not.
+fn load_embedder() -> Box<dyn physis_core::embed::VectorEmbed> {
+    let (e, kind) = physis_core::embed::select(384);
+    if kind == "random-projection" {
+        eprintln!(
+            "warning: embedder is random-projection (non-semantic). \
+Similarity here is lexical, not meaning-based. Set PHYSIS_MODEL_DIR \
+or build with --features embed-onnx and real weights for semantic scores."
+        );
+    }
+    e
 }
 
 fn load_quality() -> QualityTracker {
@@ -1701,13 +1716,12 @@ CANDIDATES (count-ordered)
 }
 
 fn cmd_demo(dir: &Path, query: &str, order: u8) -> anyhow::Result<()> {
-    use physis_core::embed::RandomProjectionEmbedder;
     use physis_core::model_provider::{ModelProvider, NgramDecoderModel};
     use physis_core::ngram_table::{TableBuilder, TableConfig};
     use std::sync::Arc;
     let docs = physis_core::map::load_corpus(dir)?;
     anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", dir.display());
-    let embedder = RandomProjectionEmbedder::new(64);
+    let embedder = load_embedder();
     let report = physis_core::map::build_map(&docs, &embedder, None)?;
     println!("── PHYSIS STRUCTURAL MAP (deterministic) ──");
     for l in report.hero_lines() { println!("{l}"); }
@@ -1729,11 +1743,10 @@ less context, more structure — physis.");
 }
 
 fn cmd_context(corpus: &Path, query: &str, budget: usize, json: bool) -> anyhow::Result<()> {
-    use physis_core::embed::RandomProjectionEmbedder;
     use physis_core::map::compile_context;
     let docs = physis_core::map::load_corpus(corpus)?;
     anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", corpus.display());
-    let embedder = RandomProjectionEmbedder::new(64);
+    let embedder = load_embedder();
     let report = compile_context(&docs, &embedder, query, budget)?;
     if json {
         println!("{}", serde_json::to_string_pretty(&report)?);
@@ -1747,21 +1760,29 @@ fn cmd_context(corpus: &Path, query: &str, budget: usize, json: bool) -> anyhow:
 }
 
 fn cmd_benchmark(order: u8, budget: usize, big_model: Option<String>) -> anyhow::Result<()> {
-    use physis_core::bench::{self, BenchConfig, BenchRun};
-    use physis_core::embed::RandomProjectionEmbedder;
-    let embedder = RandomProjectionEmbedder::new(64);
+    use physis_core::bench::BenchConfig;
+    // A benchmark that does not record WHICH embedder produced it is not
+    // reproducible: the same corpus scores differently under a lexical hash and
+    // a real model. `embedder_kind` goes into provenance.json for that reason.
+    let (embedder, embedder_kind) = physis_core::embed::select(384);
+    if embedder_kind == "random-projection" {
+        eprintln!(
+            "warning: benchmarking with random-projection (non-semantic). \
+Retrieval quality here is lexical; the numbers are a floor, not a claim."
+        );
+    }
     let pkg = env!("CARGO_PKG_VERSION").to_string();
     let cfg = BenchConfig {
         corpus_root: "benchmarks/ground-truth".into(),
         order,
         min_count: 1,
         context_budget: budget,
-        big_model: big_model.map(|s| s.clone()),
+        big_model,
         physis_version: pkg.clone(),
         git_commit: physis_core::bench::git_head().clone(),
         seed: 7,
     };
-    let out = physis_core::bench::run(cfg.clone(), &embedder)?;
+    let out = physis_core::bench::run(cfg.clone(), embedder.as_ref())?;
     let adir = out.artifacts_dir.clone();
     physis_core::bench::materialise_ground_truth(&PathBuf::from(cfg.corpus_root))?;
     std::fs::create_dir_all(&adir)?;
@@ -1775,6 +1796,7 @@ fn cmd_benchmark(order: u8, budget: usize, big_model: Option<String>) -> anyhow:
             "physis_version": cfg.physis_version,
             "seed": cfg.seed,
             "model": cfg.big_model,
+            "embedder": embedder_kind,
             "ngram_order": cfg.order,
             "context_budget": cfg.context_budget,
         }))?,
@@ -1792,6 +1814,7 @@ fn cmd_benchmark(order: u8, budget: usize, big_model: Option<String>) -> anyhow:
     println!("context compression  {}% ({} to {} tokens)", cpct, m.baseline_tokens, m.physis_tokens);
     println!("ngram build {} ms, load {} ms, {} lookups/s, {} bytes on disk", m.ngram_build_ms.round(), m.ngram_load_ms.round(), m.ngram_lookup_per_sec.round(), m.ngram_disk_bytes);
     println!("ngram RAM estimate   {} MB", m.ngram_ram_estimate_mb);
+    println!("embedder             {}", embedder_kind);
     println!("interchangeable      {}", m.interchange_ok);
     println!("held-out ({} docs) score  {}", m.heldout_docs, (m.heldout_score * 100.0).round());
     println!("big-model oracle leg {}", m.big_model_leg);
@@ -1806,7 +1829,7 @@ fn cmd_benchmark(order: u8, budget: usize, big_model: Option<String>) -> anyhow:
 }
 
 fn cmd_run(config: &Path, model: Option<String>, ngram: Option<String>, query: Option<String>) -> anyhow::Result<()> {
-    use physis_core::config_run::RunConfig;
+    
     use physis_core::model_provider::{ModelProvider, NgramDecoderModel};
     use physis_core::ngram_table::{NGramTable, TableBuilder, TableConfig, TableKind, TableRegistry};
     use physis_core::tokenizer::WhitespaceTokenizer;
@@ -1842,12 +1865,12 @@ fn cmd_run(config: &Path, model: Option<String>, ngram: Option<String>, query: O
     } else if let Some(cm) = cfg.model {
         cm
     } else {
-        format!("demo-ngram")
+        "demo-ngram".to_string()
     };
     let m = NgramDecoderModel::new(&model_id, table, Box::new(WhitespaceTokenizer::new(50_000)));
     let docs = physis_core::map::load_corpus(&cfg.corpus)?;
-    let embedder = physis_core::embed::RandomProjectionEmbedder::new(64);
-    let map = physis_core::map::build_map(&docs, &embedder, None)?;
+    let embedder = load_embedder();
+    let map = physis_core::map::build_map(&docs, embedder.as_ref(), None)?;
     let ctx = physis_core::map::compile_context(&docs, &embedder, &cfg.query, cfg.budget)?;
     let score = match m.score(&cfg.query) {
         Ok(x) => (x * 100.0).round(),

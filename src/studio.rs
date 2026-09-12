@@ -788,7 +788,7 @@ async fn infra_status(State(state): State<Shared>) -> Response {
     let tables: Vec<String> = nreg
         .list()
         .iter()
-        .map(|(id, m)| id.clone())
+        .map(|(id, _)| id.clone())
         .collect();
     let models: Vec<String> = mreg
         .list()

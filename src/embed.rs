@@ -118,17 +118,164 @@ impl VectorEmbed for RandomProjectionEmbedder {
     }
 }
 
-/// Semantic self-test: a related pair must clearly out-score an unrelated pair,
-/// and all vectors finite. Guards against a broken embedder.
+/// Required margin between the related-pair similarity and the distractor-pair
+/// similarity (lexically disjoint probes; see [`semantic_self_test`]).
+pub const SEMANTIC_PROBE_MARGIN: f32 = 0.05;
+
+/// (related A, related B, unrelated distractor) — A and B MUST share no token.
+///
+/// The original probe compared "a photograph of a dog" with "a photograph of a
+/// puppy": four of five tokens shared, so any bag-of-words/feature-hashing
+/// embedder passed it and a non-semantic engine reported itself semantic. These
+/// disjoint pairs are the criterion instead (PLAN.md H2).
+pub const SEMANTIC_PROBES: [(&str, &str, &str); 3] = [
+    ("car", "automobile", "banana"),
+    ("dog", "puppy", "spreadsheet"),
+    (
+        "spindle motor overheated and tripped",
+        "thermal fault shut down the drive",
+        "invoice payment terms net thirty days",
+    ),
+];
+
+/// Semantic self-test: for EVERY lexically disjoint related pair, the pair must
+/// clearly out-score its distractor, and all vectors must be finite. A model
+/// that loads but emits garbage fails; so does any purely lexical hasher, which
+/// was the whole point of the disjointness.
 pub fn semantic_self_test(e: &dyn VectorEmbed) -> bool {
-    let a = e.embed("a photograph of a dog");
-    let related = e.embed("a photograph of a puppy");
-    let unrelated = e.embed("quarterly corporate tax accounting spreadsheet");
     let finite = |v: &[f32]| !v.is_empty() && v.iter().all(|x| x.is_finite());
-    if !(finite(&a) && finite(&related) && finite(&unrelated)) {
-        return false;
+    for (a_text, b_text, d_text) in SEMANTIC_PROBES {
+        let a = e.embed(a_text);
+        let b = e.embed(b_text);
+        let d = e.embed(d_text);
+        if !(finite(&a) && finite(&b) && finite(&d)) {
+            return false;
+        }
+        let related = crate::models::cosine_sim(&a, &b);
+        let unrelated = crate::models::cosine_sim(&a, &d);
+        if related <= unrelated + SEMANTIC_PROBE_MARGIN {
+            return false;
+        }
     }
-    crate::models::cosine_sim(&a, &related) > crate::models::cosine_sim(&a, &unrelated) + 0.05
+    true
+}
+
+/// Memoizes `embed` by exact text, for the lifetime of one process.
+///
+/// `map::compile_context` runs `retrieve_from_texts` twice and `build_map`
+/// once over the SAME corpus, so a 30-document corpus issued ~800 embed calls
+/// for ~30 distinct texts. At 18 ms/embed that is ~14 s of pure repetition per
+/// command. This is a per-process memo, not a persistent cache: it has no disk
+/// format to version and no invalidation question to get wrong.
+///
+/// ponytail: unbounded map, one process, corpus-sized. Add an LRU bound if a
+/// long-lived server ever wraps its embedder in this.
+pub struct MemoEmbedder {
+    inner: Box<dyn VectorEmbed>,
+    memo: std::sync::Mutex<std::collections::HashMap<String, Vec<f32>>>,
+}
+
+impl MemoEmbedder {
+    pub fn new(inner: Box<dyn VectorEmbed>) -> Self {
+        Self { inner, memo: std::sync::Mutex::new(std::collections::HashMap::new()) }
+    }
+}
+
+impl VectorEmbed for MemoEmbedder {
+    fn embed(&self, text: &str) -> Vec<f32> {
+        if let Some(v) = self.memo.lock().unwrap().get(text) {
+            return v.clone();
+        }
+        let v = self.inner.embed(text);
+        self.memo.lock().unwrap().insert(text.to_string(), v.clone());
+        v
+    }
+
+    fn dimension(&self) -> usize {
+        self.inner.dimension()
+    }
+}
+
+/// Which embedder [`select`] actually chose. Returned alongside the embedder so
+/// every caller can *report* what it is running on instead of assuming.
+pub type Selected = (Box<dyn VectorEmbed>, &'static str);
+
+/// Resolve an embedder, newest-honest-first, and say which one won.
+///
+/// This exists because the CLI and the benchmark used to call
+/// `RandomProjectionEmbedder::new(384)` unconditionally: every measured number
+/// in `benchmarks/results/` was produced by a **lexical hash**, while
+/// `OnnxEmbedder` sat exported-but-unused behind the `embed-onnx` feature. A
+/// retrieval claim made on a non-semantic embedder is not a retrieval claim.
+///
+/// Cascade:
+/// 1. `PHYSIS_EMBEDDER=random-projection` — explicit operator override. This is
+///    the supported OFFLINE mode (deterministic, model-free, coarser), not a
+///    failure, so it is honoured silently.
+/// 2. `PHYSIS_MODEL_DIR` if set, else `./models/bge-base-en-v1.5` (768-d), else
+///    `./models` (384-d MiniLM-style flat layout). Each candidate must load AND
+///    pass [`semantic_self_test`]; one that loads but emits garbage is skipped
+///    rather than trusted.
+/// 3. Random projection, labelled `"random-projection"` so the caller can print
+///    the truth. It fails the self-test on purpose — see
+///    `random_projection_fails_the_semantic_probe`.
+pub fn select(dim: usize) -> Selected {
+    if std::env::var("PHYSIS_EMBEDDER")
+        .map(|v| {
+            let v = v.trim().to_ascii_lowercase();
+            v == "random-projection" || v == "random_projection" || v == "rp"
+        })
+        .unwrap_or(false)
+    {
+        return (Box::new(RandomProjectionEmbedder::new(dim)), "random-projection");
+    }
+
+    #[cfg(feature = "embed-onnx")]
+    {
+        for (dir, d, pooling, label) in onnx_candidates() {
+            // 128, not 512. Measured on MiniLM: 18.3 ms/embed at 128 vs
+            // 108.1 ms at 512 — a 5.9x tax paid entirely in padding, because
+            // the documents this crate maps are short. Raise it only for a
+            // corpus with genuinely long chunks.
+            let cfg = crate::embed_onnx::OnnxConfig {
+                dim: d,
+                max_length: std::env::var("PHYSIS_MODEL_MAX_LEN")
+                    .ok()
+                    .and_then(|v| v.trim().parse().ok())
+                    .unwrap_or(128),
+                model_dir: Some(dir),
+                pooling,
+                intra_threads: None,
+            };
+            let e = crate::embed_onnx::OnnxEmbedder::with_config(&cfg);
+            if e.is_available() && semantic_self_test(&e) {
+                return (Box::new(MemoEmbedder::new(Box::new(e))), label);
+            }
+        }
+    }
+
+    (Box::new(RandomProjectionEmbedder::new(dim)), "random-projection")
+}
+
+/// Candidate ONNX model directories in preference order, with the dimension and
+/// pooling each export needs. `PHYSIS_MODEL_DIR` short-circuits the list.
+#[cfg(feature = "embed-onnx")]
+fn onnx_candidates() -> Vec<(String, usize, crate::embed_onnx::PoolingStrategy, &'static str)> {
+    use crate::embed_onnx::PoolingStrategy::Mean;
+    if let Ok(dir) = std::env::var("PHYSIS_MODEL_DIR") {
+        let dir = dir.trim().to_string();
+        if !dir.is_empty() {
+            let dim = std::env::var("PHYSIS_MODEL_DIM")
+                .ok()
+                .and_then(|v| v.trim().parse().ok())
+                .unwrap_or(768);
+            return vec![(dir, dim, Mean, "onnx-explicit")];
+        }
+    }
+    vec![
+        ("./models/bge-base-en-v1.5".into(), 768, Mean, "bge-base"),
+        ("./models".into(), 384, Mean, "minilm"),
+    ]
 }
 
 #[cfg(test)]
@@ -164,8 +311,106 @@ mod tests {
         }
     }
 
+    /// Reproduces the ORIGINAL, lax probe (dog/puppy vs a spreadsheet) exactly.
+    /// Kept only so a test can demonstrate it is no longer the criterion.
+    fn old_lax_probe(e: &dyn VectorEmbed) -> bool {
+        let a = e.embed("a photograph of a dog");
+        let b = e.embed("a photograph of a puppy");
+        let d = e.embed("quarterly corporate tax accounting spreadsheet");
+        crate::models::cosine_sim(&a, &b) > crate::models::cosine_sim(&a, &d) + 0.05
+    }
+
+    /// The feature-hashing embedder is non-semantic by design. It passes the old
+    /// token-overlap pair — which is why `/health` reported `"semantic": true`
+    /// for it — but must FAIL the disjoint probe set. PLAN.md H2.
     #[test]
-    fn selftest_passes() {
-        assert!(semantic_self_test(&RandomProjectionEmbedder::new(384)));
+    fn random_projection_fails_the_semantic_probe() {
+        let e = RandomProjectionEmbedder::new(384);
+        assert!(
+            !semantic_self_test(&e),
+            "random projection must not pass the semantic self-test"
+        );
+    }
+
+    /// Regression for the exact H2 blind spot: the old dog/puppy pair was the
+    /// SOLE criterion and a bag-of-grams hash passed it. Now that pair still
+    /// passes, but the engine no longer trusts it — the disjoint probes fail
+    /// the same embedder. If someone reverts to the single lax pair, this fails.
+    #[test]
+    fn old_probe_is_not_the_semantic_criterion() {
+        let e = RandomProjectionEmbedder::new(384);
+        assert!(
+            old_lax_probe(&e),
+            "the lax dog/puppy probe should still pass for a lexical hasher"
+        );
+        assert!(
+            !semantic_self_test(&e),
+            "the disjoint probe set must reject the same lexical hasher"
+        );
+    }
+
+    /// The override is the one branch that must work with no weights, no
+    /// network and no feature flags — it is how an operator forces the offline
+    /// mode. If this regresses, `PHYSIS_EMBEDDER=random-projection` silently
+    /// loads the ONNX cascade instead, which is the exact "ignored instruction"
+    /// failure the cascade doc warns about.
+    #[test]
+    fn select_honours_the_random_projection_override() {
+        // Serialised against the sibling env test by running both in one test.
+        let prev = std::env::var("PHYSIS_EMBEDDER").ok();
+        for v in ["random-projection", "random_projection", "RP", " rp "] {
+            unsafe { std::env::set_var("PHYSIS_EMBEDDER", v) };
+            let (e, kind) = select(384);
+            assert_eq!(kind, "random-projection", "override {v:?} was ignored");
+            assert_eq!(e.dimension(), 384);
+            // And the thing it selected is the thing that fails the probe —
+            // the label is not cosmetic.
+            assert!(!semantic_self_test(e.as_ref()));
+        }
+        unsafe { std::env::remove_var("PHYSIS_EMBEDDER") };
+        if let Some(p) = prev {
+            unsafe { std::env::set_var("PHYSIS_EMBEDDER", p) };
+        }
+    }
+
+    /// Whatever the cascade returns, the label must be honest: a
+    /// `"random-projection"` label implies the probe fails, and any other label
+    /// implies it passes. Without this, a future candidate that loads but emits
+    /// garbage could be returned under a model name — the H2 failure shape
+    /// (more confident, no more correct) rebuilt one layer up.
+    #[test]
+    fn select_label_always_matches_probe_outcome() {
+        let prev = std::env::var("PHYSIS_EMBEDDER").ok();
+        unsafe { std::env::remove_var("PHYSIS_EMBEDDER") };
+        let (e, kind) = select(384);
+        let passes = semantic_self_test(e.as_ref());
+        if kind == "random-projection" {
+            assert!(!passes, "random projection is labelled honestly but passed the probe");
+        } else {
+            assert!(passes, "{kind} was selected without passing the semantic probe");
+        }
+        if let Some(p) = prev {
+            unsafe { std::env::set_var("PHYSIS_EMBEDDER", p) };
+        }
+    }
+
+    /// Probe design contract: members of each related pair share NO token, or a
+    /// bag-of-words embedder could pass by overlap again.
+    #[test]
+    fn semantic_probe_pairs_are_lexically_disjoint() {
+        let tokenize = |s: &str| -> Vec<String> {
+            s.split(|c: char| !c.is_alphanumeric())
+                .filter(|t| !t.is_empty())
+                .map(|t| t.to_ascii_lowercase())
+                .collect()
+        };
+        for (a, b, _) in SEMANTIC_PROBES {
+            let (ta, tb) = (tokenize(a), tokenize(b));
+            let shared: Vec<&String> = ta.iter().filter(|t| tb.contains(t)).collect();
+            assert!(
+                shared.is_empty(),
+                "probe pair {a:?}/{b:?} shares tokens {shared:?} — a hash embedder could pass by overlap"
+            );
+        }
     }
 }
