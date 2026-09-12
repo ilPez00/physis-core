@@ -581,6 +581,211 @@ pub fn build_structural(
     Ok(b.finish(&tok, &corpus_hash))
 }
 
+// ── Per-cell tables — one table per grid cell, not one table over all cells ─
+
+/// A family of structural tables: one per `DOMAIN×MODE` cell, plus the flat
+/// table over every sequence as its control.
+///
+/// # Why per-cell rather than one table
+///
+/// A single structural table models `P(next cell | previous cells)` over all
+/// 70 symbols at once. It is one distribution, so every cell's continuations
+/// are pooled and a rare cell's behaviour is averaged away by a common one.
+///
+/// A family conditions first: `tables["HEAL×MAINTAIN"]` is estimated **only**
+/// from the steps that pass through that cell, so it can carry a continuation
+/// pattern specific to that region even when that pattern is rare globally.
+/// Facets (`sub_domain`, `sub_mode`, `lifecycle`, …) nest the same way — this
+/// type is the first level, keyed by whatever symbol the caller supplies, so a
+/// caller that emits `HEAL×MAINTAIN/pumps` gets that granularity for free.
+///
+/// # This is a claim, not a result
+///
+/// Conditioning costs data: each per-cell table sees a fraction of the corpus
+/// and is therefore estimated from fewer counts. Whether the specificity pays
+/// for the sparsity is **an empirical question**, which is why [`flat`] is
+/// built from the same sequences in the same pass. Compare against it before
+/// reporting that per-cell tables help; if the flat table wins, the flat table
+/// wins.
+pub struct CellTables {
+    /// cell symbol → the table estimated from steps at that cell.
+    pub tables: BTreeMap<String, BackoffTable>,
+    /// The construction-matched control: one table over the same sequences.
+    pub flat: BackoffTable,
+    /// How many training steps each cell's table was estimated from.
+    pub support: BTreeMap<String, usize>,
+}
+
+impl CellTables {
+    /// Predict the next symbol after `context`, preferring the table for the
+    /// cell the context currently sits in and falling back to `flat`.
+    ///
+    /// Falls back when the cell is unseen OR its table has less than
+    /// `min_support` training steps — an under-supported table is worse than
+    /// the pooled one, and silently trusting it is how conditioning turns into
+    /// noise amplification.
+    pub fn top_next(&self, context: &[String], k: usize, min_support: usize) -> Vec<(String, f32)> {
+        match context.last() {
+            Some(cell) if self.support.get(cell).copied().unwrap_or(0) >= min_support => self
+                .tables
+                .get(cell)
+                .map(|t| t.top_next(context, k))
+                .unwrap_or_else(|| self.flat.top_next(context, k)),
+            _ => self.flat.top_next(context, k),
+        }
+    }
+
+    /// Cells that have a table, ordered by support descending.
+    pub fn by_support(&self) -> Vec<(&String, usize)> {
+        let mut v: Vec<(&String, usize)> = self.support.iter().map(|(k, n)| (k, *n)).collect();
+        v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        v
+    }
+}
+
+/// Build a [`CellTables`] family from already-classified symbol sequences.
+///
+/// `sequences` is one ordered run of cell symbols per unit of work — a session,
+/// an actor's trace, a document. Order matters: these are transitions, and a
+/// set would lose exactly the information the table is for.
+///
+/// A cell's table is trained on every sequence *slice ending at that cell*, so
+/// a step contributes context to the cell it lands on.
+pub fn build_cell_tables(
+    sequences: &[Vec<String>],
+    cfg: TableConfig,
+) -> anyhow::Result<CellTables> {
+    anyhow::ensure!(!sequences.is_empty(), "no sequences to build cell tables from");
+    let tok = crate::tokenizer::StructuralTokenizer::default();
+
+    // The control, over the identical input.
+    let mut flat_b = TableBuilder::new(cfg.clone());
+    let mut hash = Sha256::new();
+    for seq in sequences {
+        for sym in seq {
+            hash.update(sym.as_bytes());
+        }
+        hash.update(b"\n");
+        flat_b.push_sequence(seq);
+    }
+    let corpus_hash = format!("{:x}", hash.finalize());
+    let (flat, _) = flat_b.finish(&tok, &corpus_hash);
+
+    // Group every transition by the cell it departs from.
+    let mut per_cell: BTreeMap<String, Vec<Vec<String>>> = BTreeMap::new();
+    let mut support: BTreeMap<String, usize> = BTreeMap::new();
+    for seq in sequences {
+        for i in 0..seq.len() {
+            let cell = seq[i].clone();
+            *support.entry(cell.clone()).or_insert(0) += 1;
+            // The window ending at i, plus what follows, is this cell's
+            // evidence. `max_order` bounds how much history is kept.
+            let lo = i.saturating_sub(cfg.max_order as usize);
+            let hi = (i + 2).min(seq.len());
+            if hi > lo + 1 {
+                per_cell.entry(cell).or_default().push(seq[lo..hi].to_vec());
+            }
+        }
+    }
+
+    let mut tables = BTreeMap::new();
+    for (cell, seqs) in per_cell {
+        let mut b = TableBuilder::new(cfg.clone());
+        for s in &seqs {
+            b.push_sequence(s);
+        }
+        let (t, _) = b.finish(&tok, &corpus_hash);
+        tables.insert(cell, t);
+    }
+
+    Ok(CellTables { tables, flat, support })
+}
+
+#[cfg(test)]
+mod cell_table_tests {
+    use super::*;
+
+    fn cfg() -> TableConfig {
+        TableConfig { kind: TableKind::Structural, max_order: 3, min_count: 1, ..Default::default() }
+    }
+
+    /// The family must actually condition: a continuation that is RARE overall
+    /// but DOMINANT at one cell has to survive in that cell's table. This is
+    /// the whole reason per-cell tables exist, so if it fails the type is
+    /// pointless.
+    #[test]
+    fn a_cell_keeps_a_continuation_the_pooled_table_drowns() {
+        let mut seqs: Vec<Vec<String>> = Vec::new();
+        // 30 runs of the common pattern: A -> B -> C.
+        for _ in 0..30 {
+            seqs.push(vec!["A".into(), "B".into(), "C".into()]);
+        }
+        // 5 runs where B is reached from Z and is followed by Q instead.
+        for _ in 0..5 {
+            seqs.push(vec!["Z".into(), "B".into(), "Q".into()]);
+        }
+        let fam = build_cell_tables(&seqs, cfg()).unwrap();
+
+        // Support is counted per occurrence, not per sequence.
+        assert_eq!(fam.support["B"], 35);
+        assert!(fam.tables.contains_key("B"), "B must have its own table");
+
+        // Both tables see B -> Q; the point is that B's own table ranks it
+        // against a smaller, more homogeneous pool.
+        let b = &fam.tables["B"];
+        assert!(b.count(&["B".into()], "Q") > 0, "B's table must retain B->Q");
+        assert!(b.count(&["B".into()], "C") > 0, "B's table must retain B->C");
+    }
+
+    /// Under-supported cells must fall back to the pooled table rather than be
+    /// trusted. Conditioning on two observations is noise amplification.
+    #[test]
+    fn under_supported_cells_fall_back_to_the_flat_control() {
+        let mut seqs: Vec<Vec<String>> = Vec::new();
+        for _ in 0..20 {
+            seqs.push(vec!["A".into(), "B".into(), "C".into()]);
+        }
+        seqs.push(vec!["RARE".into(), "X".into()]);
+        let fam = build_cell_tables(&seqs, cfg()).unwrap();
+        assert_eq!(fam.support["RARE"], 1);
+
+        let ctx = vec!["RARE".to_string()];
+        let picked = fam.top_next(&ctx, 3, 10);
+        let flat = fam.flat.top_next(&ctx, 3);
+        assert_eq!(picked, flat, "support 1 < min_support 10 must use the control");
+    }
+
+    /// The control is built from the SAME sequences in the SAME pass. If it
+    /// ever diverges from the input the comparison it exists for is void.
+    #[test]
+    fn the_flat_control_covers_every_sequence() {
+        let seqs = vec![
+            vec!["A".to_string(), "B".to_string()],
+            vec!["C".to_string(), "D".to_string()],
+        ];
+        let fam = build_cell_tables(&seqs, cfg()).unwrap();
+        assert!(fam.flat.count(&["A".into()], "B") > 0);
+        assert!(fam.flat.count(&["C".into()], "D") > 0);
+    }
+
+    #[test]
+    fn empty_input_is_an_error_not_an_empty_family() {
+        assert!(build_cell_tables(&[], cfg()).is_err());
+    }
+
+    #[test]
+    fn by_support_is_ordered_and_deterministic() {
+        let seqs = vec![
+            vec!["A".to_string(), "A".to_string(), "A".to_string()],
+            vec!["B".to_string(), "C".to_string()],
+        ];
+        let fam = build_cell_tables(&seqs, cfg()).unwrap();
+        let order: Vec<&str> = fam.by_support().iter().map(|(c, _)| c.as_str()).collect();
+        assert_eq!(order[0], "A", "highest support first");
+        assert_eq!(fam.by_support(), fam.by_support(), "deterministic");
+    }
+}
+
 // ── Registry — multiple named tables on disk, like the model registry ───────
 
 pub struct TableRegistry {
