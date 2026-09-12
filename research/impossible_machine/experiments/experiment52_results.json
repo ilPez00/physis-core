@@ -1,0 +1,35 @@
+{
+  "title": "Prime Pair-Correlation (Hardy-Littlewood singular series) — first representation-covariant arithmetic law test",
+  "context": "E50/E51: representation-bound at the geometric and probability levels. E52 tests the small-gap correlation, which is specific (absent in independence nulls) and should be out-of-sample stable if it is a true law.",
+  "representations_views": [
+    "pi/theta jumps (consecutive-prime gaps)",
+    "psi/von-Mangoldt jumps (primes + prime powers)"
+  ],
+  "nulls": [
+    "Cramer random primes (1/ln x)",
+    "iid geometric gaps (same density)"
+  ],
+  "primary_candidate": {
+    "id": "H1",
+    "description": "Hardy-Littlewood singular-series deviation of small even prime-gap frequencies from the Cramer independence model (RMS over k=2..40)",
+    "discovery_deviation": 1.2223612788630371,
+    "held_out_deviation": 1.2577437760416195,
+    "discovery_twin_ratio": 1.448110362041607,
+    "held_out_twin_ratio": 1.4484597126456047,
+    "null_deviations": [
+      0.09630722283790755,
+      0.10452548870255969
+    ],
+    "view_correlation": 0.9990382396715352,
+    "arithmetic_specific": true,
+    "held_out_survives": true,
+    "survives": true
+  },
+  "relation_to_half": "no candidate targets 1/2; observed discovery D=1.222, held-out D=1.258, twin ratios 1.448/1.448",
+  "final_verdict": "PARTIAL-POSITIVE — the Hardy-Littlewood small-gap correction is strongly arithmetic-specific (discovery D ~12x above every independence null: Cramer 0.10, geometric 0.10) AND out-of-sample stable (the held-out half reproduces the frozen discovery deviation; twin-ratio > 1 in BOTH halves). This is the first object-level property in the E50/E51 line that is BOTH strongly prime-specific AND out-of-sample stable. Caveat, not a discovery: the pi/theta and psi views count the same primes, so 'representation-covariant' here only asserts every counting-function view recovers the identical law — the substantive win is specificity + stability, which E50/E51's framework demanded but could not find at the geometric or cumulative-distribution levels.",
+  "artifacts": [
+    "physis-core/examples/experiment52_pair_correlation.rs",
+    "physis-core/research/impossible_machine/experiments/experiment52_results.json",
+    "physis-core/research/impossible_machine/EXPERIMENT52_RESULTS.md"
+  ]
+}
