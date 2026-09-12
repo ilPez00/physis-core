@@ -13,11 +13,13 @@
   "baseline_tokens": 220,
   "physis_tokens": 166,
   "context_compression_ratio": 0.24545455,
-  "ngram_build_ms": 6.960511207580566,
-  "ngram_load_ms": 4.487659782171249,
-  "ngram_lookup_per_sec": 192375.20105769095,
-  "ngram_disk_bytes": 22595,
+  "ngram_build_ms": 2.388987923040986,
+  "ngram_load_ms": 1.6599149676039815,
+  "ngram_lookup_per_sec": 338988.2285342653,
+  "ngram_disk_bytes": 14874,
   "ngram_ram_estimate_mb": 1,
   "interchange_ok": true,
+  "heldout_docs": 15,
+  "heldout_score": -1.0077245,
   "big_model_leg": "not_configured"
 }

@@ -1795,6 +1795,12 @@ fn cmd_benchmark(order: u8, budget: usize, big_model: Option<String>) -> anyhow:
     println!("interchangeable      {}", m.interchange_ok);
     println!("held-out ({} docs) score  {}", m.heldout_docs, (m.heldout_score * 100.0).round());
     println!("big-model oracle leg {}", m.big_model_leg);
+    println!(
+        "oracle agreement     {}% · evidence {}/{} · per-case detail in metrics.json oracle_cases",
+        (m.oracle_mean_agreement * 100.0).round(),
+        m.oracle_evidence_hits,
+        m.oracle_evidence_total
+    );
     println!("artifacts -> benchmarks/results/ (run.json, metrics.json, provenance.json)");
     Ok(())
 }

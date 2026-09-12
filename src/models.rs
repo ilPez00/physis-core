@@ -118,6 +118,12 @@ pub struct GanttChart {
     pub critical_path: Vec<String>,
 }
 
+impl Default for GanttChart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GanttChart {
     /// Create a new empty Gantt chart.
     pub fn new() -> Self {

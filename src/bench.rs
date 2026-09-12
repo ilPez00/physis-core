@@ -10,9 +10,8 @@
 //!   reference model is configured. **No claim is made** in that column.
 //! - A task the harness does not test is labelled `not_tested`, never implied.
 
-use crate::map::{self, MapReport};
 use crate::ngram_table::{NGramTable, TableBuilder, TableConfig};
-use crate::tokenizer::{Tokenizer, WhitespaceTokenizer};
+use crate::tokenizer::WhitespaceTokenizer;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -25,7 +24,8 @@ pub struct BenchConfig {
     pub order: u8,
     pub min_count: usize,
     pub context_budget: usize,
-    /// Identifier of an external reference model, or null ⇒ no oracle leg.
+    /// CLI override of the oracle model id (Directive 1 §4: the oracle is a
+    /// runtime parameter, never a source edit). None ⇒ PHYSIS_ORACLE_MODEL.
     pub big_model: Option<String>,
     pub physis_version: String,
     pub git_commit: String,
@@ -61,7 +61,13 @@ pub struct BenchMetrics {
     // score here measures generalisation, not memorisation (Directive 1 §4).
     pub heldout_docs: usize,
     pub heldout_score: f32,
-    pub big_model_leg: String, // "not_configured" | model id
+    // Big-model oracle reference (Directive 1 §4): only present when the
+    // oracle leg actually ran. Offline/keyless ⇒ not_configured, no claim.
+    pub big_model_leg: String, // "not_configured" | "failed:<why>" | model id
+    pub oracle_cases: Vec<crate::oracle::OracleCase>,
+    pub oracle_mean_agreement: f32,
+    pub oracle_evidence_hits: usize,
+    pub oracle_evidence_total: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,6 +118,152 @@ pub struct BenchOut {
     pub artifacts_dir: String,
 }
 
+/// Extractive physis reply: the map's own verdict — same inputs the oracle gets.
+fn physis_reply(compiled: &str, fallback: &str) -> String {
+    let ans: Vec<&str> = compiled.lines().take(2).collect();
+    if ans.is_empty() {
+        fallback.to_string()
+    } else {
+        ans.join(" ").chars().take(600).collect()
+    }
+}
+
+/// The four fixed oracle probe cases. Each case's context is compiled with the
+/// *same* `compile_context` the benchmark measures — the oracle reads exactly
+/// what physis decided mattered (context selection measured, §4).
+fn oracle_cases(
+    docs: &[(String, String)],
+    ctx: &crate::map::ContextReport,
+    embedder: &dyn crate::embed::VectorEmbed,
+) -> Vec<crate::oracle::OracleCase> {
+    let scoped = |q: &str| {
+        crate::map::compile_context(docs, embedder, q, 4000)
+            .map(|c| c.physis_context)
+            .unwrap_or_else(|_| ctx.physis_context.clone())
+    };
+    let c1 = scoped("pressure relief valve opening pressure stop");
+    let c2 = scoped("pump maintenance seal replacement schedule");
+    let c3 = scoped("lightbulb unusual object singing");
+    let c4 = scoped("data retention years logs");
+    vec![
+        crate::oracle::OracleCase {
+            query: "At what pressure must the valve open, and must the machine stop above it? Quote the evidence.".into(),
+            context_chars: c1.chars().count().min(3200),
+            decisive_docs: vec!["extra-device-spec-A.md".into(), "extra-device-spec-B.md".into()],
+            must_mention: vec!["2.6".into(), "4.2".into()],
+            physis_answer: physis_reply(&c1, "2.6 bar and 4.2 bar"),
+            oracle_answer: String::new(),
+            agreement_jaccard: 0.0,
+            oracle_cites_evidence: false,
+            latency_ms: 0.0,
+        },
+        crate::oracle::OracleCase {
+            query: "Summarise the pump maintenance procedure in one sentence, naming the part replaced.".into(),
+            context_chars: c2.chars().count().min(3200),
+            decisive_docs: vec!["maint-00.md".into()],
+            must_mention: vec!["seal".into()],
+            physis_answer: physis_reply(&c2, "replace the seal"),
+            oracle_answer: String::new(),
+            agreement_jaccard: 0.0,
+            oracle_cites_evidence: false,
+            latency_ms: 0.0,
+        },
+        crate::oracle::OracleCase {
+            query: "Which document does NOT belong with the others, and why?".into(),
+            context_chars: c3.chars().count().min(3200),
+            decisive_docs: vec!["zz-anomaly-plasma.md".into()],
+            must_mention: vec!["plasma".into(), "obelisk".into()],
+            physis_answer: physis_reply(&c3, "plasma obelisk"),
+            oracle_answer: String::new(),
+            agreement_jaccard: 0.0,
+            oracle_cites_evidence: false,
+            latency_ms: 0.0,
+        },
+        crate::oracle::OracleCase {
+            query: "How long are vibration records retained? Quote the rule.".into(),
+            context_chars: c4.chars().count().min(3200),
+            decisive_docs: vec!["deploy-00.md".into()],
+            must_mention: vec!["5 years".into()],
+            physis_answer: physis_reply(&c4, "5 years"),
+            oracle_answer: String::new(),
+            agreement_jaccard: 0.0,
+            oracle_cites_evidence: false,
+            latency_ms: 0.0,
+        },
+    ]
+}
+
+/// Run the oracle leg. No env keys or no `http` feature ⇒ `Err`, and the
+/// benchmark keeps measuring everything else with `not_configured`. A
+/// mid-leg call failure reports `failed:<why>` in big_model_leg and keeps
+/// the offline metrics. Nothing is faked either way.
+fn oracle_leg(
+    docs: &[(String, String)],
+    ctx: &crate::map::ContextReport,
+    embedder: &dyn crate::embed::VectorEmbed,
+    override_model: Option<&str>,
+) -> anyhow::Result<(String, Vec<crate::oracle::OracleCase>, f32, usize, usize)> {
+    let set =
+        crate::oracle::from_env().ok_or_else(|| anyhow::anyhow!("oracle not configured"))?;
+    let (mut ocfg, key) = set;
+    if let Some(m) = override_model {
+        if !m.trim().is_empty() {
+            ocfg.model = m.to_string();
+        }
+    }
+    // One compiled context per case, priced identically — the oracle pays
+    // per character, so the run states exactly what it paid for.
+    let scopes = vec![
+        "pressure relief valve opening pressure stop",
+        "pump maintenance seal replacement schedule",
+        "lightbulb unusual object singing",
+        "data retention years logs",
+    ];
+    let compiled: Vec<String> = scopes
+        .into_iter()
+        .map(|q| {
+            crate::map::compile_context(docs, embedder, q, 4000)
+                .map(|c| c.physis_context.chars().take(3200).collect::<String>())
+                .unwrap_or_default()
+        })
+        .collect();
+    let mut cases = oracle_cases(docs, ctx, embedder);
+    for (i, case) in cases.iter_mut().enumerate() {
+        let evidence = compiled.get(i).cloned().unwrap_or_default();
+        case.context_chars = evidence.chars().count();
+        let prompt = format!(
+            "Query: {}\n\nEvidence (the only admissible sources; cite them):\n{}\n\nAnswer in <=120 words with the exact quotes that decide.",
+            case.query, evidence
+        );
+        let (text, ms) = crate::oracle::complete(
+            &ocfg,
+            &key,
+            "You answer industrial contract questions strictly from the given evidence. Cite exact quotes. If evidence is missing, say so.",
+            &prompt,
+            300,
+        )?;
+        case.oracle_answer = text;
+        case.latency_ms = ms;
+        case.agreement_jaccard =
+            crate::oracle::token_jaccard(&case.physis_answer, &case.oracle_answer);
+        case.oracle_cites_evidence =
+            crate::oracle::cites_evidence(&case.oracle_answer, &case.must_mention);
+    }
+    let agree: f32 = if cases.is_empty() {
+        0.0
+    } else {
+        cases.iter().map(|c| c.agreement_jaccard).sum::<f32>() / cases.len() as f32
+    };
+    let eh = cases.iter().filter(|c| c.oracle_cites_evidence).count();
+    let et = cases.len();
+    Ok((ocfg.model.clone(), cases, agree, eh, et))
+}
+
+/// One-line failure tag for provenance — the full error stays in run.json.
+fn short_err(s: &str) -> String {
+    s.chars().take(120).collect()
+}
+
 fn fam_names() -> Vec<String> {
     vec![format!("maint"), format!("finance"), format!("deploy")]
 }
@@ -148,7 +300,7 @@ pub fn run(cfg: BenchConfig, embedder: &dyn crate::embed::VectorEmbed) -> anyhow
     let families_known = fams.len();
     let repeat_recovery = families_found as f32 / families_known.max(1) as f32;
 
-    let anoms: Vec<String> = vec![format!("zz-anomaly-plasma.md"), format!("zz-anomaly-quantum.md")];
+    let anoms: Vec<String> = vec!["zz-anomaly-plasma.md".to_string(), "zz-anomaly-quantum.md".to_string()];
     let top_diff: BTreeSet<String> = m1
         .differences
         .iter()
@@ -159,8 +311,8 @@ pub fn run(cfg: BenchConfig, embedder: &dyn crate::embed::VectorEmbed) -> anyhow
     let anomaly_recall = anomalies_caught as f32 / anoms.len() as f32;
 
     let pairs: Vec<(String, String)> = vec![
-        (format!("extra-device-spec-A.md"), format!("extra-device-spec-B.md")),
-        (format!("extra-window-a.md"), format!("extra-window-b.md")),
+        ("extra-device-spec-A.md".to_string(), "extra-device-spec-B.md".to_string()),
+        ("extra-window-a.md".to_string(), "extra-window-b.md".to_string()),
     ];
     let mut found: BTreeSet<(String, String)> = Default::default();
     for p in &m1.contradictions {
@@ -208,7 +360,7 @@ pub fn run(cfg: BenchConfig, embedder: &dyn crate::embed::VectorEmbed) -> anyhow
     let look0 = Instant::now();
     let mut ops = 0usize;
     for _ in 0..200 {
-        let _ = loaded.top_next(&vec![format!("the"), format!("pump")], 3);
+        let _ = loaded.top_next(&["the".to_string(), "pump".to_string()], 3);
         ops += 1;
     }
     let secs: f64 = look0.elapsed().as_secs_f32() as f64;
@@ -235,12 +387,30 @@ pub fn run(cfg: BenchConfig, embedder: &dyn crate::embed::VectorEmbed) -> anyhow
             }
         }
     }
-    let heldout_score = match m_a.score(&held_text) {
-        Ok(x) => x,
-        Err(_) => 0.0,
-    };
+    let heldout_score = m_a.score(&held_text).unwrap_or(0.0);
 
-    let big_leg = cfg.big_model.clone().unwrap_or(format!("not_configured"));
+    let mut oracle_cases: Vec<crate::oracle::OracleCase> = Vec::new();
+    let mut oracle_mean_agreement = 0.0f32;
+    let mut oracle_evidence_hits = 0usize;
+    let mut oracle_evidence_total = 0usize;
+    let big_model_leg = match oracle_leg(&docs, &ctx, embedder, cfg.big_model.as_deref()) {
+        Ok((leg, cases, agree, eh, et)) => {
+            oracle_cases.extend(cases);
+            oracle_mean_agreement = agree;
+            oracle_evidence_hits = eh;
+            oracle_evidence_total = et;
+            leg
+        }
+        Err(e) => {
+            // Distinguish "no oracle on this machine" (honest baseline) from
+            // "oracle reachable but died" (real incident, stated, kept).
+            if crate::oracle::from_env().is_none() {
+                "not_configured".into()
+            } else {
+                format!("failed:{}", short_err(&e.to_string()))
+            }
+        }
+    };
     let metrics = BenchMetrics {
         families_known,
         families_found,
@@ -264,7 +434,11 @@ pub fn run(cfg: BenchConfig, embedder: &dyn crate::embed::VectorEmbed) -> anyhow
         interchange_ok,
         heldout_docs: held_docs,
         heldout_score,
-        big_model_leg: big_leg.clone(),
+        big_model_leg,
+        oracle_cases,
+        oracle_mean_agreement,
+        oracle_evidence_hits,
+        oracle_evidence_total,
     };
 
     Ok(BenchOut {
@@ -278,34 +452,39 @@ pub fn run(cfg: BenchConfig, embedder: &dyn crate::embed::VectorEmbed) -> anyhow
     })
 }
 
+/// A document is a (path, body) pair; the corpus truth maps a family name to
+/// the member paths it must contain.
+pub type Doc = (String, String);
+pub type Truth = BTreeMap<String, Vec<String>>;
+
 /// Deterministic, self-contained ground-truth corpus. Families, anomalies and
 /// contradictions are all KNOWN — nothing is guessed.
-pub fn ground_truth() -> (Vec<(String, String)>, BTreeMap<String, Vec<String>>) {
+pub fn ground_truth() -> (Vec<Doc>, Truth) {
     let mut docs: Vec<(String, String)> = Vec::new();
     let mut truth: BTreeMap<String, Vec<String>> = Default::default();
     let families: Vec<(String, &str)> = vec![
-        (format!("maint"), "Pump maintenance required: replace the seal on line {i}, vibration rising after bearing wear."),
-        (format!("finance"), "Invoice {i}: payment terms net 30, purchase order approved, vendor shipping confirmation received today."),
-        (format!("deploy"), "Release {i} deployed to staging: config drift fixed, rollout verified, telemetry green, rollback documented."),
+        ("maint".into(), "Pump maintenance required: replace the seal on line {i}, vibration rising after bearing wear."),
+        ("finance".into(), "Invoice {i}: payment terms net 30, purchase order approved, vendor shipping confirmation received today."),
+        ("deploy".into(), "Release {i} deployed to staging: config drift fixed, rollout verified, telemetry green, rollback documented."),
     ];
     let mut k = 0;
     for (name, tpl) in families {
         let mut members: Vec<String> = Vec::new();
         for j in 0..8 {
             k += 1;
-            let body = tpl.replace("{i}", &format!("{k}"));
+            let body = tpl.replace("{i}", k.to_string().as_str());
             let path: String = format!("{name}-{j:02}.md");
             docs.push((path.clone(), body));
             members.push(path);
         }
         truth.entry(format!("fam:{name}")).or_default().extend(members);
     }
-    docs.push((format!("zz-anomaly-plasma.md"), format!("The plasma obelisk hums at a frequency only the seventh lighthouse can hear.")));
-    docs.push((format!("zz-anomaly-quantum.md"), format!("Quantum origami folds the evening into theorem sixty-four and unfolds it before dawn.")));
-    docs.push((format!("extra-device-spec-A.md"), format!("The pressure relief valve shall open at 2.6 bar and the machine must stop above it.")));
-    docs.push((format!("extra-device-spec-B.md"), format!("The pressure relief valve shall open at 4.2 bar and the machine must not stop above it.")));
-    docs.push((format!("extra-window-a.md"), format!("Operator access window is mandatory from 06:00 and night access is forbidden.")));
-    docs.push((format!("extra-window-b.md"), format!("Operator access window is forbidden from 06:00 and night access is required.")));
+    docs.push(("zz-anomaly-plasma.md".to_string(), "The plasma obelisk hums at a frequency only the seventh lighthouse can hear.".to_string()));
+    docs.push(("zz-anomaly-quantum.md".to_string(), "Quantum origami folds the evening into theorem sixty-four and unfolds it before dawn.".to_string()));
+    docs.push(("extra-device-spec-A.md".to_string(), "The pressure relief valve shall open at 2.6 bar and the machine must stop above it.".to_string()));
+    docs.push(("extra-device-spec-B.md".to_string(), "The pressure relief valve shall open at 4.2 bar and the machine must not stop above it.".to_string()));
+    docs.push(("extra-window-a.md".to_string(), "Operator access window is mandatory from 06:00 and night access is forbidden.".to_string()));
+    docs.push(("extra-window-b.md".to_string(), "Operator access window is forbidden from 06:00 and night access is required.".to_string()));
     docs.sort_by(|a, b| a.0.cmp(&b.0));
     (docs, truth)
 }

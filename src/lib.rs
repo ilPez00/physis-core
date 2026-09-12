@@ -205,6 +205,7 @@ pub mod hypothesis;
 pub mod model_provider;
 pub mod models;
 pub mod ngram_table;
+pub mod oracle;
 pub mod ontology;
 pub mod praxis;
 pub mod propose;

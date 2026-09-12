@@ -5,8 +5,8 @@
     "min_count": 1,
     "context_budget": 300,
     "big_model": null,
-    "physis_version": "0.1.25",
-    "git_commit": "1e6cda9",
+    "physis_version": "0.1.26",
+    "git_commit": "275be18",
     "seed": 7
   },
   "metrics": {
@@ -24,14 +24,16 @@
     "baseline_tokens": 220,
     "physis_tokens": 166,
     "context_compression_ratio": 0.24545455,
-    "ngram_build_ms": 6.960511207580566,
-    "ngram_load_ms": 4.487659782171249,
-    "ngram_lookup_per_sec": 192375.20105769095,
-    "ngram_disk_bytes": 22595,
+    "ngram_build_ms": 2.388987923040986,
+    "ngram_load_ms": 1.6599149676039815,
+    "ngram_lookup_per_sec": 338988.2285342653,
+    "ngram_disk_bytes": 14874,
     "ngram_ram_estimate_mb": 1,
     "interchange_ok": true,
+    "heldout_docs": 15,
+    "heldout_score": -1.0077245,
     "big_model_leg": "not_configured"
   },
   "corpus_hash": "a8ac5be2f5b872735d89b0cc97f86776fcec5eb65d90dffaf296f6d4e330d975",
-  "timestamp": "2026-09-12T08:30:48.880871488+00:00"
+  "timestamp": "2026-09-12T10:22:22.700642235+00:00"
 }

@@ -1,9 +1,9 @@
 {
   "context_budget": 300,
   "corpus_hash": "a8ac5be2f5b872735d89b0cc97f86776fcec5eb65d90dffaf296f6d4e330d975",
-  "git_commit": "1e6cda9",
+  "git_commit": "275be18",
   "model": null,
   "ngram_order": 5,
-  "physis_version": "0.1.25",
+  "physis_version": "0.1.26",
   "seed": 7
 }
