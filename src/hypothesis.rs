@@ -348,12 +348,13 @@ impl Hypothesis {
 
     /// Add supporting evidence and update status and fitness.
     pub fn add_supporting_evidence(&mut self, evidence: Evidence) {
+        let previous = self.status;
         self.supporting_evidence.push(evidence);
         if self.status == HypothesisStatus::Candidate && !self.supporting_evidence.is_empty() {
             self.status = HypothesisStatus::Supported;
         }
         self.recompute_fitness();
-        self.revise("Added supporting evidence", None);
+        self.revise(previous, "Added supporting evidence", None);
     }
 
     pub fn add_supporting(&mut self, evidence: Evidence) {
@@ -362,10 +363,11 @@ impl Hypothesis {
 
     /// Add contradicting evidence and update status and fitness.
     pub fn add_contradicting_evidence(&mut self, evidence: Evidence) {
+        let previous = self.status;
         self.contradicting_evidence.push(evidence);
         self.status = HypothesisStatus::Contradicted;
         self.recompute_fitness();
-        self.revise("Added contradicting evidence", None);
+        self.revise(previous, "Added contradicting evidence", None);
     }
 
     pub fn add_contradicting(&mut self, evidence: Evidence) {
@@ -399,6 +401,7 @@ impl Hypothesis {
         if removed == 0 {
             return 0;
         }
+        let previous = self.status;
         if self.status != HypothesisStatus::Certified {
             if !self.contradicting_evidence.is_empty() {
                 self.status = HypothesisStatus::Contradicted;
@@ -409,7 +412,11 @@ impl Hypothesis {
             }
         }
         self.recompute_fitness();
-        self.revise(format!("Retracted evidence from {}", source), Some(String::from(source)));
+        self.revise(
+            previous,
+            format!("Retracted evidence from {}", source),
+            Some(String::from(source)),
+        );
         removed
     }
 
@@ -423,12 +430,13 @@ impl Hypothesis {
 
     /// Record a prediction and its outcome.
     pub fn record_prediction(&mut self, prediction: Prediction) {
+        let previous = self.status;
         if let Some(ref outcome) = prediction.actual_outcome {
             self.actual_outcomes.push(outcome.clone());
         }
         self.predictions.push(prediction);
         self.recompute_fitness();
-        self.revise("Recorded prediction outcome", None);
+        self.revise(previous, "Recorded prediction outcome", None);
     }
 
     pub fn add_prediction(&mut self, prediction: Prediction) {
@@ -577,6 +585,7 @@ impl Hypothesis {
         actual_outcome: impl Into<String>,
         correct: bool,
     ) -> bool {
+        let previous = self.status;
         let Some(pred) = self.predictions.get_mut(index) else {
             return false;
         };
@@ -589,6 +598,7 @@ impl Hypothesis {
         let statement = pred.statement.clone();
         self.recompute_fitness();
         self.revise(
+            previous,
             format!(
                 "Resolved prediction {} ({}): {}",
                 index,
@@ -623,8 +633,36 @@ impl Hypothesis {
             .count()
     }
 
-    fn revise(&mut self, description: impl Into<String>, trigger: Option<String>) {
-        let previous = self.status;
+    /// Record a revision, given the status that held BEFORE the caller changed it.
+    ///
+    /// # PH-017
+    ///
+    /// This previously read `self.status` for both ends of the transition:
+    ///
+    /// ```ignore
+    /// let previous = self.status;        // caller has ALREADY mutated this
+    /// ...
+    /// previous_status: previous,
+    /// new_status: self.status,           // the same value
+    /// ```
+    ///
+    /// Every caller mutates `self.status` before revising, so every revision
+    /// recorded `previous == new` — a history asserting that nothing ever
+    /// changed. `replay`, which reconstructs standing from that history, was
+    /// therefore blind by construction, while `list` derived status from
+    /// fitness at read time. The two disagreed for the whole life of the
+    /// feature, and the cause was not a missing event: it was a recorded
+    /// transition with both ends set to the destination.
+    ///
+    /// Taking `previous` as an argument makes it impossible to get wrong by
+    /// forgetting to capture it first — the type system now requires the caller
+    /// to have it.
+    fn revise(
+        &mut self,
+        previous: HypothesisStatus,
+        description: impl Into<String>,
+        trigger: Option<String>,
+    ) {
         self.revised_at = chrono::Utc::now();
         self.revision_history.push(Revision {
             timestamp: self.revised_at,
@@ -670,6 +708,51 @@ mod resolution_tests {
     /// the composite, and nothing could write `Prediction.correct`, so that
     /// quarter was pinned at its 0.5 default for every hypothesis that ever
     /// existed. This is the test that the write path exists at all.
+    /// PH-017, the failing test written before the fix.
+    ///
+    /// Every status-changing path records a `Revision`. If those revisions say
+    /// `previous == new`, the history claims nothing ever changed and `replay`
+    /// is blind by construction — which is exactly why it disagreed with
+    /// `list`.
+    #[test]
+    fn a_revision_records_the_status_it_changed_from() {
+        let mut h = Hypothesis::new("testable", vec![]);
+        assert_eq!(h.status, HypothesisStatus::Candidate);
+
+        h.add_supporting_evidence(Evidence::supports("src", "it held"));
+        assert_eq!(h.status, HypothesisStatus::Supported, "the status did move");
+
+        let r = h.revision_history.last().expect("the move must be recorded");
+        assert_eq!(
+            r.previous_status,
+            HypothesisStatus::Candidate,
+            "the revision must record what it changed FROM, not the post-mutation value"
+        );
+        assert_eq!(r.new_status, HypothesisStatus::Supported);
+        assert_ne!(
+            r.previous_status, r.new_status,
+            "a revision that records no change makes replay blind"
+        );
+    }
+
+    /// The negative from the packet: the log records transitions, not
+    /// heartbeats. Recomputing without crossing a status boundary must not
+    /// manufacture a transition.
+    #[test]
+    fn a_recomputation_that_changes_nothing_records_no_transition() {
+        let mut h = Hypothesis::new("stable", vec![]);
+        h.add_supporting_evidence(Evidence::supports("a", "one"));
+        let after_first = h.revision_history.len();
+        // A second supporting piece does not cross a boundary: already Supported.
+        h.add_supporting_evidence(Evidence::supports("b", "two"));
+        let last = h.revision_history.last().unwrap();
+        assert_eq!(
+            last.previous_status, last.new_status,
+            "no boundary crossed, so the revision is a no-op record"
+        );
+        assert!(h.revision_history.len() > after_first, "but it is still audited");
+    }
+
     #[test]
     fn resolving_a_prediction_moves_fitness() {
         let mut h = hyp();

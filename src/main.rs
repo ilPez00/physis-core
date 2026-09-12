@@ -599,7 +599,12 @@ fn main() -> anyhow::Result<()> {
             cmd_direction(&before, &after, &want, json)
         }
         Command::Ground { json } => {
-            let g = physis_core::ground::read(&load_core(), &physis_core::observe::read(&physis_core::observe::log_path()).unwrap_or_default(), chrono::Utc::now());
+            let mut core = load_core();
+            if core.project_all_revisions() > 0 {
+                store::ensure_data_dir()?;
+                core.persist()?;
+            }
+            let g = physis_core::ground::read(&core, &physis_core::observe::read(&physis_core::observe::log_path()).unwrap_or_default(), chrono::Utc::now());
             if json {
                 println!("{}", serde_json::to_string_pretty(&g)?);
             } else {
@@ -1533,7 +1538,16 @@ fn run_audit() -> anyhow::Result<()> {
 }
 
 fn run_replay(subject: &str, at: Option<&str>) -> anyhow::Result<()> {
-    let core = load_core();
+    // PH-017: project each hypothesis's own revision history into the audit
+    // trail before reading it. The trail is a VIEW over `revision_history`
+    // rather than a parallel record kept in sync by discipline — discipline is
+    // what failed, and the projection removes the disagreement by construction.
+    // Idempotent, so the persist below adds nothing when already current.
+    let mut core = load_core();
+    if core.project_all_revisions() > 0 {
+        store::ensure_data_dir()?;
+        core.persist()?;
+    }
     let timestamp = match at {
         Some(t) => chrono::DateTime::parse_from_rfc3339(t)?.with_timezone(&chrono::Utc),
         None => chrono::Utc::now(),
@@ -1551,12 +1565,38 @@ fn run_replay(subject: &str, at: Option<&str>) -> anyhow::Result<()> {
         IdMatch::Unknown => subject.to_string(),
     };
 
-    match core.reconstruct_belief_at(&subject, timestamp) {
+    let replayed = core.reconstruct_belief_at(&subject, timestamp);
+    let derived = core.hypotheses.get(&subject).map(|h| h.status);
+
+    match replayed {
         Some(status) => println!("Belief at {timestamp} for [{subject}]: {:?}", status),
         None if core.hypotheses.contains_key(&subject) => {
             println!("[{subject}] is known but had no recorded belief at {timestamp}")
         }
         None => println!("No subject [{subject}] in the audit trail (try `physis-core audit`)"),
+    }
+
+    // PH-017: where the log and the derived view disagree, SAY SO.
+    //
+    // Answering with one of them silently is the original defect wearing a
+    // different face. The log is authoritative for what was RECORDED; the
+    // derived status is what the evidence implies now. A gap between them is
+    // information — usually that the claim's history was written before the
+    // `revise` fix, when every recorded transition had both ends set to the
+    // destination and so said nothing moved. That history cannot be
+    // reconstructed and must not be fabricated.
+    if at.is_none() {
+        if let (Some(d), Some(r)) = (derived, replayed) {
+            if d != r {
+                println!();
+                println!("  !! the log and the derived view DISAGREE");
+                println!("     recorded (this replay) : {r:?}");
+                println!("     derived from evidence  : {d:?}");
+                println!("     The log has no transition for this claim — its revisions predate");
+                println!("     the PH-017 fix and recorded no change. The gap is not repairable");
+                println!("     without inventing history, so it is reported instead.");
+            }
+        }
     }
     Ok(())
 }

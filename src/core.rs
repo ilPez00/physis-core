@@ -582,6 +582,70 @@ impl PhysisCore {
         }
     }
 
+    /// Project a hypothesis's own revision history into the audit trail.
+    ///
+    /// # PH-017 — why a projection rather than more emit sites
+    ///
+    /// `Hypothesis` mutates status in five places and has no access to the
+    /// audit trail, so the packet's instinct was to emit from each. That would
+    /// keep two records in sync by discipline, and discipline is what failed:
+    /// the original defect was a `revise` helper that wrote the destination
+    /// status into both ends of the transition, so the history claimed nothing
+    /// ever changed while `list` derived standing from fitness at read time.
+    ///
+    /// A projection removes the disagreement by construction. `revision_history`
+    /// is the single record of what changed; the audit trail is a view over it.
+    /// A future mutation path cannot forget to emit, because it does not emit —
+    /// it revises, and revisions are projected.
+    ///
+    /// Idempotent: only revisions newer than the last projected event are
+    /// recorded, so calling this repeatedly does not duplicate history. Only
+    /// **real** transitions are projected — a revision whose status did not move
+    /// is audited on the hypothesis but is not a transition, because the log
+    /// records transitions rather than heartbeats.
+    pub fn project_revisions(&mut self, id: &str) -> usize {
+        let Some(h) = self.hypotheses.get(id) else { return 0 };
+        let last_seen = self
+            .epistemic_audit
+            .events
+            .iter()
+            .filter(|e| e.subject_id == id && e.event_type == EpistemicEventType::StatusTransition)
+            .map(|e| e.timestamp)
+            .max();
+
+        let pending: Vec<_> = h
+            .revision_history
+            .iter()
+            .filter(|r| last_seen.is_none_or(|t| r.timestamp > t))
+            .filter(|r| r.previous_status != r.new_status)
+            .cloned()
+            .collect();
+        let fitness = h.fitness;
+
+        let n = pending.len();
+        for r in pending {
+            let mut ev = EpistemicEvent::new(
+                EpistemicEventType::StatusTransition,
+                id,
+                r.description.clone(),
+            )
+            .with_transition(r.previous_status.as_str(), r.new_status.as_str())
+            .with_metric(fitness);
+            // Keep the revision's own clock: an event stamped "now" would make
+            // `replay --at T` answer with a belief the machine did not hold at T.
+            ev.timestamp = r.timestamp;
+            self.epistemic_audit.record(ev);
+        }
+        n
+    }
+
+    /// Project every hypothesis's revisions. Cheap and idempotent; call it
+    /// wherever the store is about to be read for standing.
+    pub fn project_all_revisions(&mut self) -> usize {
+        let ids: Vec<String> = self.hypotheses.keys().cloned().collect();
+        ids.iter().map(|id| self.project_revisions(id)).sum()
+    }
+
     // ── Contradictions ─────────────────────────────────────────────────
 
     /// Record an explicit contradiction between two claims without overwriting.
@@ -968,6 +1032,99 @@ impl PhysisCore {
                 EpistemicQueryResult::RankedHypotheses { hypotheses: hyps }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod ph017_tests {
+    use super::*;
+    use crate::hypothesis::{Evidence, Hypothesis};
+
+    /// The invariant the whole packet exists for: what `replay` reconstructs
+    /// must equal what `list` reports. This is the assertion that would have
+    /// caught the defect years earlier.
+    #[test]
+    fn replay_agrees_with_the_derived_status() {
+        let mut core = PhysisCore::new();
+        let mut h = Hypothesis::new("under test", vec![]);
+        h.add_supporting_evidence(Evidence::supports("a", "held"));
+        let id = h.id.clone();
+        let derived = h.status;
+        core.hypotheses.insert(id.clone(), h);
+
+        core.project_all_revisions();
+
+        let replayed = core
+            .epistemic_audit
+            .reconstruct_status_at(&id, chrono::Utc::now());
+        assert_eq!(
+            replayed,
+            Some(derived),
+            "replay must reconstruct the same standing `list` derives"
+        );
+    }
+
+    /// A transition must be replayable AT THE TIME IT HAPPENED, not at the time
+    /// it was projected — otherwise `replay --at T` answers with a belief the
+    /// machine did not hold at T.
+    #[test]
+    fn projection_preserves_the_revisions_own_clock() {
+        let mut core = PhysisCore::new();
+        let mut h = Hypothesis::new("timed", vec![]);
+        h.add_supporting_evidence(Evidence::supports("a", "held"));
+        let revision_time = h.revision_history.last().unwrap().timestamp;
+        let id = h.id.clone();
+        core.hypotheses.insert(id.clone(), h);
+        core.project_all_revisions();
+
+        let ev = core
+            .epistemic_audit
+            .events
+            .iter()
+            .find(|e| e.subject_id == id)
+            .expect("the transition must be projected");
+        assert_eq!(ev.timestamp, revision_time, "the event keeps the revision's clock");
+    }
+
+    /// Idempotent: the projection is a view, and calling it twice must not
+    /// duplicate history.
+    #[test]
+    fn projecting_twice_records_nothing_the_second_time() {
+        let mut core = PhysisCore::new();
+        let mut h = Hypothesis::new("once", vec![]);
+        h.add_supporting_evidence(Evidence::supports("a", "held"));
+        core.hypotheses.insert(h.id.clone(), h);
+
+        let first = core.project_all_revisions();
+        assert!(first >= 1, "something must be projected the first time");
+        assert_eq!(core.project_all_revisions(), 0, "and nothing the second");
+    }
+
+    /// The log records transitions, not heartbeats. A revision that did not
+    /// cross a status boundary is audited on the hypothesis but is not a
+    /// transition, and must not enter the trail.
+    #[test]
+    fn a_revision_that_changed_nothing_is_not_projected() {
+        let mut core = PhysisCore::new();
+        let mut h = Hypothesis::new("steady", vec![]);
+        h.add_supporting_evidence(Evidence::supports("a", "one")); // Candidate -> Supported
+        h.add_supporting_evidence(Evidence::supports("b", "two")); // Supported -> Supported
+        // Three revisions exist: "Created" (Candidate->Candidate, construction
+        // rather than a transition), the real Candidate->Supported move, and a
+        // second Supported->Supported that crossed nothing.
+        assert_eq!(h.revision_history.len(), 3, "all three are audited on the hypothesis");
+        assert_eq!(
+            h.revision_history.iter().filter(|r| r.previous_status != r.new_status).count(),
+            1,
+            "but only one of them is a transition"
+        );
+        core.hypotheses.insert(h.id.clone(), h);
+
+        assert_eq!(
+            core.project_all_revisions(),
+            1,
+            "but only the real transition reaches the trail"
+        );
     }
 }
 
