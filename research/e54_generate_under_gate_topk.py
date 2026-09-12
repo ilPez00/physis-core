@@ -26,6 +26,16 @@ Run from physis-core/:  python3 research/e54_generate_under_gate.py [--limit N]
 """
 import argparse, collections, pathlib, random, re, subprocess, sys, time
 
+# !! This experiment WRITES BROKEN CODE INTO src/ ON PURPOSE, one file at a
+# !! time, restoring each from git afterwards. Two consequences:
+# !!   1. Do not run anything else against this tree while it runs — a build in
+# !!      a dependent crate will fail spuriously.
+# !!   2. NEVER `git add -A` while it is running. A blanket stage captured one
+# !!      of this harness's own wrong guesses into 95cb60a
+# !!      (`use crate::embed::CellClassifier;`), and because restore is
+# !!      `git checkout -- FILE` — which restores to HEAD — the defect then
+# !!      became self-perpetuating. Stage explicit paths.
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 USE_RE = re.compile(r'^use crate::([a-z_][a-z0-9_]*)::(.+);\s*$')
