@@ -44,7 +44,7 @@
 //! # }
 //! ```
 
-use crate::embed::CellClassifier;
+use crate::classify::CellClassifier;
 use crate::embed::VectorEmbed;
 use std::collections::HashMap;
 
