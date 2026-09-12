@@ -1648,10 +1648,15 @@ fn cmd_ngram(cmd: NGramCmd) -> anyhow::Result<()> {
             };
             let (table, bytes) = if structural {
                 let ontology = physis_core::ontology::OntologyLoader::load_all();
-                let embedder = physis_core::embed::RandomProjectionEmbedder::new(64);
-                let clf = physis_core::classify::CellClassifier::build(&ontology, &embedder);
+                // A structural table IS the classifier's output, one symbol per
+                // segment. Built on a lexical hash the symbol sequence is noise
+                // with a schema, and every downstream order-5 count estimates a
+                // distribution over misfilings. This was the last site still
+                // constructing its own RandomProjectionEmbedder directly.
+                let embedder = load_embedder();
+                let clf = physis_core::classify::CellClassifier::build(&ontology, embedder.as_ref());
                 ngram_table::build_structural(&docs, cfg, |seg| {
-                    let emb = embedder.embed(seg);
+                    let emb = embedder.as_ref().embed(seg);
                     clf.best_entry_sim(&emb)
                         .map(|(_, d, m)| format!("{d}×{m}"))
                         .unwrap_or_else(|| "UNKNOWN×UNKNOWN".into())
