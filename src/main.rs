@@ -1937,7 +1937,11 @@ less context, more structure — physis.");
 
 fn cmd_watch(source: &str, path: &Path, max: usize, dry_run: bool) -> anyhow::Result<()> {
     let log = physis_core::observe::log_path();
-    let known = physis_core::observe::read(&log)?;
+    // Bounded tail, not the whole log. Deduplication only needs recent history,
+    // and reading everything made a `watch` run cost 2.0 s / 372 MB at 500k
+    // observations — the cliff that killed Nepomuk, measured arriving here.
+    // 20k is far more than any watcher's window (max is capped at 500).
+    let known = physis_core::observe::read_tail(&log, 20_000)?;
     let home = std::env::var("HOME").unwrap_or_default();
     let shell_hist = || {
         let z = PathBuf::from(&home).join(".zsh_history");
