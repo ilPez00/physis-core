@@ -1488,6 +1488,9 @@ enum ModelCmd {
         #[arg(long = "file", required = true)]
         files: Vec<String>,
     },
+    /// Load a registry model or table through the model interface and print
+    /// its real backend card (what the engine will actually run).
+    Use { id: String },
     /// Remove an installed model.
     Remove { id: String },
     /// Print the install path of a model id.
@@ -1529,6 +1532,8 @@ enum NGramCmd {
 }
 
 fn cmd_model(cmd: ModelCmd) -> anyhow::Result<()> {
+    use physis_core::model_provider::ModelProvider;
+    use physis_core::ngram_table::NGramTable;
     let reg = physis_core::model_provider::ModelRegistry::new(
         physis_core::model_provider::ModelRegistry::default_root(),
     );
@@ -1561,6 +1566,45 @@ fn cmd_model(cmd: ModelCmd) -> anyhow::Result<()> {
             };
             let m = reg.install_local(record, &src, &files)?;
             println!("installed {} ({} files verified)", m.record.id, m.files.len());
+        }
+        ModelCmd::Use { id } => {
+            let mreg = physis_core::model_provider::ModelRegistry::new(
+                physis_core::model_provider::ModelRegistry::default_root(),
+            );
+            let nreg = physis_core::ngram_table::TableRegistry::new(
+                physis_core::ngram_table::TableRegistry::default_root(),
+            );
+            let mdir = mreg.path(&id);
+            let tdir = nreg.path(&id);
+            if mdir.is_dir() {
+                let m = physis_core::model_provider::DiskTableModel::load(&id, &mdir)?;
+                println!("{}", serde_json::to_string_pretty(&m.metadata())?);
+            } else if tdir.parent().map(|d| d.is_dir()).unwrap_or(false) {
+                let t = nreg.load(&id, None)?;
+                let kind = match t.manifest().kind {
+                    physis_core::ngram_table::TableKind::Lexical => "lexical".to_string(),
+                    physis_core::ngram_table::TableKind::Structural => "structural".to_string(),
+                };
+                let model = physis_core::model_provider::NgramDecoderModel::new(
+                    &id,
+                    std::sync::Arc::new(t),
+                    Box::new(physis_core::tokenizer::WhitespaceTokenizer::new(50_000)),
+                );
+                let info = serde_json::json!({
+                    "id": model.metadata().id,
+                    "architecture": model.metadata().architecture,
+                    "parameters": model.metadata().parameter_count,
+                    "tokenizer": model.metadata().tokenizer,
+                    "capabilities": model.metadata().capabilities,
+                    "kind": kind,
+                });
+                println!("{}", serde_json::to_string_pretty(&info)?);
+            } else {
+                return Err(anyhow::anyhow!(
+                    "no installed model or table under id '{}' — install it first with model install / ngram import",
+                    id
+                ));
+            }
         }
         ModelCmd::Remove { id } => {
             reg.remove(&id)?;
@@ -1749,6 +1793,7 @@ fn cmd_benchmark(order: u8, budget: usize, big_model: Option<String>) -> anyhow:
     println!("ngram build {} ms, load {} ms, {} lookups/s, {} bytes on disk", m.ngram_build_ms.round(), m.ngram_load_ms.round(), m.ngram_lookup_per_sec.round(), m.ngram_disk_bytes);
     println!("ngram RAM estimate   {} MB", m.ngram_ram_estimate_mb);
     println!("interchangeable      {}", m.interchange_ok);
+    println!("held-out ({} docs) score  {}", m.heldout_docs, (m.heldout_score * 100.0).round());
     println!("big-model oracle leg {}", m.big_model_leg);
     println!("artifacts -> benchmarks/results/ (run.json, metrics.json, provenance.json)");
     Ok(())

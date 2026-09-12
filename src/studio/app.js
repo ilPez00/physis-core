@@ -59,7 +59,7 @@ function typing() {
 }
 
 /* ── tabs ─────────────────────────────────────────────────────── */
-const TABS = ['classify', 'grid', 'ontology', 'flow', 'coherence', 'corpus', 'discover', 'quality', 'edition', 'communities'];
+const TABS = ['classify', 'grid', 'ontology', 'flow', 'coherence', 'corpus', 'discover', 'structure', 'quality', 'edition', 'communities'];
 
 function showTab(name) {
   state.tab = name;
@@ -433,6 +433,46 @@ $('btnDream').onclick = guard('dream', async () => {
 });
 
 /* ── discover ─────────────────────────────────────────────────── */
+/* ── structure (Demo A) ───────────────────────────────── */
+$('btnMapRun').onclick = guard('structure map', async () => {
+  const dir = ($('mapdir').value || 'examples/demo-corpus').trim();
+  const btn = $('btnMapRun');
+  btn.disabled = true; btn.textContent = 'Mapping…';
+  try {
+    const r = await api('/api/map', { dir });
+    $('mapTiles').innerHTML =
+      tile(r.docs, 'documents')
+      + tile(r.repeats.length, 'patterns')
+      + tile(r.differences.length, 'differences')
+      + tile(r.contradictions.length, 'contradictions');
+    const rep = $('mapRepeats');
+    rep.innerHTML = '';
+    (r.repeats || []).forEach(c => {
+      const d = document.createElement('div');
+      d.className = 'card';
+      d.innerHTML = '<b>' + esc(c.name) + '</b> <span class="muted">' + c.count + ' instances · ' + esc((c.hints || []).join(', ')) + '</span>'
+        + '<div class="muted">' + c.instances.slice(0, 8).map(x => esc(x.title)).join(', ') + '</div>';
+      rep.appendChild(d);
+    });
+    if (!(r.repeats || []).length) rep.innerHTML = '<div class="muted">Nothing repeats at corpus scale here.</div>';
+    const dif = $('mapDiffs');
+    dif.innerHTML = '';
+    (r.differences || []).slice(0, 8).forEach(x => {
+      dif.innerHTML += '<div>• <b>' + esc(x.title) + '</b> <span class="muted">separation ' + (x.separation || 0).toFixed(2) + ' · nearest ' + esc(x.nearest_cluster || 'none') + '</span></div>';
+    });
+    (r.contradictions || []).slice(0, 6).forEach(p => {
+      dif.innerHTML += '<div>⚠ <b>' + esc(p.a.title) + '</b> vs <b>' + esc(p.b.title) + '</b> <span class="muted">[' + esc(p.cluster) + ']</span></div>';
+    });
+    if (!(r.differences || []).length && !(r.contradictions || []).length)
+      dif.innerHTML = '<div class="muted">No differences, no contradictions — a perfectly uniform corpus.</div>';
+    $('mapHash').textContent = 'structure hash ' + (r.structure_hash || '').slice(0, 12)
+      + ' · threshold ' + (r.threshold_used != null ? r.threshold_used.toFixed(2) : '?')
+      + (r.auto_retuned ? ' (auto-retuned)' : '');
+    toast(r.repeats.length + ' pattern(s), ' + r.differences.length + ' difference(s)');
+  } catch (e) { toast('map failed: ' + e.message, true); }
+  btn.disabled = false; btn.textContent = 'Run map';
+});
+
 $('btnIngest').onclick = guard('gap scan', async () => {
   const dir = $('ingestdir').value.trim();
   if (!dir) { toast('enter a directory path', true); return; }

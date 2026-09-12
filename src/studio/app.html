@@ -31,6 +31,7 @@
     <button data-tab="coherence">Coherence <span class="k">5</span></button>
     <button data-tab="corpus">Corpus <span class="k">6</span></button>
     <button data-tab="discover">Discover <span class="k">7</span></button>
+    <button data-tab="structure">Structure <span class="k">S</span></button>
     <button data-tab="quality">Quality <span class="k">8</span></button>
     <button data-tab="edition" id="navEdition">Pro <span class="k">9</span></button>
     <button data-tab="communities">Communities <span class="k">0</span></button>
@@ -290,6 +291,27 @@
       <h3>Proposed domains</h3>
       <div id="proposals" class="muted">Run a gap scan to see proposals.</div>
     </div>
+  </section>
+
+  <section class="tab" id="tab-structure">
+    <div class="hero">
+      <div>
+        <h2>Structure — what repeats, what differs</h2>
+        <p>The deterministic corpus map (Demo A): nearest-neighbour clusters, loneliness
+           anomalies, flipped-duplicate contradictions, a reproducibility hash.
+           Same builder the CLI runs — every instance traces to its source file.</p>
+      </div>
+      <div class="row tight">
+        <input id="mapdir" placeholder="corpus directory, e.g. examples/demo-corpus" style="min-width:280px" />
+        <button id="btnMapRun">Run map</button>
+      </div>
+    </div>
+    <div id="mapTiles" class="tiles"></div>
+    <h3>Recurring patterns</h3>
+    <div id="mapRepeats"><div class="muted">Run the map to see what repeats.</div></div>
+    <h3>Differences & contradictions</h3>
+    <div id="mapDiffs"><div class="muted">Loneliness anomalies and surfaced contradictions appear here.</div></div>
+    <div id="mapHash" class="muted" style="margin-top:10px"></div>
   </section>
 
   <!-- ── QUALITY ──────────────────────────────────────────────── -->

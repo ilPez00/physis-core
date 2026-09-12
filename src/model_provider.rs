@@ -49,6 +49,81 @@ pub enum ModelError {
     Backend(String),
 }
 
+/// A registry-installed, disk-loading model: `load()` verifies and loads the
+/// bundled `.physisng` table file, then decoding runs identically to the
+/// in-memory decoder. The model is now an **installed artifact**, not a
+/// session-local object.
+///
+/// Manifest expectation: installed dir contains exactly one `*.physisng` file
+/// with a verified checksum (written by `TableRegistry::install_bytes`).
+pub struct DiskTableModel {
+    pub model_id: String,
+    pub source_path: PathBuf,
+    pub inner: NgramDecoderModel,
+}
+
+fn first_table_file(dir: &Path) -> anyhow::Result<PathBuf> {
+    let entries = std::fs::read_dir(dir)
+        .map_err(|e| anyhow::anyhow!("model dir unreadable {}: {e}", dir.display()))?;
+    let mut found: Vec<PathBuf> = Vec::new();
+    for e in entries.filter_map(|x| x.ok()) {
+        let p = e.path();
+        if p.extension().and_then(|x| x.to_str()) == Some("physisng") {
+            found.push(p);
+        }
+    }
+    if found.len() != 1 {
+        return Err(anyhow::anyhow!(
+            "model dir {} must contain exactly one .physisng table, found {}",
+            dir.display(),
+            found.len()
+        ));
+    }
+    Ok(found.into_iter().next().unwrap())
+}
+
+impl DiskTableModel {
+    /// Load the (verified) table backing this installed model and wrap it in
+    /// the shared decoder — the same backend any in-memory table uses.
+    pub fn load(model_id: &str, dir: &Path) -> anyhow::Result<Self> {
+        let table_path = first_table_file(dir)?;
+        let table = crate::ngram_table::load(&table_path)?; // checksum verified
+        let tok: Box<dyn Tokenizer> =
+            match table.manifest().tokenizer.id.as_str() {
+                "whitespace-v1" => Box::new(crate::tokenizer::WhitespaceTokenizer::new(50_000)),
+                other => {
+                    return Err(anyhow::anyhow!(
+                        "model table uses unknown tokenizer '{other}' — rebuild with a supported tokenizer"
+                    ));
+                }
+            };
+        let inner = NgramDecoderModel::new(model_id, Arc::new(table), tok);
+        Ok(Self {
+            model_id: model_id.to_string(),
+            source_path: table_path,
+            inner,
+        })
+    }
+}
+
+impl ModelProvider for DiskTableModel {
+    fn metadata(&self) -> &ModelMetadata {
+        self.inner.metadata()
+    }
+    fn tokenize(&self, text: &str) -> Vec<String> {
+        self.inner.tokenize(text)
+    }
+    fn detokenize(&self, tokens: &[String]) -> String {
+        self.inner.detokenize(tokens)
+    }
+    fn generate(&self, prompt: &str, max_tokens: usize) -> Result<String, ModelError> {
+        self.inner.generate(prompt, max_tokens)
+    }
+    fn score(&self, text: &str) -> Result<f32, ModelError> {
+        self.inner.score(text)
+    }
+}
+
 impl fmt::Display for ModelError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

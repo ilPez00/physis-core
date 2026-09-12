@@ -57,6 +57,10 @@ pub struct BenchMetrics {
     pub ngram_disk_bytes: u64,
     pub ngram_ram_estimate_mb: u64,
     pub interchange_ok: bool,
+    // Held-out leg: no doc the table was built from is ever probed — a
+    // score here measures generalisation, not memorisation (Directive 1 §4).
+    pub heldout_docs: usize,
+    pub heldout_score: f32,
     pub big_model_leg: String, // "not_configured" | model id
 }
 
@@ -186,9 +190,13 @@ pub fn run(cfg: BenchConfig, embedder: &dyn crate::embed::VectorEmbed) -> anyhow
         min_count: cfg.min_count,
         ..Default::default()
     };
+    // Train split for the table that also backs m_a: even indices only.
+    // Odd indices are the HELD-OUT probe — never counted, never scored on.
     let mut tb = TableBuilder::new(tcfg);
-    for (_, body) in &docs {
-        tb.push_text(&tok, body);
+    for (i, (_, body)) in docs.iter().enumerate() {
+        if i % 2 == 0 {
+            tb.push_text(&tok, body);
+        }
     }
     let (tbl, bytes) = tb.finish(&tok, &hash);
     let ngram_build_ms = build0.elapsed().as_secs_f32() as f64 * 1000.0;
@@ -216,6 +224,21 @@ pub fn run(cfg: BenchConfig, embedder: &dyn crate::embed::VectorEmbed) -> anyhow
     let m_b = NgramDecoderModel::new("bench-b", std::sync::Arc::new(tbl2), Box::new(WhitespaceTokenizer::new(50_000)));
     let interchange_ok = !m_a.generate("the pump", 2).unwrap().is_empty()
         && !m_b.generate("the pump", 2).unwrap().is_empty();
+    // Held-out: even indices built the table; odd indices are probed.
+    let mut held_docs = 0usize;
+    let mut held_text = String::new();
+    for (i, (_, body)) in docs.iter().enumerate() {
+        if i % 2 == 1 {
+            held_docs += 1;
+            if held_text.is_empty() {
+                held_text = body.clone();
+            }
+        }
+    }
+    let heldout_score = match m_a.score(&held_text) {
+        Ok(x) => x,
+        Err(_) => 0.0,
+    };
 
     let big_leg = cfg.big_model.clone().unwrap_or(format!("not_configured"));
     let metrics = BenchMetrics {
@@ -239,6 +262,8 @@ pub fn run(cfg: BenchConfig, embedder: &dyn crate::embed::VectorEmbed) -> anyhow
         ngram_disk_bytes: bytes.len() as u64,
         ngram_ram_estimate_mb,
         interchange_ok,
+        heldout_docs: held_docs,
+        heldout_score,
         big_model_leg: big_leg.clone(),
     };
 
