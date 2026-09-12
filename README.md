@@ -1,5 +1,15 @@
 # Physis Core (`physis-core`)
 
+
+> **Compression numbers restated 2026-09-12.** Earlier figures (220 → 165, 25%)
+> compared two different quantities: the baseline was a *sum of chunk tokens*
+> while the physis side counted the *assembled string*, which carries separators.
+> Both sides now count the string a model is actually handed. The corrected
+> measurement on the same corpus is **253 → 165 tokens, 35%** — the old number
+> understated it, because the baseline was undercounted. Caught by a chain test
+> asserting `context_tokens <= baseline_tokens`, which a three-document corpus
+> inverted.
+
 [![Crates.io](https://img.shields.io/crates/v/physis-core.svg)](https://crates.io/crates/physis-core)
 [![Documentation](https://docs.rs/physis-core/badge.svg)](https://docs.rs/physis-core)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -15,7 +25,7 @@ context for humans and AI. Offline. No API key. No cloud.
   ↓ PHYSIS
 3 RECURRING PATTERNS · 1 DIFFERENCE · 1 CONTRADICTION
   ↓
-compiled context  — measured 25% smaller than conventional retrieval
+compiled context  — measured 35% smaller than conventional retrieval
 ```
 
 > **What that 25% is, and is not.** It is a real token count from an actual run

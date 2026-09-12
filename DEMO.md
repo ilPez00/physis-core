@@ -1,5 +1,15 @@
 # DEMO — physis-core
 
+
+> **Compression numbers restated 2026-09-12.** Earlier figures (220 → 165, 25%)
+> compared two different quantities: the baseline was a *sum of chunk tokens*
+> while the physis side counted the *assembled string*, which carries separators.
+> Both sides now count the string a model is actually handed. The corrected
+> measurement on the same corpus is **253 → 165 tokens, 35%** — the old number
+> understated it, because the baseline was undercounted. Caught by a chain test
+> asserting `context_tokens <= baseline_tokens`, which a three-document corpus
+> inverted.
+
 **Structure in your documents, context under a hard budget, answers with
 citations. Offline, deterministic, no API key.**
 
@@ -8,7 +18,7 @@ citations. Offline, deterministic, no API key.**
   ↓ physis
 4 REPEAT FAMILIES · 2 DIFFERENCES · 1 CONTRADICTION
   ↓
-220 → 165 tokens  (25% smaller than conventional retrieval)
+253 → 165 tokens  (35% smaller than conventional retrieval)
 ```
 
 Three demos to run first, each with its real transcript:
@@ -19,7 +29,7 @@ Three demos to run first, each with its real transcript:
 | [**Draft and fill**](#demo-0b-draft-and-fill--spend-the-model-only-on-the-gaps) | the table drafts what the corpus supports; a real transcript of the method *declining to be used* |
 | [**Per-cell tables**](#demo-0c-per-cell-tables--70-tables-with-subtables-and-the-control) | 70 tables with subtables, each shipped next to the control that could beat it |
 
-> **On the 25%.** It is a real token count from a real run. It is **not**
+> **On the 35%.** It is a real token count from a real run. It is **not**
 > evidence that the *selection* is good: `benchmarks/ground-truth` scores
 > identically under a real sentence transformer and a random-projection lexical
 > hash, because its repeat families are lexically near-identical. For a

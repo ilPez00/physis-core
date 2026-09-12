@@ -74,7 +74,7 @@ fn terms(text: &str) -> impl Iterator<Item = String> + '_ {
 }
 
 /// Most frequent terms across a cluster, ties broken alphabetically (determinism).
-fn top_terms(texts: &[&str], max: usize) -> Vec<String> {
+pub(crate) fn top_terms(texts: &[&str], max: usize) -> Vec<String> {
     let mut freq: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
     for t in texts {
         for w in terms(t) {

@@ -1,5 +1,15 @@
 # The neurosemantic layer
 
+
+> **Compression numbers restated 2026-09-12.** Earlier figures (220 → 165, 25%)
+> compared two different quantities: the baseline was a *sum of chunk tokens*
+> while the physis side counted the *assembled string*, which carries separators.
+> Both sides now count the string a model is actually handed. The corrected
+> measurement on the same corpus is **253 → 165 tokens, 35%** — the old number
+> understated it, because the baseline was undercounted. Caught by a chain test
+> asserting `context_tokens <= baseline_tokens`, which a three-document corpus
+> inverted.
+
 > Scope: this file covers the *retrieval* operation only — one of six (see
 > `../docs/WHAT_PHYSIS_IS.md` §3). For the five harnesses that feed the shared
 > coherence graph, see `../wiring/neurosemantic_wiring.md`.
@@ -36,9 +46,9 @@ seed 7, run twice — once under a lexical hash, once under a real ONNX model:
 | Anomaly recall | 1.00 (2/2) | 1.00 (2/2) |
 | Contradiction recall | 0.50 (1/2) | 0.50 (1/2) |
 | Map deterministic | true | true |
-| Baseline tokens | 220 | 221 |
+| Baseline tokens | 253 | 254 |
 | Physis tokens | 165 | 168 |
-| Context reduction | 25.0% | 24.0% |
+| Context reduction | 35.0% | 35.0% |
 | Structure hash | `0890098a…` | `c79cee20…` |
 | **Big-model oracle leg** | `not_configured` | `not_configured` |
 

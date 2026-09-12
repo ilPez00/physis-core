@@ -188,6 +188,23 @@ enum Command {
         #[arg(long)]
         big_model: Option<String>,
     },
+    /// The whole engine in one pass: structure, bounded context, coverage
+    /// gaps, a shortlist per gap, drift detection — and the label-permuted
+    /// control that all of it is scored against.
+    #[command(name = "chain")]
+    Chain {
+        #[arg(long)]
+        corpus: PathBuf,
+        #[arg(long, default_value = "")]
+        query: String,
+        #[arg(long, default_value_t = 1200)]
+        budget: usize,
+        /// Cosine below which a record counts as unplaced.
+        #[arg(long, default_value_t = 0.75)]
+        threshold: f32,
+        #[arg(long)]
+        json: bool,
+    },
     /// Grounded answer over a local corpus, with citations (the "NotebookLM"
     /// shape). Synthesises when an OpenAI-compatible endpoint is configured
     /// (a local ollama counts); otherwise returns a labelled extract and says
@@ -469,6 +486,9 @@ fn main() -> anyhow::Result<()> {
         Command::Model { cmd } => cmd_model(cmd),
         Command::NGram { cmd } => cmd_ngram(cmd),
         Command::Demo { dir, query, order } => cmd_demo(&dir, &query, order),
+        Command::Chain { corpus, query, budget, threshold, json } => {
+            cmd_chain(&corpus, &query, budget, threshold, json)
+        }
         Command::Notebook { corpus, query, budget, json, draft, confidence } => cmd_notebook(&corpus, &query, budget, json, draft, confidence),
         Command::Context { corpus, query, budget, json } => cmd_context(&corpus, &query, budget, json),
         Command::Benchmark { order, budget, big_model } => cmd_benchmark(order, budget, big_model),
@@ -1791,6 +1811,41 @@ fn cmd_demo(dir: &Path, query: &str, order: u8) -> anyhow::Result<()> {
     println!("continuation: {}…", model.generate(query, 8)?);
     println!("
 less context, more structure — physis.");
+    Ok(())
+}
+
+fn cmd_chain(
+    corpus: &Path,
+    query: &str,
+    budget: usize,
+    threshold: f32,
+    json: bool,
+) -> anyhow::Result<()> {
+    let docs = physis_core::map::load_corpus(corpus)?;
+    anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", corpus.display());
+    let (embedder, kind) = physis_core::embed::select(384);
+    let ontology = physis_core::ontology::OntologyLoader::load_all();
+    let clf = physis_core::classify::CellClassifier::build(&ontology, embedder.as_ref());
+    // An empty query still needs something to compile context against; the
+    // corpus's own first title is a neutral default that keeps the run
+    // reproducible instead of erroring on a flag the user did not need.
+    let q = if query.trim().is_empty() { docs[0].0.as_str() } else { query };
+    let r = physis_core::chain::run(
+        &docs, q, embedder.as_ref(), &clf, budget, threshold, kind,
+    )?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&r)?);
+    } else {
+        print!("{}", r.render());
+    }
+    // Exit non-zero when there WAS a comparison and the pass lost it, so a
+    // script cannot consume a shortlist the chain itself calls noise. A corpus
+    // with no gaps is not a failure: nothing was proposed, so nothing is unsafe
+    // to act on, and exiting 1 there would make "clean corpus" look like "broken
+    // run".
+    if r.testable() && !r.discriminates() {
+        std::process::exit(1);
+    }
     Ok(())
 }
 

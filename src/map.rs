@@ -594,7 +594,20 @@ pub fn compile_context(
         usize::MAX / 2,
         docs.len().min(12),
     );
-    let baseline_tokens = base_res.total_tokens;
+    // Count the ASSEMBLED baseline, not the sum of its chunk tokens.
+    //
+    // `physis_tokens` below counts the joined context string, which carries the
+    // "\n\n---\n\n" separators; `base_res.total_tokens` is a bare sum that does
+    // not. Comparing them made the ratio an apples-to-oranges figure — on a
+    // large corpus the budget cap dominates and it looks right, but on a
+    // three-document corpus the separator overhead alone inverts it and the
+    // "compressed" context measures LARGER than the baseline. Caught by a chain
+    // test asserting context_tokens <= baseline_tokens.
+    //
+    // Both sides now count the same thing: the string a model would actually be
+    // handed.
+    let baseline_context = crate::rag::assemble_context(&base_res, "\n\n---\n\n");
+    let baseline_tokens = crate::rag::count_tokens(&baseline_context);
 
     // Physis: the same retriever, but capped at the fixed budget.
     let top_k = docs.len().clamp(3, 8);
