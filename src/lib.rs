@@ -215,6 +215,7 @@ pub mod experiments;
 pub mod quality;
 pub mod rag;
 pub mod relation;
+pub mod notebook;
 pub mod store;
 pub mod temporal;
 pub mod transplant;

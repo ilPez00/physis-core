@@ -188,6 +188,21 @@ enum Command {
         #[arg(long)]
         big_model: Option<String>,
     },
+    /// Grounded answer over a local corpus, with citations (the "NotebookLM"
+    /// shape). Synthesises when an OpenAI-compatible endpoint is configured
+    /// (a local ollama counts); otherwise returns a labelled extract and says
+    /// why. See the `notebook` module docs for the two tiers.
+    #[command(name = "notebook")]
+    Notebook {
+        #[arg(long)]
+        corpus: PathBuf,
+        #[arg(long)]
+        query: String,
+        #[arg(long, default_value_t = 1200)]
+        budget: usize,
+        #[arg(long)]
+        json: bool,
+    },
     /// Physis context compiler: fixed-budget structural context for a query
     /// against a corpus, with the measured compression over conventional
     /// retrieval (Demo B).
@@ -443,6 +458,7 @@ fn main() -> anyhow::Result<()> {
         Command::Model { cmd } => cmd_model(cmd),
         Command::NGram { cmd } => cmd_ngram(cmd),
         Command::Demo { dir, query, order } => cmd_demo(&dir, &query, order),
+        Command::Notebook { corpus, query, budget, json } => cmd_notebook(&corpus, &query, budget, json),
         Command::Context { corpus, query, budget, json } => cmd_context(&corpus, &query, budget, json),
         Command::Benchmark { order, budget, big_model } => cmd_benchmark(order, budget, big_model),
         Command::Run { config, model, ngram, query } => cmd_run(&config, model, ngram, query),
@@ -1744,6 +1760,19 @@ fn cmd_demo(dir: &Path, query: &str, order: u8) -> anyhow::Result<()> {
     println!("continuation: {}…", model.generate(query, 8)?);
     println!("
 less context, more structure — physis.");
+    Ok(())
+}
+
+fn cmd_notebook(corpus: &Path, query: &str, budget: usize, json: bool) -> anyhow::Result<()> {
+    let docs = physis_core::map::load_corpus(corpus)?;
+    anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", corpus.display());
+    let embedder = load_embedder();
+    let a = physis_core::notebook::answer(&docs, query, embedder.as_ref(), budget)?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&a)?);
+    } else {
+        print!("{}", a.render());
+    }
     Ok(())
 }
 
