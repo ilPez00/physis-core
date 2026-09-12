@@ -216,6 +216,7 @@ pub mod quality;
 pub mod rag;
 pub mod relation;
 pub mod chain;
+pub mod ground;
 pub mod notebook;
 pub mod store;
 pub mod temporal;

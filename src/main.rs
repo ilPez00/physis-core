@@ -188,6 +188,14 @@ enum Command {
         #[arg(long)]
         big_model: Option<String>,
     },
+    /// The conceptual state a human and a machine are both working on: what is
+    /// believed and on what evidence, what is still disputed, and what was
+    /// predicted and never scored. No model is involved — it reads the store.
+    #[command(name = "ground")]
+    Ground {
+        #[arg(long)]
+        json: bool,
+    },
     /// The whole engine in one pass: structure, bounded context, coverage
     /// gaps, a shortlist per gap, drift detection — and the label-permuted
     /// control that all of it is scored against.
@@ -486,6 +494,15 @@ fn main() -> anyhow::Result<()> {
         Command::Model { cmd } => cmd_model(cmd),
         Command::NGram { cmd } => cmd_ngram(cmd),
         Command::Demo { dir, query, order } => cmd_demo(&dir, &query, order),
+        Command::Ground { json } => {
+            let g = physis_core::ground::read(&load_core(), chrono::Utc::now());
+            if json {
+                println!("{}", serde_json::to_string_pretty(&g)?);
+            } else {
+                print!("{}", g.render());
+            }
+            Ok(())
+        }
         Command::Chain { corpus, query, budget, threshold, json } => {
             cmd_chain(&corpus, &query, budget, threshold, json)
         }
