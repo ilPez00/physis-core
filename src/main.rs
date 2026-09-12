@@ -1,8 +1,9 @@
 //! physis-core CLI.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
+use sha2::{Digest, Sha256};
 use physis_core::classify::{CellClassifier, CellScore};
 use physis_core::contradiction::{Contradiction, ContradictionParty, ResolutionStatus};
 use physis_core::core::PhysisCore;
@@ -143,6 +144,58 @@ enum Command {
     Quality {
         #[command(subcommand)]
         cmd: QualityCmd,
+    },
+    /// Model registry: list / info / install / remove / path.
+    Model {
+        #[command(subcommand)]
+        cmd: ModelCmd,
+    },
+    /// N-gram tables: build / list / info / remove / path / inspect / export / import.
+    #[command(name = "ngram")]
+    NGram {
+        #[command(subcommand)]
+        cmd: NGramCmd,
+    },
+    /// Reproducible benchmark over a deterministic ground-truth corpus.
+    /// Writes machine-readable artifacts to benchmarks/results/ (Directives 1+2).
+    Benchmark {
+        /// N-gram order for the infra leg.
+        #[arg(long, default_value_t = 5)]
+        order: u8,
+        /// Context budget for the compression leg.
+        #[arg(long, default_value_t = 300)]
+        budget: usize,
+        /// Optional reference (big) model id for the oracle leg — measured
+        /// only when an external harness supplies it; otherwise reported as
+        /// `not_configured` with no claim made.
+        #[arg(long)]
+        big_model: Option<String>,
+    },
+    /// Physis context compiler: fixed-budget structural context for a query
+    /// against a corpus, with the measured compression over conventional
+    /// retrieval (Demo B).
+    #[command(name = "context")]
+    Context {
+        #[arg(long)]
+        corpus: PathBuf,
+        #[arg(long)]
+        query: String,
+        #[arg(long, default_value_t = 1200)]
+        budget: usize,
+        #[arg(long)]
+        json: bool,
+    },
+    /// One-command offline demo: corpus → map → ngram table → model answer.
+    Demo {
+        /// Corpus directory (markdown/txt).
+        #[arg(long, default_value = "examples")]
+        dir: PathBuf,
+        /// Query whose continuation the local model completes.
+        #[arg(long, default_value = "the pump")]
+        query: String,
+        /// N-gram order for the table built on the fly.
+        #[arg(long, default_value_t = 5)]
+        order: u8,
     },
     /// Epistemic hypothesis management.
     Hypothesis {
@@ -370,6 +423,11 @@ fn main() -> anyhow::Result<()> {
         Command::Audit => run_audit(),
         Command::Replay { subject, at } => run_replay(&subject, at.as_deref()),
         Command::Discover { dir, min_cluster } => run_discover(dir.as_deref(), min_cluster),
+        Command::Model { cmd } => cmd_model(cmd),
+        Command::NGram { cmd } => cmd_ngram(cmd),
+        Command::Demo { dir, query, order } => cmd_demo(&dir, &query, order),
+        Command::Context { corpus, query, budget, json } => cmd_context(&corpus, &query, budget, json),
+        Command::Benchmark { order, budget, big_model } => cmd_benchmark(order, budget, big_model),
         #[cfg(feature = "studio")]
         Command::Studio { port, model } => run_studio(port, model),
     }
@@ -1395,6 +1453,289 @@ fn run_discover(dir: Option<&std::path::Path>, min_cluster: usize) -> anyhow::Re
 }
 
 #[cfg(feature = "studio")]
+
+#[derive(Subcommand)]
+enum ModelCmd {
+    /// List installed models.
+    List,
+    /// Show the manifest of one installed model.
+    Info { id: String },
+    /// Install a model from a local directory (checksum-verified).
+    Install {
+        id: String,
+        /// Source directory containing the model files.
+        #[arg(long)]
+        src: PathBuf,
+        /// Files to install (relative to --src).
+        #[arg(long = "file", required = true)]
+        files: Vec<String>,
+    },
+    /// Remove an installed model.
+    Remove { id: String },
+    /// Print the install path of a model id.
+    Path { id: String },
+}
+
+#[derive(Subcommand)]
+enum NGramCmd {
+    /// Build a table from a corpus directory.
+    Build {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long, default_value_t = 5)]
+        order: u8,
+        #[arg(long, default_value_t = 1)]
+        min_count: usize,
+        #[arg(long, default_value_t = 50000)]
+        max_vocabulary: usize,
+        /// Build a structural (grid-symbol) table instead of a lexical one.
+        #[arg(long)]
+        structural: bool,
+    },
+    List,
+    Info { id: String },
+    Remove { id: String },
+    Path { id: String },
+    /// Human-readable continuation inspection of an installed table.
+    Inspect {
+        id: String,
+        #[arg(long)]
+        context: String,
+        #[arg(long, default_value_t = 8)]
+        top: usize,
+    },
+    Export { id: String, dest: PathBuf },
+    Import { id: String, src: PathBuf },
+}
+
+fn cmd_model(cmd: ModelCmd) -> anyhow::Result<()> {
+    let reg = physis_core::model_provider::ModelRegistry::new(
+        physis_core::model_provider::ModelRegistry::default_root(),
+    );
+    match cmd {
+        ModelCmd::List => {
+            for m in reg.list() {
+                println!("{:<24} {:<28} {} MB", m.record.id, m.record.architecture, m.record.memory_estimate_mb);
+            }
+            if reg.list().is_empty() {
+                eprintln!("no models installed — install one with `model install --id … --src …`");
+            }
+        }
+        ModelCmd::Info { id } => {
+            let m = reg.info(&id)?;
+            println!("{}", serde_json::to_string_pretty(&m)?);
+        }
+        ModelCmd::Install { id, src, files } => {
+            let record = physis_core::model_provider::ModelRecord {
+                id: id.clone(),
+                name: id.clone(),
+                architecture: "local".into(),
+                parameter_count: None,
+                context_length: 0,
+                tokenizer: "whitespace-v1".into(),
+                quantization: None,
+                source: format!("local:{}", src.display()),
+                memory_estimate_mb: 0,
+                capabilities: vec![physis_core::model_provider::Capability::Generation],
+                license: "unspecified".into(),
+            };
+            let m = reg.install_local(record, &src, &files)?;
+            println!("installed {} ({} files verified)", m.record.id, m.files.len());
+        }
+        ModelCmd::Remove { id } => {
+            reg.remove(&id)?;
+            println!("removed {id}");
+        }
+        ModelCmd::Path { id } => println!("{}", reg.path(&id).display()),
+    }
+    Ok(())
+}
+
+fn cmd_ngram(cmd: NGramCmd) -> anyhow::Result<()> {
+    use physis_core::ngram_table::{self, NGramTable, TableConfig, TableKind, TableRegistry};
+    use physis_core::tokenizer::{Tokenizer, WhitespaceTokenizer};
+    let reg = TableRegistry::new(TableRegistry::default_root());
+    match cmd {
+        NGramCmd::Build { input, output, order, min_count, max_vocabulary, structural } => {
+            let docs = physis_core::map::load_corpus(&input)?;
+            anyhow::ensure!(!docs.is_empty(), "no md/txt documents under {}", input.display());
+            let cfg = TableConfig {
+                table_id: output.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "table".into()),
+                kind: if structural { TableKind::Structural } else { TableKind::Lexical },
+                max_order: order,
+                min_count,
+                max_vocabulary,
+                ..Default::default()
+            };
+            let (table, bytes) = if structural {
+                let ontology = physis_core::ontology::OntologyLoader::load_all();
+                let embedder = physis_core::embed::RandomProjectionEmbedder::new(64);
+                let clf = physis_core::classify::CellClassifier::build(&ontology, &embedder);
+                ngram_table::build_structural(&docs, cfg, |seg| {
+                    let emb = embedder.embed(seg);
+                    clf.best_entry_sim(&emb)
+                        .map(|(_, d, m)| format!("{d}×{m}"))
+                        .unwrap_or_else(|| "UNKNOWN×UNKNOWN".into())
+                })?
+            } else {
+                let t = WhitespaceTokenizer::new(max_vocabulary);
+                let mut b = ngram_table::TableBuilder::new(cfg);
+                for (_, body) in &docs {
+                    b.push_text(&t, body);
+                }
+                let mut h = Sha256::new();
+                for (pth, bd) in &docs {
+                    h.update(pth.as_bytes());
+                    h.update(bd.as_bytes());
+                }
+                let hash = format!("{:x}", h.finalize());
+                b.finish(&t, &hash)
+            };
+            std::fs::create_dir_all(output.parent().unwrap_or(Path::new(".")))?;
+            std::fs::write(&output, &bytes)?;
+            let st = table.statistics();
+            println!("built {} — {} entries, vocab {}, max order {}, {} bytes, sha-checksummed", table.manifest().table_id, st.entry_count, st.vocabulary, st.max_order, bytes.len());
+        }
+        NGramCmd::List => {
+            let all = reg.list();
+            if all.is_empty() { eprintln!("no tables — build one with `ngram build --input … --output …`"); }
+            for (id, m) in all {
+                println!("{:<28} {:?} order {} {} entries", id, m.kind, m.max_order, m.entry_count);
+            }
+        }
+        NGramCmd::Info { id } => println!("{}", serde_json::to_string_pretty(&reg.info(&id)?)?),
+        NGramCmd::Remove { id } => { reg.remove(&id)?; println!("removed {id}"); }
+        NGramCmd::Path { id } => println!("{}", reg.path(&id).display()),
+        NGramCmd::Inspect { id, context, top } => {
+            let table = reg.load(&id, None)?;
+            let t = WhitespaceTokenizer::new(0);
+            let ctx = t.encode(&context);
+            println!("CONTEXT
+{context}
+");
+            let m = table.manifest();
+            println!("BACKOFF ORDER {} → {}", m.max_order, 1);
+            println!("
+CANDIDATES (count-ordered)
+");
+            println!("{:<24} probability", "token");
+            println!("-----------------------------------");
+            for (w, p) in table.top_next(&ctx, top) {
+                println!("{:<24} {:.4}", w, p);
+            }
+        }
+        NGramCmd::Export { id, dest } => {
+            let n = reg.export(&id, &dest)?;
+            println!("exported {id} → {} ({n} bytes)", dest.display());
+        }
+        NGramCmd::Import { id, src } => {
+            let m = reg.import(&id, &src)?;
+            println!("imported {} (order {}, {} entries)", id, m.max_order, m.entry_count);
+        }
+    }
+    Ok(())
+}
+
+fn cmd_demo(dir: &Path, query: &str, order: u8) -> anyhow::Result<()> {
+    use physis_core::embed::RandomProjectionEmbedder;
+    use physis_core::model_provider::{ModelProvider, NgramDecoderModel};
+    use physis_core::ngram_table::{TableBuilder, TableConfig};
+    use std::sync::Arc;
+    let docs = physis_core::map::load_corpus(dir)?;
+    anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", dir.display());
+    let embedder = RandomProjectionEmbedder::new(64);
+    let report = physis_core::map::build_map(&docs, &embedder, None)?;
+    println!("── PHYSIS STRUCTURAL MAP (deterministic) ──");
+    for l in report.hero_lines() { println!("{l}"); }
+    // The n-gram floor + model, built in-process from the same corpus.
+    let tok = physis_core::tokenizer::WhitespaceTokenizer::new(0);
+    let cfg = TableConfig { table_id: "demo".into(), max_order: order, ..Default::default() };
+    let mut b = TableBuilder::new(cfg);
+    for (_, body) in &docs { b.push_text(&tok, body); }
+    let (table, _bytes) = b.finish(&tok, "demo-corpus");
+    let model = NgramDecoderModel::new("demo-ngram", Arc::new(table), Box::new(tok));
+    println!("
+── LOCAL MODEL (n-gram decoder, offline, deterministic) ──");
+    println!("model: {} — caps {:?} — ~{} MB", model.metadata().id, model.capabilities(), model.memory_requirements_mb());
+    println!("score(query) = {:.4} mean log-prob", model.score(query)?);
+    println!("continuation: {}…", model.generate(query, 8)?);
+    println!("
+less context, more structure — physis.");
+    Ok(())
+}
+
+fn cmd_context(corpus: &Path, query: &str, budget: usize, json: bool) -> anyhow::Result<()> {
+    use physis_core::embed::RandomProjectionEmbedder;
+    use physis_core::map::compile_context;
+    let docs = physis_core::map::load_corpus(corpus)?;
+    anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", corpus.display());
+    let embedder = RandomProjectionEmbedder::new(64);
+    let report = compile_context(&docs, &embedder, query, budget)?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        print!("{}", report.render());
+        println!("
+── COMPILED CONTEXT (first {} chars) ──", 400);
+        println!("{}", report.physis_context.chars().take(400).collect::<String>());
+    }
+    Ok(())
+}
+
+fn cmd_benchmark(order: u8, budget: usize, big_model: Option<String>) -> anyhow::Result<()> {
+    use physis_core::bench::{self, BenchConfig, BenchRun};
+    use physis_core::embed::RandomProjectionEmbedder;
+    let embedder = RandomProjectionEmbedder::new(64);
+    let pkg = env!("CARGO_PKG_VERSION").to_string();
+    let cfg = BenchConfig {
+        corpus_root: "benchmarks/ground-truth".into(),
+        order,
+        min_count: 1,
+        context_budget: budget,
+        big_model: big_model.map(|s| s.clone()),
+        physis_version: pkg.clone(),
+        git_commit: physis_core::bench::git_head().clone(),
+        seed: 7,
+    };
+    let out = physis_core::bench::run(cfg.clone(), &embedder)?;
+    let adir = out.artifacts_dir.clone();
+    physis_core::bench::materialise_ground_truth(&PathBuf::from(cfg.corpus_root))?;
+    std::fs::create_dir_all(&adir)?;
+    std::fs::write(PathBuf::from(&adir).join("run.json"), serde_json::to_vec_pretty(&out.run)?)?;
+    std::fs::write(PathBuf::from(&adir).join("metrics.json"), serde_json::to_vec_pretty(&out.run.metrics)?)?;
+    std::fs::write(
+        PathBuf::from(&adir).join("provenance.json"),
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "corpus_hash": out.run.corpus_hash,
+            "git_commit": cfg.git_commit,
+            "physis_version": cfg.physis_version,
+            "seed": cfg.seed,
+            "model": cfg.big_model,
+            "ngram_order": cfg.order,
+            "context_budget": cfg.context_budget,
+        }))?,
+    )?;
+    let m = out.run.metrics;
+    let rp = (m.repeat_recovery * 100.0).round();
+    let ap = (m.anomaly_recall * 100.0).round();
+    let cp = (m.contradiction_recall * 100.0).round();
+    let cpct = (m.context_compression_ratio * 100.0).round();
+    println!("BENCHMARK (ground truth, deterministic)");
+    println!("repeat/recall        {}% ({}/{})", rp, m.families_found, m.families_known);
+    println!("anomaly recall       {}% ({}/{})", ap, m.anomalies_caught, m.anomalies_known);
+    println!("contradiction recall {}% ({}/{})", cp, m.contradictions_found, m.contradictions_known);
+    println!("map deterministic    {} ({})", m.map_deterministic, m.structure_hash.chars().take(12).collect::<String>());
+    println!("context compression  {}% ({} to {} tokens)", cpct, m.baseline_tokens, m.physis_tokens);
+    println!("ngram build {} ms, load {} ms, {} lookups/s, {} bytes on disk", m.ngram_build_ms.round(), m.ngram_load_ms.round(), m.ngram_lookup_per_sec.round(), m.ngram_disk_bytes);
+    println!("ngram RAM estimate   {} MB", m.ngram_ram_estimate_mb);
+    println!("interchangeable      {}", m.interchange_ok);
+    println!("big-model oracle leg {}", m.big_model_leg);
+    println!("artifacts -> benchmarks/results/ (run.json, metrics.json, provenance.json)");
+    Ok(())
+}
+
 fn run_studio(port: u16, model: Option<String>) -> anyhow::Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(physis_core::studio::run_with_model(port, model))

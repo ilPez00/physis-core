@@ -346,3 +346,103 @@ physis-core studio --port 3000
 Small model: the user-facing interface. physis-core: the deterministic engine behind it.*
 
 *Together: AI that is fully offline, zero-cost, instantly adaptable, and completely auditable.*
+---
+
+## The shipped product demos (0.1.25)
+
+One command launches the offline experience end-to-end. No API key, no cloud,
+no model download past a documented setup. Everything below was measured on
+this machine from `examples/demo-corpus/` (26 files: three repeat families of
+8 + 2 deliberate anomalies) — the numbers are real, not placeholders.
+
+### Demo A — Difference & Repetition (the corpus becomes visible)
+
+```sh
+physis-core demo --dir examples/demo-corpus --query "the pump"
+```
+
+```text
+── PHYSIS STRUCTURAL MAP (deterministic) ──
+26 DOCUMENTS
+↓ PHYSIS
+3 RECURRING PATTERNS
+1 SIGNIFICANT DIFFERENCES
+0 CONTRADICTION CANDIDATES
+structure hash 19aec4…
+
+the pump …→ maintenance required replace the seal…
+```
+
+- **What repeats** is found by nearest-neighbour union-find (embedder-agnostic,
+  relative to the corpus's own median similarity).
+- **What differs** is the *loneliness* signal: how far a document's nearest
+  neighbour sits below the corpus median — the two anomalies are flagged.
+- **What contradicts** is reported per high-overlap / low-similarity pair,
+  never merged away.
+- **Determinism**: the same corpus gives the same `structure hash` on every
+  run; the corpus-map pipeline is pure (no hidden randomness).
+
+Drill-down trade: a repeat cluster is a set of source files (provenance); a
+singleton difference is a list with its separation score. See
+`src/map.rs` (`build_map`, `MapReport`) and `examples/` for the API.
+
+### Demo B — Physis context compiler (measured compression)
+
+```sh
+physis-core context \
+  --corpus examples/demo-corpus \
+  --query "what maintenance is scheduled and why" \
+  --budget 400
+```
+
+```text
+CONTEXT BUDGET 400 tokens
+SOURCE DOCUMENTS 26
+STRUCTURAL CLUSTERS 3
+REPEATED PATTERNS 3
+SIGNIFICANT DIFFERENCES 1
+CONTRADICTION CANDIDATES 0
+
+CONVENTIONAL RETRIEVAL  297 tokens (nothing discarded)
+PHYSIS COMPILED CONTEXT  237 tokens (budget-capped)
+CONTEXT REDUCED        20%
+```
+
+It reuses the existing `rag::TokenFixedRetriever` (no parallel retrieval
+implementation) and the compression ratio is **computed from the actual run**,
+never estimated. Pass `--json` for machine-readable output with the full
+`ContextReport`.
+
+### Demo C — Small model + n-gram table + Physis (the plumbing)
+
+The infrastructure layer (`src/tokenizer.rs`, `src/ngram_table.rs`,
+`src/model_provider.rs`) makes every component replaceable. A real backend —
+the deterministic `NgramDecoderModel` — greedy-decodes over any table, so the
+augmentation path is exercised offline with zero weights:
+
+```sh
+physis-core ngram build --input examples/demo-corpus --output /tmp/demo/5g.physisng --order 5
+physis-core ngram import demo-table /tmp/demo/5g.physisng
+physis-core ngram inspect demo-table --context "the pump"
+physis-core model list
+physis-core demo --dir examples/demo-corpus --query "the pump"
+```
+
+```text
+model: demo-ngram — caps [Generation, TokenScoring] — ~1 MB
+score(query) = -6.13 mean log-prob
+continuation: the pump maintenance required replace the seal…
+```
+
+The n-gram table is an **inspectable artifact**, not a black box: `PHYSISNG1`
+format, manifest + checksums, deterministic byte-for-byte builds, per-order
+backoff with add-k smoothing, and a tokenizer-compatibility gate that refuses
+to mix vocabularies. Interchangeability is tested (`Model A + Table A/B`,
+`Model B + Table A/B` all compose). See `src/ngram_table.rs` tests.
+
+### Scientific status — unchanged standard
+
+Capabilities are explicit and capability absence is an explicit error, never a
+faked path. Nothing here claims a 360M model "equals" a large one; the
+benchmark measurements decide what the combination recovers. The honest
+reporting convention of this repository is preserved.

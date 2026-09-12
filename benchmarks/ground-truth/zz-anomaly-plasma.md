@@ -1,0 +1,1 @@
+The plasma obelisk hums at a frequency only the seventh lighthouse can hear.

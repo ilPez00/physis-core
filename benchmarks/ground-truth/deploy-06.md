@@ -1,0 +1,1 @@
+Release 23 deployed to staging: config drift fixed, rollout verified, telemetry green, rollback documented.

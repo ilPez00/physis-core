@@ -1,0 +1,1 @@
+Pump maintenance required: replace the seal on line 3, vibration rising after bearing wear.

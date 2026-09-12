@@ -3,6 +3,44 @@
 [![Crates.io](https://img.shields.io/crates/v/physis-core.svg)](https://crates.io/crates/physis-core)
 [![Documentation](https://docs.rs/physis-core/badge.svg)](https://docs.rs/physis-core)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
+## See the structure inside your data.
+
+Physis finds **what repeats, what differs, and what matters** in large bodies of
+information — deterministically — then compiles that structure into compact
+context for humans and AI. Offline. No API key. No cloud.
+
+```text
+30 DOCUMENTS
+  ↓ PHYSIS
+3 RECURRING PATTERNS · 1 DIFFERENCE · 1 CONTRADICTION
+  ↓
+compiled context  — measured 25% smaller than conventional retrieval
+```
+
+### Run it (one command, fully offline)
+
+```sh
+physis-core demo --dir examples/demo-corpus --query "the pump"
+physis-core context --corpus examples/demo-corpus --query "what maintenance is scheduled" --budget 400
+physis-core benchmark
+physis-core studio --port 3000
+```
+
+### The three demonstrations
+1. **Difference & Repetition** — a corpus collapses into a structural map:
+   repeat families, anomalies, contradictions, a reproducibility hash. Deterministic.
+2. **Context compiler** — fixed-budget structural context over a corpus, with the
+   compression over conventional retrieval **measured from the actual run**.
+3. **Small model + n-gram table + Physis** — every component is replaceable via
+   `model_provider` / `ngram_table` / `tokenizer`; a real offline decoder backend
+   drives the pipeline at ~1 MB. Interchangeability is tested (`Model A + Table
+   A/B`, `Model B + Table A/B`).
+
+Full playbooks in [`DEMO.md`](DEMO.md) and [`SHIP_PLAN.md`](SHIP_PLAN.md).
+
+---
 
 > ## STATUS: measured limits, growing capabilities
 >

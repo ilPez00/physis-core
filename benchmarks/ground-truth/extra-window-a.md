@@ -1,0 +1,1 @@
+Operator access window is mandatory from 06:00 and night access is forbidden.

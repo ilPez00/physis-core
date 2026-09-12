@@ -1,0 +1,23 @@
+{
+  "families_known": 3,
+  "families_found": 3,
+  "repeat_recovery": 1.0,
+  "anomalies_known": 2,
+  "anomalies_caught": 2,
+  "anomaly_recall": 1.0,
+  "contradictions_known": 2,
+  "contradictions_found": 1,
+  "contradiction_recall": 0.5,
+  "map_deterministic": true,
+  "structure_hash": "0890098a13ac37901f1bff9da35c9af8de396e9ff43f1a39b14b7d4bfc92b4e3",
+  "baseline_tokens": 220,
+  "physis_tokens": 166,
+  "context_compression_ratio": 0.24545455,
+  "ngram_build_ms": 6.960511207580566,
+  "ngram_load_ms": 4.487659782171249,
+  "ngram_lookup_per_sec": 192375.20105769095,
+  "ngram_disk_bytes": 22595,
+  "ngram_ram_estimate_mb": 1,
+  "interchange_ok": true,
+  "big_model_leg": "not_configured"
+}

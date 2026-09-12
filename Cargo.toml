@@ -27,6 +27,7 @@ sha2 = "0.10"
 clap = { version = "4", features = ["derive"], optional = true }
 axum = { version = "0.7", features = ["json", "macros"], optional = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"], optional = true }
+ureq = { version = "2.2", optional = true }
 
 # Production semantic embeddings (optional — off by default so the package
 # builds anywhere without model files). Enable with --features embed-onnx.
@@ -40,6 +41,7 @@ studio = ["dep:axum", "dep:tokio"]
 # ONNX MiniLM embedder via the `ort` runtime. Requires model.onnx +
 # tokenizer.json in the model dir at runtime; falls back to random projection.
 embed-onnx = ["dep:ort", "dep:tokenizers"]
+http = ["dep:ureq"]
 
 [dev-dependencies]
 tempfile = "3"

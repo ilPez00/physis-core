@@ -180,6 +180,7 @@
 //! - [`vault`]: Markdown knowledge vault and Git commit history importers.
 //! - [`studio`]: Embedded lightweight web studio GUI and RESTful API endpoints.
 
+pub mod bench;
 pub mod becoming;
 pub mod classify;
 pub mod coherence_dimensions;
@@ -197,8 +198,12 @@ pub mod epistemic;
 pub mod explanation;
 pub mod history;
 pub mod linkage;
+pub mod map;
+pub mod tokenizer;
 pub mod hypothesis;
+pub mod model_provider;
 pub mod models;
+pub mod ngram_table;
 pub mod ontology;
 pub mod praxis;
 pub mod propose;
