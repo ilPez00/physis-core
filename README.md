@@ -3,7 +3,6 @@
 [![Crates.io](https://img.shields.io/crates/v/physis-core.svg)](https://crates.io/crates/physis-core)
 [![Documentation](https://docs.rs/physis-core/badge.svg)](https://docs.rs/physis-core)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 ## See the structure inside your data.
 
@@ -18,6 +17,19 @@ context for humans and AI. Offline. No API key. No cloud.
   ↓
 compiled context  — measured 25% smaller than conventional retrieval
 ```
+
+> **What that 25% is, and is not.** It is a real token count from an actual run
+> on `benchmarks/ground-truth`. It is **not** evidence that the *selection* is
+> good: that corpus scores identically under a real sentence transformer and
+> under a random-projection lexical hash (repeat 100%, anomaly 100%,
+> contradiction 50%, compression ~24% either way), because its repeat families
+> are lexically near-identical. A benchmark whose score does not move when
+> retrieval quality moves is not measuring retrieval quality.
+>
+> For a measurement that *does* discriminate, see
+> [`benchmarks/retrieval`](https://github.com/ilPez00/physis-skill) in the
+> superproject: questions asked in a developer's words about code written in a
+> compiler's words, scored `hit@5` — **0.57 semantic vs 0.14 lexical, +0.43**.
 
 ### Run it (one command, fully offline)
 
@@ -1380,3 +1392,18 @@ Pinned by 4 lib tests (`reciprocal_resource_exchange_abstraction_transfers`,
 `invalid_analogy_rejected`) — run `cargo test -p physis-core transform::`.
 Benchmarks (owner: transform track): `tests/transform_bench.rs`.
 
+
+---
+
+## Agent skill
+
+An agent skill that uses this engine to make an assistant verify its claims
+before making them: <https://github.com/ilPez00/physis-skill>
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ilPez00/physis-skill/main/install.sh | bash
+```
+
+## Support
+
+Donations: <https://praxisweb.xyz/me>
