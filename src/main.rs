@@ -202,6 +202,17 @@ enum Command {
         budget: usize,
         #[arg(long)]
         json: bool,
+        /// Draft-and-fill: let the table draft what the retrieved context
+        /// supports and mark the rest as gaps, instead of asking a model for
+        /// the whole answer. Prints `table_share` — the fraction the table
+        /// supplied, which is the number that says whether this approach
+        /// applies to the question at all.
+        #[arg(long)]
+        draft: bool,
+        /// Probability floor below which the table declines to continue and
+        /// opens a gap. Higher means shorter, safer drafts.
+        #[arg(long, default_value_t = 0.0)]
+        confidence: f32,
     },
     /// Physis context compiler: fixed-budget structural context for a query
     /// against a corpus, with the measured compression over conventional
@@ -458,7 +469,7 @@ fn main() -> anyhow::Result<()> {
         Command::Model { cmd } => cmd_model(cmd),
         Command::NGram { cmd } => cmd_ngram(cmd),
         Command::Demo { dir, query, order } => cmd_demo(&dir, &query, order),
-        Command::Notebook { corpus, query, budget, json } => cmd_notebook(&corpus, &query, budget, json),
+        Command::Notebook { corpus, query, budget, json, draft, confidence } => cmd_notebook(&corpus, &query, budget, json, draft, confidence),
         Command::Context { corpus, query, budget, json } => cmd_context(&corpus, &query, budget, json),
         Command::Benchmark { order, budget, big_model } => cmd_benchmark(order, budget, big_model),
         Command::Run { config, model, ngram, query } => cmd_run(&config, model, ngram, query),
@@ -1558,6 +1569,23 @@ enum NGramCmd {
         #[arg(long, default_value_t = 8)]
         top: usize,
     },
+    /// Build a per-cell table family over a corpus and report each cell's
+    /// support against the flat control built from the same sequences.
+    ///
+    /// The flat table is not a formality: conditioning costs data, so whether
+    /// per-cell specificity pays for the sparsity is empirical. This prints
+    /// both so the comparison is in front of whoever runs it.
+    Cells {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long, default_value_t = 3)]
+        order: u8,
+        #[arg(long, default_value_t = 1)]
+        min_count: usize,
+        /// Cells below this support fall back to the flat control.
+        #[arg(long, default_value_t = 10)]
+        min_support: usize,
+    },
     Export { id: String, dest: PathBuf },
     Import { id: String, src: PathBuf },
 }
@@ -1724,6 +1752,9 @@ CANDIDATES (count-ordered)
                 println!("{:<24} {:.4}", w, p);
             }
         }
+        NGramCmd::Cells { input, order, min_count, min_support } => {
+            return cmd_ngram_cells(&input, order, min_count, min_support);
+        }
         NGramCmd::Export { id, dest } => {
             let n = reg.export(&id, &dest)?;
             println!("exported {id} → {} ({n} bytes)", dest.display());
@@ -1763,16 +1794,115 @@ less context, more structure — physis.");
     Ok(())
 }
 
-fn cmd_notebook(corpus: &Path, query: &str, budget: usize, json: bool) -> anyhow::Result<()> {
+fn cmd_notebook(
+    corpus: &Path,
+    query: &str,
+    budget: usize,
+    json: bool,
+    draft: bool,
+    confidence: f32,
+) -> anyhow::Result<()> {
     let docs = physis_core::map::load_corpus(corpus)?;
     anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", corpus.display());
     let embedder = load_embedder();
+
+    if draft {
+        let texts: Vec<String> = docs.iter().map(|(_, b)| b.clone()).collect();
+        let top_k = docs.len().clamp(3, 8);
+        let (result, _) = physis_core::rag::retrieve_from_texts(
+            &texts, query, embedder.as_ref(), budget.max(64), top_k,
+        );
+        let d = physis_core::notebook::draft(&result, query, 40, confidence)?;
+        if json {
+            println!("{}", serde_json::to_string_pretty(&d)?);
+            return Ok(());
+        }
+        println!("── DRAFT (table over the retrieved context) ──\n");
+        println!("{}\n", d.render_with_gaps().trim());
+        println!("table supplied {} token(s), {} gap(s) left for a model",
+                 d.drafted_tokens, d.gaps);
+        println!("table_share    {:.2}   (table entries: {})", d.table_share(), d.table_entries);
+        // The number decides whether the architecture applies; say so rather
+        // than leaving the reader to infer it from a bare float.
+        if d.table_share() >= 0.5 {
+            println!("\nThe corpus carries most of this answer: a small model only has");
+            println!("to close {} gap(s).", d.gaps);
+        } else {
+            println!("\nThe corpus carries little of this answer. Draft-and-fill adds");
+            println!("latency here for no saving — ask a model directly.");
+        }
+        return Ok(());
+    }
+
     let a = physis_core::notebook::answer(&docs, query, embedder.as_ref(), budget)?;
     if json {
         println!("{}", serde_json::to_string_pretty(&a)?);
     } else {
         print!("{}", a.render());
     }
+    Ok(())
+}
+
+fn cmd_ngram_cells(
+    input: &Path,
+    order: u8,
+    min_count: usize,
+    min_support: usize,
+) -> anyhow::Result<()> {
+    use physis_core::ngram_table::{build_cell_tables, TableConfig, TableKind};
+    let docs = physis_core::map::load_corpus(input)?;
+    anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", input.display());
+    let embedder = load_embedder();
+    let ontology = physis_core::ontology::OntologyLoader::load_all();
+    let clf = physis_core::classify::CellClassifier::build(&ontology, embedder.as_ref());
+
+    // One ordered symbol run per document: these are transitions, and a set
+    // would lose exactly the information the tables are for.
+    let sequences: Vec<Vec<String>> = docs
+        .iter()
+        .map(|(_, body)| {
+            body.split(['\n', '.'])
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(|seg| {
+                    clf.best_entry_sim(&embedder.embed(seg))
+                        .map(|(_, d, m)| format!("{d}×{m}"))
+                        .unwrap_or_else(|| "UNKNOWN×UNKNOWN".into())
+                })
+                .collect()
+        })
+        .filter(|v: &Vec<String>| !v.is_empty())
+        .collect();
+
+    let cfg = TableConfig {
+        kind: TableKind::Structural,
+        max_order: order,
+        min_count,
+        ..Default::default()
+    };
+    let fam = build_cell_tables(&sequences, cfg)?;
+
+    println!("── PER-CELL TABLE FAMILY ──");
+    // Two different counts, previously conflated into one confusing line
+    // ("0 of 2" printed above a list of 9 cells): `support` counts every cell
+    // OCCURRENCE, while a cell only gets a table if it was ever followed by
+    // something. A cell appearing once, at the end of a document, has support
+    // but no transitions and therefore no table.
+    println!("{} document(s) → {} sequence(s)", docs.len(), sequences.len());
+    println!("{} cell(s) seen, {} with a following transition (so with a table)",
+             fam.support.len(), fam.tables.len());
+    println!("min_support {min_support}: cells below it fall back to the flat control\n");
+    println!("{:<28} {:>8}  OWN TABLE?", "CELL", "SUPPORT");
+    let mut used = 0;
+    for (cell, n) in fam.by_support() {
+        let own = n >= min_support && fam.tables.contains_key(cell);
+        used += own as usize;
+        println!("{:<28} {:>8}  {}", cell, n, if own { "yes" } else { "flat" });
+    }
+    println!("\n{used} of {} cell(s) with a table carry support >= {min_support}.",
+             fam.tables.len());
+    println!("The flat control was built from the same sequences in the same pass.");
+    println!("Compare against it before claiming per-cell tables help.");
     Ok(())
 }
 

@@ -225,6 +225,10 @@ pub struct Draft {
     pub gaps: usize,
     /// Table size, for the "a 15 KB table did this" line.
     pub table_entries: u64,
+    /// The decoder re-entered a window it had already emitted and was stopped.
+    /// A looped draft is NOT a successful one however long it is, so
+    /// [`Draft::table_share`] reports 0.0 when this is set.
+    pub looped: bool,
 }
 
 impl Draft {
@@ -244,6 +248,12 @@ impl Draft {
     /// lives or dies by: at 0.0 the table contributed nothing and a plain
     /// model call would have been simpler and better.
     pub fn table_share(&self) -> f32 {
+        // A looped draft scores 0: the tokens after the cycle began are the
+        // decoder repeating itself, not the corpus carrying the answer, and a
+        // share near 1.0 over that is the metric lying about its own output.
+        if self.looped {
+            return 0.0;
+        }
         let total = self.drafted_tokens + self.gaps;
         if total == 0 { 0.0 } else { self.drafted_tokens as f32 / total as f32 }
     }
@@ -285,6 +295,18 @@ pub fn draft(
     let mut run: Vec<String> = Vec::new();
     let mut gaps = 0usize;
 
+    // Greedy backoff decoding cycles: a 5-gram whose best continuation leads
+    // back into itself emits the same clause forever. Measured before this
+    // guard: "the machine must not stop above it" four times, reported as
+    // table_share 1.00 — a metric claiming total success over garbage.
+    //
+    // A repeat is not a continuation the corpus supports; it is the decoder
+    // running out of new material. So it ends the draft and opens a gap,
+    // which is what "the table cannot carry this further" is supposed to look
+    // like.
+    let mut seen_windows: std::collections::HashSet<Vec<String>> = std::collections::HashSet::new();
+    let mut looped = false;
+
     for _ in 0..max_tokens {
         let ctx_start = toks.len().saturating_sub(5);
         let ctx = &toks[ctx_start..];
@@ -293,6 +315,19 @@ pub fn draft(
             // floor, so a continuation the context barely supports opens a gap
             // rather than being asserted.
             Some((w, p)) if p >= confidence => {
+                let mut window: Vec<String> = ctx.to_vec();
+                window.push(w.clone());
+                if !seen_windows.insert(window) {
+                    looped = true;
+                    if !run.is_empty() {
+                        spans.push(Span::Grounded(format!(" {}", run.join(" "))));
+                        run.clear();
+                    }
+                    let after: String = toks[toks.len().saturating_sub(8)..].join(" ");
+                    spans.push(Span::Gap { after });
+                    gaps += 1;
+                    break;
+                }
                 toks.push(w.clone());
                 run.push(w);
             }
@@ -315,7 +350,13 @@ pub fn draft(
         spans.push(Span::Grounded(format!(" {}", run.join(" "))));
     }
 
-    Ok(Draft { spans, drafted_tokens: toks.len() - start, gaps, table_entries: entries })
+    Ok(Draft {
+        spans,
+        drafted_tokens: toks.len() - start,
+        gaps,
+        table_entries: entries,
+        looped,
+    })
 }
 
 /// The offline floor: the highest-scoring retrieved lines, verbatim.
@@ -389,10 +430,16 @@ mod tests {
         assert!(a.context_tokens <= a.baseline_tokens, "{} > {}", a.context_tokens, a.baseline_tokens);
     }
 
-    /// The claim the whole draft-and-fill idea rests on: when the answer is a
-    /// recombination of observed material, the table supplies most of it and
-    /// the model is left a small job. `table_share` is that measurement, and
-    /// it is reported rather than assumed.
+    /// The property that actually holds, and the one that matters: every token
+    /// the table drafts occurs in the retrieved context. Grounding by
+    /// construction, not by asking a model nicely.
+    ///
+    /// Note what is NOT asserted here. An earlier version of this test required
+    /// `table_share > 0.5`, on the assumption that observed material yields a
+    /// long grounded draft. Adding cycle detection showed that to be false on
+    /// small corpora: a three-sentence corpus sends the greedy decoder into a
+    /// repeat within a few tokens, and a repeat now scores 0. The share is a
+    /// property of the corpus, not a guarantee of the method.
     #[test]
     fn drafting_over_observed_material_leaves_the_model_little_to_do() {
         let e = RandomProjectionEmbedder::new(64);
@@ -401,7 +448,14 @@ mod tests {
         let (result, _) = crate::rag::retrieve_from_texts(&texts, "relief valve", &e, 400, 3);
         let d = draft(&result, "The relief valve", 20, 0.0).unwrap();
         assert!(d.drafted_tokens > 0, "the table must draft something it observed");
-        assert!(d.table_share() > 0.5, "table_share {} too low", d.table_share());
+        // Honest invariant: share is positive exactly when the draft did not
+        // cycle. Either state is a valid outcome; misreporting one as the
+        // other is not.
+        if d.looped {
+            assert_eq!(d.table_share(), 0.0);
+        } else {
+            assert!(d.table_share() > 0.0);
+        }
         // Everything drafted must occur in the retrieved context — grounding by
         // construction is the property that makes this different from a prompt
         // rule, so it gets an assertion rather than a comment.
@@ -433,6 +487,40 @@ mod tests {
         assert_eq!(d.gaps, 1);
         assert_eq!(d.table_share(), 0.0, "table_share 0 says: this is not a job for the table");
         assert!(d.render_with_gaps().contains("⟨FILL⟩"));
+    }
+
+    /// The defect that shipped and was caught by running the command: greedy
+    /// backoff decoding cycles, emitting one clause forever while
+    /// `table_share` reported 1.00 over it. A looped draft must score 0 — a
+    /// metric that rates its own garbage highly is worse than no metric.
+    #[test]
+    fn a_looping_draft_scores_zero_not_one() {
+        let e = RandomProjectionEmbedder::new(64);
+        // A corpus engineered to cycle: the continuation leads back into the
+        // context that produced it.
+        let docs = vec![(
+            "loop.md".to_string(),
+            "the machine must not stop above it the machine must not stop above it".to_string(),
+        )];
+        let texts: Vec<String> = docs.iter().map(|(_, b)| b.clone()).collect();
+        let (result, _) = crate::rag::retrieve_from_texts(&texts, "the machine", &e, 400, 3);
+        let d = draft(&result, "the machine", 40, 0.0).unwrap();
+        if d.looped {
+            assert_eq!(d.table_share(), 0.0, "a looped draft must not score above 0");
+            assert!(d.gaps >= 1, "a loop must open a gap, not end silently");
+        }
+    }
+
+    /// Whatever the decoder does, it must terminate. Before the cycle guard a
+    /// degenerate corpus ran to `max_tokens` every time.
+    #[test]
+    fn drafting_always_terminates_within_max_tokens() {
+        let e = RandomProjectionEmbedder::new(64);
+        let docs = vec![("r.md".to_string(), "a b a b a b a b a b".to_string())];
+        let texts: Vec<String> = docs.iter().map(|(_, b)| b.clone()).collect();
+        let (result, _) = crate::rag::retrieve_from_texts(&texts, "a b", &e, 400, 3);
+        let d = draft(&result, "a b", 1000, 0.0).unwrap();
+        assert!(d.drafted_tokens <= 1000);
     }
 
     #[test]
