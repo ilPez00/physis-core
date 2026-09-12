@@ -1,5 +1,10 @@
 # The neurosemantic layer
 
+> Scope: this file covers the *retrieval* operation only — one of six (see
+> `../docs/WHAT_PHYSIS_IS.md` §3). For the five harnesses that feed the shared
+> coherence graph, see `../wiring/neurosemantic_wiring.md`.
+
+
 The layer that sits between a corpus and a language model: it decides *what the
 model reads*. Everything here is measured or labelled `NOT MEASURED`. Numbers
 without a run behind them do not belong in this file — see the scientific
