@@ -512,6 +512,30 @@ mod tests {
         assert!(r.render().contains("NOT ABOVE THE NULL"));
     }
 
+    /// The winning branch must reach the output too. Only the losing one was
+    /// covered, so `discriminates() == true` had never been exercised: a verdict
+    /// path that no test can distinguish from unreachable.
+    #[test]
+    fn beating_the_control_reaches_the_output() {
+        let r = ChainReport {
+            documents: 3, repeats: 1, differences: 0, contradictions: 0,
+            structure_hash: "abcdef123456".into(), baseline_tokens: 100,
+            context_tokens: 50,
+            unplaced: vec![Unplaced { id: "z".into(), live_score: 0.4,
+                                      shortlist: vec!["A/B".into()], top_gain: 0.30 }],
+            mean_gain: 0.30, null: 0.05, drifts: vec![], candidates: 1,
+            embedder: "test".into(),
+        };
+        assert!(r.testable());
+        assert!(r.discriminates(), "0.30 must beat 0.05 by more than the 0.02 margin");
+        assert!(r.render().contains("carries signal"));
+        assert!(!r.render().contains("NOT ABOVE THE NULL"));
+
+        // And the margin itself must bite: 0.02 is not "more than 0.02".
+        let edge = ChainReport { mean_gain: 0.07, null: 0.05, ..r };
+        assert!(!edge.discriminates(), "a margin of exactly 0.02 must not pass");
+    }
+
     /// The pass runs end to end and reports the embedder it used — a run that
     /// does not say which embedder produced it is not reproducible.
     #[test]
