@@ -31,9 +31,27 @@ compiled context  — measured 25% smaller than conventional retrieval
 > superproject: questions asked in a developer's words about code written in a
 > compiler's words, scored `hit@5` — **0.57 semantic vs 0.14 lexical, +0.43**.
 
+### Install
+
+```sh
+# Not on crates.io. From git, with the ONNX embedder capability:
+cargo install --git https://github.com/ilPez00/physis-core \
+      --features cli,embed-onnx --locked physis-core
+```
+
+`embed-onnx` is **not** a default feature. Without it the embedder cascade has
+no model to try and resolves to random projection — a lexical hash that fails
+the semantic self-test by design, and says so on stderr.
+
 ### Run it (one command, fully offline)
 
 ```sh
+# Answers from your documents, with citations that cannot be invented:
+physis-core notebook --corpus ./my-docs --query "what changed in the spec" --budget 400
+
+# Let the table draft and spend a model only on the gaps:
+physis-core notebook --corpus ./my-docs --query "..." --draft
+
 physis-core demo --dir examples/demo-corpus --query "the pump"
 physis-core context --corpus examples/demo-corpus --query "what maintenance is scheduled" --budget 400
 physis-core benchmark
@@ -1398,7 +1416,8 @@ Benchmarks (owner: transform track): `tests/transform_bench.rs`.
 ## Agent skill
 
 An agent skill that uses this engine to make an assistant verify its claims
-before making them: <https://github.com/ilPez00/physis-skill>
+before making them — four failure modes, each with a mechanical check rather
+than an instruction to be careful: <https://github.com/ilPez00/physis-skill>
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ilPez00/physis-skill/main/install.sh | bash

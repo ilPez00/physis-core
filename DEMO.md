@@ -1,14 +1,187 @@
-# DEMO: physis-core + Small Model — Recordable Examples
+# DEMO — physis-core
+
+**Structure in your documents, context under a hard budget, answers with
+citations. Offline, deterministic, no API key.**
+
+```text
+30 DOCUMENTS
+  ↓ physis
+4 REPEAT FAMILIES · 2 DIFFERENCES · 1 CONTRADICTION
+  ↓
+220 → 165 tokens  (25% smaller than conventional retrieval)
+```
+
+Three demos to run first, each with its real transcript:
+
+| | what it shows |
+|---|---|
+| [**Notebook**](#demo-0-notebook--answers-from-your-documents-with-citations-offline) | answers with citations that cannot be invented — and a corpus contradiction surviving instead of being quietly resolved |
+| [**Draft and fill**](#demo-0b-draft-and-fill--spend-the-model-only-on-the-gaps) | the table drafts what the corpus supports; a real transcript of the method *declining to be used* |
+| [**Per-cell tables**](#demo-0c-per-cell-tables--70-tables-with-subtables-and-the-control) | 70 tables with subtables, each shipped next to the control that could beat it |
+
+> **On the 25%.** It is a real token count from a real run. It is **not**
+> evidence that the *selection* is good: `benchmarks/ground-truth` scores
+> identically under a real sentence transformer and a random-projection lexical
+> hash, because its repeat families are lexically near-identical. For a
+> measurement that discriminates, see `benchmarks/retrieval` in the superproject
+> — `hit@5` **0.57 semantic vs 0.14 lexical**.
+
+---
+
 
 ## Prerequisites
 
 ```sh
-# Install the CLI (includes studio and default features)
-cargo install -- physis-core   # or: cargo build --release && use target/release/physis-core
+# physis-core is not on crates.io. Install from git:
+cargo install --git https://github.com/ilPez00/physis-core \
+      --features cli,embed-onnx --locked physis-core
 
-# Verify it works:
+# Or, if you also want the agent skill that drives it:
+curl -fsSL https://raw.githubusercontent.com/ilPez00/physis-skill/main/install.sh | bash
+
 physis-core --help
 ```
+
+**`--features embed-onnx` matters.** It is not a default. Without it the
+embedder cascade has no model to try and resolves to random projection — a
+lexical hash that fails the semantic self-test by design and says so on stderr.
+The feature adds the capability; you still supply weights (`PHYSIS_MODEL_DIR`).
+
+Every transcript below is **real output from the command above it**, captured
+2026-09-12 on `benchmarks/ground-truth` (30 documents, known truth). Nothing is
+illustrative.
+
+---
+
+## Demo 0: "Notebook" — answers from your documents, with citations, offline
+
+The NotebookLM shape, except the citations cannot be invented and the
+contradictions do not get quietly resolved.
+
+```sh
+physis-core notebook --corpus benchmarks/ground-truth \
+  --query "at what pressure must the valve open" --budget 300
+```
+
+```
+── ANSWER · EXTRACTIVE (n-gram decoder — fragments, not synthesis) ──
+
+The pressure relief valve shall open at 2.6 bar and the machine must stop above it. [1]
+The pressure relief valve shall open at 4.2 bar and the machine must not stop above it. [2]
+The plasma obelisk hums at a frequency only the seventh lighthouse can hear. [3]
+
+!! DEGRADED: no PHYSIS_ORACLE_KEY / OPENROUTER_API_KEY / GROQ_API_KEY — synthesis
+   needs a generator. A local ollama works: PHYSIS_ORACLE_URL=http://localhost:11434/v1
+
+── SOURCES ──
+  [1] benchmarks/ground-truth/extra-device-spec-A.md (0.946)
+      The pressure relief valve shall open at 2.6 bar and the machine must stop above it.
+  [2] benchmarks/ground-truth/extra-device-spec-B.md (0.945)
+      The pressure relief valve shall open at 4.2 bar and the machine must not stop above it.
+```
+
+**Read [1] and [2] again.** The corpus contradicts itself — 2.6 bar versus
+4.2 bar, stop versus do-not-stop — and the answer hands you *both*, each cited
+to its own file. A system that picked one would have looked more confident and
+been less correct. `map.rs` never merges a contradiction pair, so it survives
+retrieval instead of being averaged away.
+
+**Three things this output does that matter:**
+
+| | how |
+|---|---|
+| Citations cannot be invented | Sources come from `RetrievedChunk::id`, a lookup into the corpus — never parsed out of the generator's text. A model that cites nothing still gets a correct source list; a model that invents `[7]` cannot add one. |
+| It never pretends to synthesise | Every answer is tagged `EXTRACTIVE` or `SYNTHESISED`. Fragments are labelled fragments. |
+| It degrades loudly | No generator configured? It says so, and says the exact command that fixes it. A silent downgrade to a worse answer that looks the same is the failure mode this field exists to prevent. |
+
+Add a generator and the tier changes, with nothing else to configure:
+
+```sh
+export PHYSIS_ORACLE_URL=http://localhost:11434/v1
+export PHYSIS_ORACLE_MODEL=qwen3:4b
+export PHYSIS_ORACLE_KEY=ollama      # ollama ignores it
+physis-core notebook --corpus ./my-docs --query "..." --budget 800
+```
+
+Still offline. Still your machine.
+
+---
+
+## Demo 0b: "Draft and fill" — spend the model only on the gaps
+
+Let the table draft what the corpus supports; mark the rest as gaps for a model.
+Drafted text is grounded **by construction** — the table can only emit sequences
+it observed in the retrieved context.
+
+```sh
+physis-core notebook --corpus benchmarks/ground-truth \
+  --query "the relief valve" --budget 300 --draft
+```
+
+```
+── DRAFT (table over the retrieved context) ──
+
+shall open at 2 6 bar and the machine must not stop above it the machine must not stop ⟨FILL⟩
+
+table supplied 19 token(s), 1 gap(s) left for a model
+table_share    0.00   (table entries: 510)
+
+The corpus carries little of this answer. Draft-and-fill adds
+latency here for no saving — ask a model directly.
+```
+
+**This is a real transcript of the method declining to be used.** That is the
+feature. `table_share` is the fraction the table supplied; near 1 the answer is
+a recombination of observed material and a small model need only close the gaps,
+near 0 the table contributed nothing. **The method reports whether it applies,**
+so you never have to guess.
+
+Here it scores 0 because the decoder re-entered a window it had already emitted.
+A repeat is not the corpus carrying the answer, it is the decoder running out of
+new material, so it ends the draft and opens a gap rather than padding the
+output. Before that guard existed this same command looped four times and
+reported `table_share 1.00` — a metric rating its own garbage highly, which is
+worse than no metric.
+
+> **Known limit, stated rather than hidden.** Look at the drafted text: it
+> stitches `2 6 bar` from spec A with `must not stop` from spec B. Grounded in
+> the corpus, factually wrong — it crossed a contradiction the structural map
+> itself flags. Draft-and-fill does not yet respect contradiction boundaries.
+
+---
+
+## Demo 0c: "Per-cell tables" — 70 tables with subtables, and the control
+
+One table over 70 grid symbols pools every cell's continuations and averages a
+rare cell away. A family conditions first: each cell's table is estimated only
+from the steps passing through it.
+
+```sh
+physis-core ngram cells --input benchmarks/ground-truth --order 3 --min-support 5
+```
+
+```
+── PER-CELL TABLE FAMILY ──
+30 document(s) → 30 sequence(s)
+9 cell(s) seen, 2 with a following transition (so with a table)
+min_support 5: cells below it fall back to the flat control
+
+CELL                          SUPPORT  OWN TABLE?
+STUDY×LEARN                         9  flat
+HEAL×CREATE                         8  flat
+HEAL×REST                           7  flat
+BOND×MAINTAIN                       2  flat
+...
+0 of 2 cell(s) with a table carry support >= 5.
+The flat control was built from the same sequences in the same pass.
+Compare against it before claiming per-cell tables help.
+```
+
+**Every cell says `flat`.** On a 30-document corpus no cell earns its own table,
+and the command says so instead of shipping 9 tables estimated from 2
+observations each. Conditioning costs data; whether specificity pays for the
+sparsity is empirical, which is why the flat control is built from the same
+sequences in the same pass and handed back alongside.
 
 ---
 

@@ -1,6 +1,6 @@
 # E54 — Does the A→B path *generate*? The compiler decides.
 
-**Status: PARTIAL at top-1.** Structure is real — it beats its
+**Status: PARTIAL at top-1, SUPPORTED in the retry regime.** Structure is real — it beats its
 construction-matched null by +0.150 — but at one shot it does **not** beat
 simply ranking by popularity (+0.025, n=40). Not a shippable positive.
 
@@ -60,10 +60,33 @@ structure confirmed, advantage over the majority baseline NOT established at
 one shot.** It may not be described as a generator that beats the trivial
 approach.
 
-The one-shot framing is also not how an agent works — it emits, compiles, and
-retries. `research/e54_generate_under_gate_topk.py` scores the retry regime and
-reports mean attempts, which is the honest cost. Its result belongs here when it
-lands; until then this file's verdict stands at PARTIAL.
+## The retry regime — SUPPORTED
+
+One shot is not how an agent works: it emits, compiles, and retries. Scoring the
+same task with up to 3 attempts, n=15:
+
+| arm | gate passes within 3 | rate | mean attempts when it passed |
+|---|---|---|---|
+| **ANALOGY** | 12/15 | **0.800** | 1.33 |
+| POPULARITY | 10/15 | 0.667 | 1.10 |
+| PERMUTED null | 7/15 | 0.467 | 1.29 |
+
+ANALOGY − PERMUTED = **+0.333** · ANALOGY − POPULARITY = **+0.133**
+
+**This was a pre-registered prediction, and it held.** The top-1 section above
+states plainly that E53's thin top-1 column implied the advantage lives in
+top-3, *before* this arm was run. It does.
+
+So the honest two-line summary of E54: at one shot, analogy is not distinguishable
+from guessing the most-imported module (+0.025). Allowed three compiler-checked
+attempts, it passes 80% against a majority baseline's 67% and a shuffled graph's
+47%, at a mean cost of 1.33 attempts.
+
+**Caveats that keep this from being a headline.** n=15 for the retry arm against
+n=40 for one-shot, so it is the weaker measurement of the two. Same corpus, same
+single predicate. And on most individual cases ANALOGY and POPULARITY emit the
+*same* candidate — the gap comes from a minority of cases where analogy's
+ordering differs, which is consistent with the small one-shot delta.
 
 ## Limits
 
