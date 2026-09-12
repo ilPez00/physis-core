@@ -31,6 +31,37 @@
 //! than as similarity to it, because similarity rewards copying and would hand
 //! the verdict to the scissors. See [`worst_covered`].
 //!
+//! # !! THIS CONTROL DOES NOT CURRENTLY WORK — measured 2026-09-12
+//!
+//! It was validated on one authored example and **inverts on the first real
+//! text it was pointed at.** Three arms over the same 118-word source (this
+//! crate's own `observe.rs` header), semantic embedder:
+//!
+//! | arm | Δ | verdict | should be |
+//! |---|---|---|---|
+//! | genuine compression, every point kept | **−0.034** | FAILS | holds |
+//! | drop every other sentence (deletion) | **+0.024** | HOLDS | fails |
+//! | word shuffle at same length | −0.080 | fails | fails ✓ |
+//!
+//! **It prefers deletion over compression.** `worst_covered` moved the copying
+//! bias from the whole-text level to the sentence level; it did not remove it.
+//! Verbatim sentences still outscore paraphrases, so decimating homogeneous
+//! prose leaves every dropped unit with a surviving near-neighbour and the
+//! minimum stays high — while a real rewrite scores every unit as a paraphrase
+//! and the minimum falls.
+//!
+//! Two further things are unmeasured and must not be quoted:
+//! - the `0.02` margin threshold in [`Verdict::holds`] was chosen arbitrarily,
+//!   and the observed margins (−0.080, −0.034, +0.024, +0.134) straddle it;
+//! - `n = 4` across two texts, all four arms authored by the same party that
+//!   wrote the metric.
+//!
+//! The shape is right — a direction needs a null that reaches the same
+//! magnitude stupidly — and the retention statistic inside it is wrong. Do not
+//! act on a `holds` from this command. Recorded rather than patched, because
+//! adjusting the metric until the examples agree is how an instrument that
+//! cannot fail gets built.
+//!
 //! ## Degrades honestly without a model
 //!
 //! The magnitude test is pure token counting and needs nothing. The retention
@@ -154,6 +185,16 @@ impl Verdict {
         self.moved && self.margin() > 0.02
     }
 
+    /// Whether this verdict is trustworthy at all. Currently: never.
+    ///
+    /// See the module header. The retention statistic inverts on real prose —
+    /// it rates deletion above compression — so `holds()` is not evidence. This
+    /// is a separate method rather than a change to `holds()` so the broken
+    /// behaviour stays visible and measurable while it is fixed.
+    pub fn is_trustworthy(&self) -> bool {
+        false
+    }
+
     pub fn render(&self) -> String {
         let mut o = String::new();
         o.push_str(&format!(
@@ -177,6 +218,13 @@ impl Verdict {
             );
         }
         o.push('\n');
+        o.push_str(
+            "\n!! DO NOT ACT ON THIS VERDICT. Measured 2026-09-12, this control\n\
+             \x20  INVERTS on real prose: it rated deletion (+0.024) above a genuine\n\
+             \x20  compression (-0.034) of the same text. The retention statistic\n\
+             \x20  still rewards verbatim text, one level down from where it was\n\
+             \x20  fixed. See the module header.\n\n",
+        );
         o.push_str(if self.holds() {
             "VERDICT  holds — it moved the requested way AND retained more than\n\
              \x20        the null. The edit did something scissors could not.\n"
@@ -388,6 +436,35 @@ If this assertion ever fails, the fallback became semantic and the warning in \
         assert_eq!(v.retention, v.null_retention);
         assert_eq!(v.margin(), 0.0);
         assert!(!v.holds());
+    }
+
+    /// The measurement that killed this control, pinned so a future fix has a
+    /// target and cannot quietly declare victory.
+    ///
+    /// Deletion must not outscore compression. Today it does, under a semantic
+    /// embedder, on this crate's own prose. The assertion is written to FAIL
+    /// when the metric is repaired — it asserts the broken ordering — so
+    /// whoever fixes `worst_covered` is forced to come back and delete it.
+    #[test]
+    #[ignore = "documents the broken ordering; run with --ignored after any change to worst_covered — it must then FAIL, and be replaced"]
+    fn known_broken_deletion_outscores_compression() {
+        let e = e();
+        let original = "The observation log records what the machine saw. Observers \
+record but never mean anything. Indexers find but hold no position on truth. \
+Interpreters let a model decide and the model becomes the memory.";
+        let sentences: Vec<&str> = original.split(". ").collect();
+        let decimated: String = sentences.iter().step_by(2).cloned().collect::<Vec<_>>().join(". ");
+        let compressed = "The log records what the machine saw. Observers record \
+without meaning; indexers find without judging truth; interpreters hand memory \
+to the model.";
+        let d = worst_covered(original, &decimated, &e);
+        let c = worst_covered(original, compressed, &e);
+        assert!(
+            d >= c,
+            "the broken ordering no longer holds (deletion {d} < compression {c}) — \
+the metric may be fixed. Verify against the module header's table and delete \
+this test."
+        );
     }
 
     #[test]
