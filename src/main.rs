@@ -188,6 +188,53 @@ enum Command {
         #[arg(long)]
         big_model: Option<String>,
     },
+    /// Watch a source and append what changed to the observation log.
+    /// Append-only: nothing here is ever rewritten. Re-running over an
+    /// unchanged tree produces nothing.
+    #[command(name = "watch")]
+    Watch {
+        /// `fs` (content-hash gated tree scan) or `git` (commits, with the
+        /// interval since the previous commit as their duration).
+        #[arg(long, default_value = "fs")]
+        source: String,
+        #[arg(long, default_value = ".")]
+        path: PathBuf,
+        #[arg(long, default_value_t = 2000)]
+        max: usize,
+        /// Show what would be appended without writing.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Read the observation log: what this machine saw, and what else was
+    /// happening at the same time.
+    #[command(name = "observed")]
+    Observed {
+        /// Only this bucket (`fs`, `git`, `terminal`, `model`, …).
+        #[arg(long)]
+        source: Option<String>,
+        /// What overlapped this observation in time, across every source.
+        #[arg(long)]
+        concurrent: Option<u64>,
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Did a transformation go the way it was asked to — and did it beat doing
+    /// the same thing stupidly? Reads two files and answers with the null in
+    /// the same pass.
+    #[command(name = "direction")]
+    DirectionCmd {
+        #[arg(long)]
+        before: PathBuf,
+        #[arg(long)]
+        after: PathBuf,
+        /// `shorter` | `longer` | `rephrased`
+        #[arg(long, default_value = "shorter")]
+        want: String,
+        #[arg(long)]
+        json: bool,
+    },
     /// The conceptual state a human and a machine are both working on: what is
     /// believed and on what evidence, what is still disputed, and what was
     /// predicted and never scored. No model is involved — it reads the store.
@@ -494,6 +541,15 @@ fn main() -> anyhow::Result<()> {
         Command::Model { cmd } => cmd_model(cmd),
         Command::NGram { cmd } => cmd_ngram(cmd),
         Command::Demo { dir, query, order } => cmd_demo(&dir, &query, order),
+        Command::Watch { source, path, max, dry_run } => {
+            cmd_watch(&source, &path, max, dry_run)
+        }
+        Command::Observed { source, concurrent, limit, json } => {
+            cmd_observed(source.as_deref(), concurrent, limit, json)
+        }
+        Command::DirectionCmd { before, after, want, json } => {
+            cmd_direction(&before, &after, &want, json)
+        }
         Command::Ground { json } => {
             let g = physis_core::ground::read(&load_core(), chrono::Utc::now());
             if json {
@@ -1828,6 +1884,105 @@ fn cmd_demo(dir: &Path, query: &str, order: u8) -> anyhow::Result<()> {
     println!("continuation: {}…", model.generate(query, 8)?);
     println!("
 less context, more structure — physis.");
+    Ok(())
+}
+
+fn cmd_watch(source: &str, path: &Path, max: usize, dry_run: bool) -> anyhow::Result<()> {
+    let log = physis_core::observe::log_path();
+    let known = physis_core::observe::read(&log)?;
+    let mut fresh = match source {
+        "fs" => physis_core::observe::watch_fs(path, &known, max),
+        "git" => physis_core::observe::watch_git(path, max.min(500)),
+        other => anyhow::bail!("unknown source {other:?} — try `fs` or `git`"),
+    };
+    // `git` re-reads the same history every run; drop what the log already has
+    // so the append stays idempotent the way the fs watcher already is.
+    if source == "git" {
+        fresh.retain(|o| !known.iter().any(|k| k.source == "git" && k.subject == o.subject));
+    }
+    if fresh.is_empty() {
+        println!("nothing changed — {} observation(s) already in the log", known.len());
+        return Ok(());
+    }
+    if dry_run {
+        println!("would append {} observation(s):", fresh.len());
+        for o in fresh.iter().take(20) {
+            println!("  {:<8} {}", o.source, o.subject);
+        }
+        return Ok(());
+    }
+    let (a, b) = physis_core::observe::append(&log, &mut fresh)?;
+    println!("appended {} observation(s), seq {a}..={b}", fresh.len());
+    println!("log: {}", log.display());
+    Ok(())
+}
+
+fn cmd_observed(
+    source: Option<&str>,
+    concurrent: Option<u64>,
+    limit: usize,
+    json: bool,
+) -> anyhow::Result<()> {
+    let all = physis_core::observe::read(&physis_core::observe::log_path())?;
+    if all.is_empty() {
+        println!("The log is empty. Nothing has been observed, so nothing can be claimed.");
+        println!("  physis-core watch --source fs --path .");
+        return Ok(());
+    }
+    let rows: Vec<physis_core::observe::Observation> = if let Some(seq) = concurrent {
+        physis_core::observe::concurrent(&all, seq)
+    } else if let Some(s) = source {
+        physis_core::observe::by_source(&all, s)
+    } else {
+        let mut v = all.clone();
+        v.sort_by_key(|o| std::cmp::Reverse(o.seq));
+        v
+    };
+    if json {
+        println!("{}", serde_json::to_string_pretty(&rows)?);
+        return Ok(());
+    }
+    if let Some(seq) = concurrent {
+        println!("── CONCURRENT WITH #{seq} ──");
+        if rows.is_empty() {
+            println!("  nothing overlapped it in time");
+        }
+    } else {
+        println!("── OBSERVED ── {} total", all.len());
+    }
+    for o in rows.iter().take(limit) {
+        let dur = o
+            .duration_ms
+            .map(|m| format!("{:>7.1}s", m as f64 / 1000.0))
+            .unwrap_or_else(|| "       ·".into());
+        println!(
+            "  #{:<5} {} {:<9} {}",
+            o.seq,
+            dur,
+            o.source,
+            o.subject.chars().take(84).collect::<String>()
+        );
+    }
+    Ok(())
+}
+
+fn cmd_direction(before: &Path, after: &Path, want: &str, json: bool) -> anyhow::Result<()> {
+    let Some(dir) = physis_core::direction::Direction::parse(want) else {
+        anyhow::bail!("unknown direction {want:?} — try shorter | longer | rephrased");
+    };
+    let b = std::fs::read_to_string(before)?;
+    let a = std::fs::read_to_string(after)?;
+    let (embedder, kind) = physis_core::embed::select(384);
+    let v = physis_core::direction::check(&b, &a, dir, embedder.as_ref(), kind)?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&v)?);
+    } else {
+        print!("{}", v.render());
+    }
+    // A failed direction check must be visible to a script, not only to a reader.
+    if !v.holds() {
+        std::process::exit(1);
+    }
     Ok(())
 }
 
