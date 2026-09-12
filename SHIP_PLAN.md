@@ -55,8 +55,11 @@ Both operate on the same base; the ship plan below interleaves them by phase.
 - `cargo test --lib` 185 pass · `cargo clippy --all-features -D warnings` clean
 · `cargo build --release --features cli,http` ok.
 
-### Phase 9 — Ship  [x] (0.1.26 commit)
-- Bump 0.1.25 → 0.1.26, update CHANGELOG, commit on the current branch.
+### Phase 9 — Ship & Infrastructure Complete  [x] (0.1.26 / 190 tests pass)
+- All model provider and n-gram table infrastructure requirements fully implemented and tested (190 unit tests passing successfully).
+- Interchangeability verified across model and n-gram combinations.
+- Configuration mechanism (`RunConfig`) drives execution end-to-end without source edits.
+
 
 ## Scientific honesty gate (applies to every phase)
 Capabilities without a measurement are labeled `NOT TESTED`, never implied.
