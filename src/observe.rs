@@ -276,6 +276,163 @@ pub fn watch_git(repo: &Path, limit: usize) -> Vec<Observation> {
     obs
 }
 
+/// Watch shell history: one observation per command, with its real runtime.
+///
+/// zsh's extended history is `: <epoch>:<elapsed>;<command>`, and `<elapsed>` is
+/// the seconds the command actually ran. That is a genuine `duration_ms` rather
+/// than an inferred one, which makes [`concurrent`] able to answer *"what was I
+/// running while that file changed"* precisely instead of approximately.
+///
+/// bash history has no timestamps unless `HISTTIMEFORMAT` is set, so plain
+/// lines are taken as instants rather than guessed at.
+///
+/// Read-only, like `recall`'s adapters into other tools' stores: this never
+/// writes to the history file it reads.
+pub fn watch_shell(hist: &Path, known: &[Observation], limit: usize) -> Vec<Observation> {
+    // Lossy, not `read_to_string`. zsh writes metafied bytes for characters
+    // outside ASCII, so a real history file is frequently NOT valid UTF-8 and
+    // `read_to_string` returns Err — which this watcher would have reported as
+    // "nothing changed". Silent emptiness from a source that plainly has
+    // content is the worst failure shape available to a watcher, and it is what
+    // shipped: the unit test used clean ASCII and never hit it.
+    let Ok(bytes) = std::fs::read(hist) else { return Vec::new() };
+    let text = String::from_utf8_lossy(&bytes);
+    let seen: std::collections::HashSet<&str> = known
+        .iter()
+        .filter(|o| o.source == "terminal")
+        .map(|o| o.subject.as_str())
+        .collect();
+
+    // zsh writes a multi-line command as physical lines joined by a trailing
+    // backslash. Read line-by-line, each continuation becomes a separate
+    // timestamp-less "command" that was never run. Join them first.
+    let mut joined: Vec<String> = Vec::new();
+    for line in text.lines() {
+        match joined.last_mut() {
+            Some(prev) if prev.ends_with('\\') => {
+                prev.pop();
+                prev.push(' ');
+                prev.push_str(line);
+            }
+            _ => joined.push(line.to_string()),
+        }
+    }
+
+    let mut out = Vec::new();
+    for line in joined.iter().rev().take(limit * 4) {
+        let line = line.as_str();
+        let (at, elapsed, cmd) = match line.strip_prefix(": ") {
+            Some(rest) => {
+                let Some((meta, cmd)) = rest.split_once(';') else { continue };
+                let Some((ts, el)) = meta.split_once(':') else { continue };
+                let Ok(ts) = ts.trim().parse::<i64>() else { continue };
+                (
+                    chrono::DateTime::from_timestamp(ts, 0),
+                    el.trim().parse::<u64>().ok(),
+                    cmd,
+                )
+            }
+            None if !line.trim().is_empty() => (None, None, line),
+            _ => continue,
+        };
+        let cmd = cmd.trim();
+        // A command line is its own identity here; re-running the watcher must
+        // not re-append what is already recorded.
+        if cmd.is_empty() || seen.contains(cmd) || out.iter().any(|o: &Observation| o.subject == cmd) {
+            continue;
+        }
+        let mut o = Observation::new("terminal", cmd).by("watch_shell");
+        if let Some(t) = at {
+            o.at = t;
+        }
+        // Zero-second commands are instants, not zero-length intervals.
+        o.duration_ms = elapsed.filter(|e| *e > 0).map(|e| e * 1000);
+        out.push(o);
+        if out.len() >= limit {
+            break;
+        }
+    }
+    out.reverse(); // oldest first, so sequence order matches time order
+    out
+}
+
+/// Watch an agent's own session store: one observation per turn.
+///
+/// This is the source the brief calls *model outputs*, and it is the one that
+/// makes the substrate reflexive — the machine observes what it was asked and
+/// what it answered, on the same timeline as the files it changed and the
+/// commands it ran.
+///
+/// Read-only over JSONL, `recall`'s adapter discipline: writes go only to our
+/// own log. Unparseable lines are skipped rather than fatal, because a session
+/// being written to concurrently will always have a partial final line.
+pub fn watch_agent(dir: &Path, known: &[Observation], limit: usize) -> Vec<Observation> {
+    let seen: std::collections::HashSet<&str> = known
+        .iter()
+        .filter(|o| o.source == "agent")
+        .map(|o| o.subject.as_str())
+        .collect();
+
+    let mut files: Vec<PathBuf> = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        let Ok(rd) = std::fs::read_dir(&d) else { continue };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if p.extension().and_then(|x| x.to_str()) == Some("jsonl") {
+                files.push(p);
+            }
+        }
+    }
+    // Newest sessions first: the recent ones are the ones worth observing.
+    files.sort_by_key(|p| {
+        std::cmp::Reverse(
+            p.metadata().and_then(|m| m.modified()).ok(),
+        )
+    });
+
+    let mut out = Vec::new();
+    for f in files {
+        let Ok(text) = std::fs::read_to_string(&f) else { continue };
+        for line in text.lines() {
+            if out.len() >= limit {
+                out.reverse();
+                return out;
+            }
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else { continue };
+            let (Some(ts), Some(sid)) = (
+                v.get("timestamp").and_then(|x| x.as_str()),
+                v.get("sessionId").and_then(|x| x.as_str()),
+            ) else {
+                continue;
+            };
+            let Ok(at) = chrono::DateTime::parse_from_rfc3339(ts) else { continue };
+            // Subject is session+timestamp: stable, and unique per turn.
+            let subject = format!("{}@{}", &sid[..8.min(sid.len())], ts);
+            if seen.contains(subject.as_str()) {
+                continue;
+            }
+            let kind = v.get("type").and_then(|x| x.as_str()).unwrap_or("turn");
+            let body: String = v
+                .get("content")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .chars()
+                .take(400)
+                .collect();
+            let mut o = Observation::new("agent", subject)
+                .with_body(format!("[{kind}] {body}"))
+                .by("watch_agent");
+            o.at = at.with_timezone(&chrono::Utc);
+            out.push(o);
+        }
+    }
+    out.reverse();
+    out
+}
+
 // ── The claim path ──────────────────────────────────────────────────────────
 //
 // This is the join the survey found missing everywhere. Observers record; they
@@ -477,6 +634,86 @@ mod tests {
         assert_eq!(found[0].seq, 42);
         // A citation into an empty log resolves to nothing, not to a guess.
         assert!(cited_by(&h, &[]).is_empty());
+    }
+
+    /// zsh extended history carries the REAL runtime of each command, which is
+    /// what makes cross-source overlap precise rather than inferred.
+    #[test]
+    fn the_shell_watcher_reads_real_durations_and_dedupes() {
+        let d = tmp("shell");
+        let h = d.join("hist");
+        std::fs::write(
+            &h,
+            ": 1700000000:12;cargo test\n: 1700000100:0;ls\n: 1700000200:5;git push\n",
+        )
+        .unwrap();
+        let first = watch_shell(&h, &[], 10);
+        assert_eq!(first.len(), 3);
+        let ct = first.iter().find(|o| o.subject == "cargo test").unwrap();
+        assert_eq!(ct.duration_ms, Some(12_000), "12 elapsed seconds");
+        let ls = first.iter().find(|o| o.subject == "ls").unwrap();
+        assert_eq!(ls.duration_ms, None, "a zero-second command is an instant");
+        // Oldest first, so sequence order matches time order.
+        assert_eq!(first[0].subject, "cargo test");
+        // Re-running must not duplicate.
+        assert!(watch_shell(&h, &first, 10).is_empty());
+    }
+
+    /// A session file being written to concurrently always has a partial final
+    /// line. That must cost one turn, not the whole session.
+    /// A multi-line command is one command. Read as physical lines, each
+    /// continuation becomes a timestamp-less entry for something that was never
+    /// run as written.
+    #[test]
+    fn the_shell_watcher_joins_continuation_lines() {
+        let d = tmp("shell-cont");
+        let h = d.join("hist");
+        std::fs::write(
+            &h,
+            ": 1700000000:2;cargo build \\\n  --release \\\n  --features cli\n: 1700000100:0;ls\n",
+        )
+        .unwrap();
+        let obs = watch_shell(&h, &[], 10);
+        assert_eq!(obs.len(), 2, "one joined command plus ls, not four fragments");
+        let built = obs.iter().find(|o| o.subject.starts_with("cargo build")).unwrap();
+        assert!(built.subject.contains("--release"), "got {:?}", built.subject);
+        assert!(built.subject.contains("--features cli"));
+        assert_eq!(built.duration_ms, Some(2_000));
+    }
+
+    /// A real zsh history is frequently not valid UTF-8. The watcher must read
+    /// it anyway rather than reporting "nothing changed", which is what it did
+    /// until this test existed.
+    #[test]
+    fn the_shell_watcher_survives_invalid_utf8() {
+        use std::io::Write;
+        let d = tmp("shell-utf8");
+        let h = d.join("hist");
+        let mut f = std::fs::File::create(&h).unwrap();
+        f.write_all(b": 1700000000:3;echo ").unwrap();
+        f.write_all(&[0xE9, 0x83]).unwrap(); // metafied bytes, invalid UTF-8
+        f.write_all(b"\n: 1700000100:0;ls\n").unwrap();
+        drop(f);
+        assert!(std::fs::read_to_string(&h).is_err(), "the fixture must be invalid UTF-8");
+
+        let obs = watch_shell(&h, &[], 10);
+        assert_eq!(obs.len(), 2, "both commands must be read despite the bad bytes");
+        assert!(obs.iter().any(|o| o.subject == "ls"));
+    }
+
+    #[test]
+    fn the_agent_watcher_skips_partial_lines() {
+        let d = tmp("agent");
+        std::fs::write(
+            d.join("s.jsonl"),
+            "{\"timestamp\":\"2026-09-12T10:00:00Z\",\"sessionId\":\"abcdef123\",\"type\":\"user\",\"content\":\"hello\"}\n             {\"timestamp\":\"2026-09-12T10:01:00Z\",\"sessionId\":\"abcdef123\",\"type\":\"assistant\",\"content\":\"hi\"}\n             {\"timestamp\":\"not-fin",
+        )
+        .unwrap();
+        let obs = watch_agent(&d, &[], 10);
+        assert_eq!(obs.len(), 2, "two good turns, one partial line skipped");
+        assert!(obs.iter().all(|o| o.source == "agent"));
+        assert!(obs[0].body.contains("[user]") || obs[1].body.contains("[user]"));
+        assert!(watch_agent(&d, &obs, 10).is_empty(), "must dedupe on re-run");
     }
 
     #[test]

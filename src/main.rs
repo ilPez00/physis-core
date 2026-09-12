@@ -193,8 +193,11 @@ enum Command {
     /// unchanged tree produces nothing.
     #[command(name = "watch")]
     Watch {
-        /// `fs` (content-hash gated tree scan) or `git` (commits, with the
-        /// interval since the previous commit as their duration).
+        /// `fs` — content-hash gated tree scan.
+        /// `git` — commits, with the interval since the previous commit.
+        /// `terminal` — shell history, with each command's real runtime.
+        /// `agent` — an agent's own session turns (model outputs and prompts).
+        /// `all` — every source above, in one pass.
         #[arg(long, default_value = "fs")]
         source: String,
         #[arg(long, default_value = ".")]
@@ -1910,16 +1913,38 @@ less context, more structure — physis.");
 fn cmd_watch(source: &str, path: &Path, max: usize, dry_run: bool) -> anyhow::Result<()> {
     let log = physis_core::observe::log_path();
     let known = physis_core::observe::read(&log)?;
+    let home = std::env::var("HOME").unwrap_or_default();
+    let shell_hist = || {
+        let z = PathBuf::from(&home).join(".zsh_history");
+        if z.exists() { z } else { PathBuf::from(&home).join(".bash_history") }
+    };
+    let agent_dir = || PathBuf::from(&home).join(".claude/projects");
+
     let mut fresh = match source {
         "fs" => physis_core::observe::watch_fs(path, &known, max),
         "git" => physis_core::observe::watch_git(path, max.min(500)),
-        other => anyhow::bail!("unknown source {other:?} — try `fs` or `git`"),
+        "terminal" => physis_core::observe::watch_shell(&shell_hist(), &known, max.min(500)),
+        "agent" => physis_core::observe::watch_agent(&agent_dir(), &known, max.min(500)),
+        // The point of the substrate is that these are one timeline, so running
+        // them together is the default way to use it rather than a convenience.
+        "all" => {
+            let mut v = physis_core::observe::watch_fs(path, &known, max);
+            v.extend(physis_core::observe::watch_git(path, max.min(200)));
+            v.extend(physis_core::observe::watch_shell(&shell_hist(), &known, max.min(200)));
+            v.extend(physis_core::observe::watch_agent(&agent_dir(), &known, max.min(200)));
+            // One timeline: sort by when it happened, not by which watcher ran.
+            v.sort_by_key(|o| o.at);
+            v
+        }
+        other => anyhow::bail!(
+            "unknown source {other:?} — try fs | git | terminal | agent | all"
+        ),
     };
     // `git` re-reads the same history every run; drop what the log already has
-    // so the append stays idempotent the way the fs watcher already is.
-    if source == "git" {
-        fresh.retain(|o| !known.iter().any(|k| k.source == "git" && k.subject == o.subject));
-    }
+    // so the append stays idempotent the way the other watchers already are.
+    fresh.retain(|o| {
+        !known.iter().any(|k| k.source == o.source && k.subject == o.subject)
+    });
     if fresh.is_empty() {
         println!("nothing changed — {} observation(s) already in the log", known.len());
         return Ok(());
@@ -1927,12 +1952,21 @@ fn cmd_watch(source: &str, path: &Path, max: usize, dry_run: bool) -> anyhow::Re
     if dry_run {
         println!("would append {} observation(s):", fresh.len());
         for o in fresh.iter().take(20) {
-            println!("  {:<8} {}", o.source, o.subject);
+            println!("  {:<9} {}", o.source, o.subject.chars().take(80).collect::<String>());
         }
         return Ok(());
     }
+    let mut by: std::collections::BTreeMap<String, usize> = Default::default();
+    for o in fresh.iter() {
+        *by.entry(o.source.clone()).or_default() += 1;
+    }
     let (a, b) = physis_core::observe::append(&log, &mut fresh)?;
-    println!("appended {} observation(s), seq {a}..={b}", fresh.len());
+    let breakdown: Vec<String> = by.iter().map(|(k, n)| format!("{n} {k}")).collect();
+    println!(
+        "appended {} observation(s), seq {a}..={b}  ({})",
+        fresh.len(),
+        breakdown.join(" · ")
+    );
     println!("log: {}", log.display());
     Ok(())
 }
