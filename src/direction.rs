@@ -49,6 +49,23 @@
 //!
 //! **Separation (destop − best failing arm) = +0.1964.** Accuracy 27/30.
 //!
+//! ## The benchmark's own control
+//!
+//! A benchmark that cannot tell a broken metric from a working one is not
+//! evidence that the working one is good. `PHYSIS_DIRECTION_METRIC=cosine`
+//! restores the original whole-text statistic — already known to reward copying
+//! — and the benchmark runs both over identical arms:
+//!
+//! | metric | separation | accuracy |
+//! |---|---|---|
+//! | `worst_covered` | **+0.2043** | 22/24 |
+//! | `cosine` (known bad) | **−0.0742** | 20/24 |
+//!
+//! Δ +0.2785. Note that *accuracy barely moves* (0.92 → 0.83) while separation
+//! **inverts**: a metric can be wrong about the one arm that matters and still
+//! look competent, because five of six arms should fail and saying "fail" is
+//! cheap. Separation is the honest statistic; accuracy is the gameable one.
+//!
 //! ## What that licenses
 //!
 //! It distinguishes **shortening that keeps every content word** from
@@ -272,6 +289,17 @@ impl Verdict {
 /// every sentence somewhere, so the minimum stays high. You cannot pass this by
 /// copying part of the input well; you have to keep all of it.
 fn worst_covered(before: &str, after: &str, embedder: &dyn VectorEmbed) -> f32 {
+    // `PHYSIS_DIRECTION_METRIC=cosine` restores the ORIGINAL, known-broken
+    // statistic: whole-text cosine, which rewards copying.
+    //
+    // This is not a fallback and no caller should set it. It exists so
+    // `benchmarks/direction` can run a KNOWN-BAD arm and show that it scores
+    // badly — a benchmark that cannot detect a broken metric is not evidence
+    // that the working one is good. Keeping the broken version reachable is the
+    // cheapest way to give the instrument its own control.
+    if std::env::var("PHYSIS_DIRECTION_METRIC").as_deref() == Ok("cosine") {
+        return crate::models::cosine_sim(&embedder.embed(before), &embedder.embed(after));
+    }
     let units: Vec<&str> = before
         .split(['.', '\n', ';'])
         .map(str::trim)
@@ -480,6 +508,24 @@ every four hundred hours. The supervisor records each replacement in the log.";
         assert!(
             k > d,
             "keeping every content word ({k}) must outscore dropping sentences ({d})"
+        );
+    }
+
+    /// The benchmark's own control must actually differ from the metric it
+    /// grades, or running both arms proves nothing.
+    #[test]
+    fn the_cosine_escape_produces_a_different_statistic() {
+        let e = e();
+        let cut: String = LONG.split_whitespace().take(12).collect::<Vec<_>>().join(" ");
+        let good = worst_covered(LONG, &cut, &e);
+        // Set, measure, restore — the variable is process-global.
+        unsafe { std::env::set_var("PHYSIS_DIRECTION_METRIC", "cosine") };
+        let broken = worst_covered(LONG, &cut, &e);
+        unsafe { std::env::remove_var("PHYSIS_DIRECTION_METRIC") };
+        assert_ne!(
+            good, broken,
+            "the escape must restore a genuinely different statistic, or the \
+benchmark's known-bad arm is measuring the same thing twice"
         );
     }
 

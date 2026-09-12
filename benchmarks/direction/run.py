@@ -45,6 +45,14 @@ is precisely the semantic operation under test. `destop` is the nearest honest
 approximation: dropping function words shortens the text while leaving every
 content word of every sentence in place, so nothing is abandoned.
 
+## The benchmark's own control
+
+`worst_covered` is graded against `cosine` — the original statistic, already
+known to reward copying — run over the identical arms via
+`PHYSIS_DIRECTION_METRIC=cosine`. A benchmark that cannot tell a broken metric
+from a working one is not evidence that the working one is good, so both are
+reported and the gap between them is the result.
+
 ## Reading the result
 
 `accuracy` is over arms whose verdict is known. A metric that says HOLD to
@@ -116,7 +124,13 @@ def arms(text):
     }
 
 
-def run(before, after):
+def run(before, after, metric=None):
+    import os
+    env = dict(os.environ)
+    if metric:
+        env["PHYSIS_DIRECTION_METRIC"] = metric
+    else:
+        env.pop("PHYSIS_DIRECTION_METRIC", None)
     with tempfile.TemporaryDirectory() as d:
         b, a = pathlib.Path(d) / "b.txt", pathlib.Path(d) / "a.txt"
         b.write_text(before)
@@ -124,12 +138,39 @@ def run(before, after):
         p = subprocess.run(
             [str(BIN), "direction", "--before", str(b), "--after", str(a),
              "--want", "shorter", "--json"],
-            capture_output=True, text=True, timeout=600,
+            capture_output=True, text=True, timeout=600, env=env,
         )
     try:
         return json.loads(p.stdout)
     except json.JSONDecodeError:
         return None
+
+
+def score(texts, metric):
+    """Separation and accuracy for one metric over every text and arm."""
+    correct = total = 0
+    margins = {k: [] for k in
+               ("destop", "truncate", "decimate", "clause", "shuffle", "verbatim")}
+    rows = []
+    for name, text in texts:
+        cells = []
+        for arm, (after, should_hold) in arms(text).items():
+            v = run(text, after, metric)
+            if v is None:
+                cells.append(f"{arm}=ERR")
+                continue
+            margin = v["retention"] - v["null_retention"]
+            held = v["moved"] and margin > 0.02
+            margins[arm].append(margin)
+            total += 1
+            ok = held == should_hold
+            correct += ok
+            cells.append(f"{arm}={'H' if held else 'f'}{'' if ok else '!'}")
+        rows.append((name, cells))
+    good = sum(margins["destop"]) / len(margins["destop"]) if margins["destop"] else 0.0
+    bad = max((sum(v) / len(v) for k, v in margins.items() if k != "destop" and v),
+              default=0.0)
+    return rows, margins, correct, total, good - bad
 
 
 def main():
@@ -140,45 +181,39 @@ def main():
         sys.exit(f"missing {BIN} — cargo build --release --features cli,embed-onnx --bin physis-core")
 
     texts = sources(args.texts)
-    print(f"direction benchmark — {len(texts)} real source texts, 5 rule-generated arms each\n")
+    print(f"direction benchmark — {len(texts)} real source texts, 6 rule-generated arms each\n")
 
-    correct = total = 0
-    margins = {k: [] for k in ("destop", "truncate", "decimate", "clause", "shuffle", "verbatim")}
-    for name, text in texts:
-        row = []
-        for arm, (after, should_hold) in arms(text).items():
-            v = run(text, after)
-            if v is None:
-                row.append(f"{arm}=ERR")
-                continue
-            margin = v["retention"] - v["null_retention"]
-            held = v["moved"] and margin > 0.02
-            margins[arm].append(margin)
-            total += 1
-            ok = held == should_hold
-            correct += ok
-            row.append(f"{arm}={'H' if held else 'f'}{'' if ok else '!'}")
-        print(f"  {name:<18} " + "  ".join(row))
+    # Two arms for the METRIC itself. `cosine` is the original, known-broken
+    # statistic (whole-text similarity, which rewards copying). If the benchmark
+    # cannot tell it from the working one, the benchmark is not evidence.
+    results = {}
+    for label, metric in (("worst_covered", None), ("cosine (known bad)", "cosine")):
+        rows, margins, correct, total, sep = score(texts, metric)
+        results[label] = (correct, total, sep, margins)
+        print(f"── {label}")
+        for name, cells in rows:
+            print(f"  {name:<18} " + "  ".join(cells))
+        print(f"  accuracy {correct}/{total} = {correct / max(total, 1):.2f}"
+              f"   separation {sep:+.4f}")
+        for k, v in margins.items():
+            if v:
+                print(f"      {k:<10} {sum(v) / len(v):+.4f}")
+        print()
 
-    print(f"\naccuracy {correct}/{total} = {correct / max(total, 1):.2f}")
-    print("\nmean margin by arm (the statistic itself, before any threshold)")
-    for k, v in margins.items():
-        if v:
-            print(f"  {k:<10} {sum(v) / len(v):+.4f}")
-
-    good = sum(margins["destop"]) / len(margins["destop"]) if margins["destop"] else 0
-    bad = max(
-        (sum(v) / len(v) for k, v in margins.items() if k != "destop" and v),
-        default=0,
-    )
-    sep = good - bad
-    print(f"\nSEPARATION  destop - best failing arm = {sep:+.4f}")
-    if sep > 0.02:
-        print("  The statistic separates compression from deletion.")
+    live = results["worst_covered"][2]
+    dead = results["cosine (known bad)"][2]
+    print(f"CONTROL   worst_covered {live:+.4f}  vs  known-bad cosine {dead:+.4f}"
+          f"   Δ {live - dead:+.4f}")
+    if live > 0.02 and live - dead > 0.02:
+        print("  The benchmark separates a working metric from a broken one, and")
+        print("  the working metric separates compression from deletion.")
+        sys.exit(0)
+    if live - dead <= 0.02:
+        print("  THE BENCHMARK CANNOT TELL THEM APART. It grades nothing: a metric")
+        print("  already known to be broken scores as well as the current one.")
     else:
-        print("  IT DOES NOT SEPARATE. A threshold cannot rescue this: the arms")
-        print("  are not ordered correctly, so no cutoff classifies them.")
-    sys.exit(0 if sep > 0.02 else 1)
+        print("  The current metric does not separate the arms.")
+    sys.exit(1)
 
 
 if __name__ == "__main__":
