@@ -183,6 +183,7 @@
 pub mod bench;
 pub mod becoming;
 pub mod classify;
+pub mod config_run;
 pub mod coherence_dimensions;
 pub mod coherence_query;
 pub mod contradiction;

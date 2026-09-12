@@ -37,7 +37,15 @@ Both operate on the same base; the ship plan below interleaves them by phase.
 - Honesty: big-model oracle leg is **not configured** on this machine — the
   harness reports it as such rather than inventing a number.
 
-### Phase 6 — Studio exposure  [ ] (lightweight: map endpoint + selector)
+### Phase 6 — Studio exposure  [x] (lightweight, verified live)
+- `POST /api/map` returns the structural map (same `map::build_map` as CLI).
+- `GET /api/infra` reports embedder/table/model status: real artifacts only.
+
+### Directive 2 §16 — One configuration mechanism  [x]
+- `src/config_run.rs` (`RunConfig` JSON + `load_config` + tests).
+- `physis-core run --config demo.json [--model X] [--ngram Y] [--query Q]`
+  drives the pipeline entirely from config: changing model or n-gram needs
+  no source edit. Verified live: `--model smollm2-360m` via config only.
 
 ### Phase 7 — Documentation  [x] (README product-first + DEMO.md)
 - README rewritten product-first (hero numbers + three demos).

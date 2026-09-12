@@ -1,0 +1,7 @@
+{
+  "corpus": "examples/demo-corpus",
+  "query": "what maintenance is scheduled and why",
+  "budget": 500,
+  "model": "smollm2-360m",
+  "ngram": { "registry_id": null, "order": 5 }
+}

@@ -156,6 +156,23 @@ enum Command {
         #[command(subcommand)]
         cmd: NGramCmd,
     },
+    /// Run the pipeline from a JSON config (Directive-2 §16): model / ngram /
+    /// corpus / budget are read from the file and overridable on the CLI,
+    /// so changing either never requires a source edit.
+    Run {
+        /// Path to a JSON config file (see `physis-core run --config …`).
+        #[arg(long, required = true)]
+        config: PathBuf,
+        /// Override the configured model registry id.
+        #[arg(long)]
+        model: Option<String>,
+        /// Override the configured ngram registry id (loads it).
+        #[arg(long)]
+        ngram: Option<String>,
+        /// Override the configured query.
+        #[arg(long)]
+        query: Option<String>,
+    },
     /// Reproducible benchmark over a deterministic ground-truth corpus.
     /// Writes machine-readable artifacts to benchmarks/results/ (Directives 1+2).
     Benchmark {
@@ -428,6 +445,7 @@ fn main() -> anyhow::Result<()> {
         Command::Demo { dir, query, order } => cmd_demo(&dir, &query, order),
         Command::Context { corpus, query, budget, json } => cmd_context(&corpus, &query, budget, json),
         Command::Benchmark { order, budget, big_model } => cmd_benchmark(order, budget, big_model),
+        Command::Run { config, model, ngram, query } => cmd_run(&config, model, ngram, query),
         #[cfg(feature = "studio")]
         Command::Studio { port, model } => run_studio(port, model),
     }
@@ -1733,6 +1751,68 @@ fn cmd_benchmark(order: u8, budget: usize, big_model: Option<String>) -> anyhow:
     println!("interchangeable      {}", m.interchange_ok);
     println!("big-model oracle leg {}", m.big_model_leg);
     println!("artifacts -> benchmarks/results/ (run.json, metrics.json, provenance.json)");
+    Ok(())
+}
+
+fn cmd_run(config: &Path, model: Option<String>, ngram: Option<String>, query: Option<String>) -> anyhow::Result<()> {
+    use physis_core::config_run::RunConfig;
+    use physis_core::model_provider::{ModelProvider, NgramDecoderModel};
+    use physis_core::ngram_table::{NGramTable, TableBuilder, TableConfig, TableKind, TableRegistry};
+    use physis_core::tokenizer::WhitespaceTokenizer;
+    use std::sync::Arc;
+    let mut cfg = physis_core::config_run::load_config(&PathBuf::from(config))?;
+    if let Some(q) = query {
+        cfg.query = q.to_string();
+    }
+    if let Some(id) = ngram {
+        cfg.ngram.registry_id = Some(id.to_string());
+    }
+    // Resolve the ngram: registry id if given, else build from the corpus.
+    let table = if let Some(rid) = cfg.ngram.registry_id {
+        let reg = TableRegistry::new(TableRegistry::default_root());
+        Arc::new(reg.load(&rid, None)?)
+    } else {
+        let docs = physis_core::map::load_corpus(&cfg.corpus)?;
+        let tok = WhitespaceTokenizer::new(50_000);
+        let bcfg = TableConfig { table_id: "run".into(), max_order: cfg.ngram.order, ..Default::default() };
+        let mut tb = TableBuilder::new(bcfg);
+        for (_, b) in &docs {
+            tb.push_text(&tok, b);
+        }
+        let (t, _bytes) = tb.finish(&tok, "run-corpus");
+        Arc::new(t)
+    };
+    let kind = match table.manifest().kind {
+        TableKind::Lexical => "lexical".to_string(),
+        TableKind::Structural => "structural".to_string(),
+    };
+    let model_id = if let Some(mx) = model {
+        mx.to_string()
+    } else if let Some(cm) = cfg.model {
+        cm
+    } else {
+        format!("demo-ngram")
+    };
+    let m = NgramDecoderModel::new(&model_id, table, Box::new(WhitespaceTokenizer::new(50_000)));
+    let docs = physis_core::map::load_corpus(&cfg.corpus)?;
+    let embedder = physis_core::embed::RandomProjectionEmbedder::new(64);
+    let map = physis_core::map::build_map(&docs, &embedder, None)?;
+    let ctx = physis_core::map::compile_context(&docs, &embedder, &cfg.query, cfg.budget)?;
+    let score = match m.score(&cfg.query) {
+        Ok(x) => (x * 100.0).round(),
+        Err(_) => 0.0,
+    };
+    let cont = m.generate(&cfg.query, 8)?;
+    println!("── PHYSIS RUN (config-driven, offline, deterministic) ──");
+    println!("model: {} · architecture: {} · ngram kind: {}", m.metadata().id, m.metadata().architecture, kind);
+    println!("corpus: {} · query: {}", cfg.corpus.display(), cfg.query);
+    for l in map.hero_lines() {
+        println!("{l}");
+    }
+    println!("context compression {}% ({} to {} tokens)", (ctx.compression_ratio * 100.0).round(), ctx.baseline_tokens, ctx.physis_tokens);
+    println!("score(query) {} (mean log-prob * 100)", score);
+    println!("continuation: {} ...", cont.trim().chars().take(60).collect::<String>());
+    println!("less context, more structure — physis.");
     Ok(())
 }
 

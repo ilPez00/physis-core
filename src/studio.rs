@@ -175,6 +175,8 @@ pub async fn run_with_model(port: u16, model_dir: Option<String>) -> anyhow::Res
         .route("/api/ontology/upsert", post(upsert_entry))
         .route("/api/ontology/delete", post(delete_entry))
         .route("/api/ingest", post(ingest_dir))
+        .route("/api/map", post(structural_map))
+        .route("/api/infra", get(infra_status))
         .route("/api/ingest/promote", post(promote_proposal))
         .route("/api/quality", get(quality_json))
         .route("/api/quality/fail", post(quality_fail))
@@ -723,11 +725,90 @@ struct IngestReq {
     dir: String,
 }
 
+#[derive(serde::Deserialize)]
+struct MapReq {
+    dir: String,
+}
+
 #[derive(serde::Serialize)]
 struct IngestResp {
     files: usize,
     lines: usize,
     report: DiscoveryReport,
+}
+
+/// POST /api/map — the corpus structural map as JSON (Demo A surface of Phase
+/// 6). The Studio reuses the same `map::build_map` as the CLI, so the page
+/// and the shell always agree: repeats, differences, contradictions,
+/// provenance, and the reproducibility hash.
+async fn structural_map(State(state): State<Shared>, Json(req): Json<MapReq>) -> Response {
+    let dir = std::path::PathBuf::from(&req.dir);
+    if !dir.is_dir() {
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("not a directory: {}", dir.display()),
+        )
+            .into_response();
+    }
+    let s = state.read().unwrap();
+    let docs = match crate::map::load_corpus(&dir) {
+        Ok(d) => d,
+        Err(e) => {
+            return (StatusCode::BAD_REQUEST, format!("corpus load: {e}"))
+                .into_response();
+        }
+    };
+    let report = match crate::map::build_map(&docs, s.embedder.as_ref(), None) {
+        Ok(r) => r,
+        Err(e) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, format!("map: {e}"))
+                .into_response();
+        }
+    };
+    match serde_json::to_string(&report) {
+        Ok(body) => ([("content-type", "application/json")], body).into_response(),
+        Err(e) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("serialize: {e}"))
+                .into_response()
+        }
+    }
+}
+
+/// GET /api/infra — model + n-gram + embedder registry status (the
+/// introspection leg of Phase 6). Selection state the UI can bind to: the
+/// Studio shows real artifacts, never invented backends.
+async fn infra_status(State(state): State<Shared>) -> Response {
+    let s = state.read().unwrap();
+    let nreg = crate::ngram_table::TableRegistry::new(
+        crate::ngram_table::TableRegistry::default_root(),
+    );
+    let mreg = crate::model_provider::ModelRegistry::new(
+        crate::model_provider::ModelRegistry::default_root(),
+    );
+    let tables: Vec<String> = nreg
+        .list()
+        .iter()
+        .map(|(id, m)| id.clone())
+        .collect();
+    let models: Vec<String> = mreg
+        .list()
+        .iter()
+        .map(|m| m.record.id.clone())
+        .collect();
+    let body = serde_json::json!({
+        "embedder": s.embedder_kind,
+        "semantic": s.semantic,
+        "tables": tables,
+        "models": models,
+        "physis": env!("CARGO_PKG_VERSION"),
+    });
+    match serde_json::to_string(&body) {
+        Ok(b) => ([("content-type", "application/json")], b).into_response(),
+        Err(e) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("serialize: {e}"))
+                .into_response()
+        }
+    }
 }
 
 async fn ingest_dir(State(state): State<Shared>, Json(req): Json<IngestReq>) -> Response {
