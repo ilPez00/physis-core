@@ -317,6 +317,21 @@ pub fn promote(
         format!("obs:{}", obs.seq),
         claim,
     ));
+    // Provenance is not corroboration, and conflating them is an epistemic bug
+    // rather than a cosmetic one.
+    //
+    // `add_supporting_evidence` promotes Candidate -> Supported as soon as any
+    // evidence lands, which is right for a measurement and wrong here: the
+    // observation is what the claim is ABOUT, not a reason to believe it. That a
+    // commit happened is no evidence that an assertion about that commit is
+    // true. Left alone, every promoted observation would enter the shared state
+    // already looking established, and `ground` would show a wall of Supported
+    // claims nobody had tested.
+    //
+    // The citation stays — `cited_by` walks it, and the evidence can be re-read.
+    // Only the standing is reset.
+    h.status = crate::hypothesis::HypothesisStatus::Candidate;
+    h.recompute_fitness();
     h
 }
 
@@ -435,6 +450,13 @@ mod tests {
         assert_eq!(o, before, "promotion must not mutate the observation");
         assert_eq!(h.supporting_evidence.len(), 1);
         assert_eq!(h.supporting_evidence[0].source, "obs:7");
+        // Provenance is not corroboration: citing the observation must NOT make
+        // the claim look established before anyone has tested it.
+        assert_eq!(
+            h.status,
+            crate::hypothesis::HypothesisStatus::Candidate,
+            "a promoted observation is asserted, not supported"
+        );
 
         // And it can be refuted — which no surveyed system's record can be.
         let mut h = h;

@@ -51,10 +51,20 @@ pub struct Claim {
     /// Supporting and contradicting counts, kept apart on purpose: a claim with
     /// 9 for and 8 against is not the same object as one with 1 for and 0
     /// against, and a single net number erases exactly that difference.
+    ///
+    /// Excludes `obs:` evidence, which is provenance rather than corroboration
+    /// and appears under [`Claim::grounded_in`].
     pub for_count: usize,
     pub against_count: usize,
     /// Predictions made and never resolved.
     pub open_predictions: usize,
+    /// Observations this claim cites, resolved back into the append-only log.
+    ///
+    /// A claim grounded in a recorded observation is a different object from an
+    /// assertion someone typed: its evidence can be re-read rather than
+    /// trusted. Empty means the claim rests on something outside the log, which
+    /// is allowed and worth seeing.
+    pub grounded_in: Vec<String>,
 }
 
 /// A disagreement that has not been resolved, shown as a disagreement.
@@ -102,8 +112,16 @@ fn rank(s: &HypothesisStatus) -> u8 {
     }
 }
 
-/// Read the shared state out of a loaded core. No model, no network, no I/O.
-pub fn read(core: &PhysisCore, now: chrono::DateTime<chrono::Utc>) -> Ground {
+/// Read the shared state out of a loaded core. No model, no network.
+///
+/// `observations` is the append-only log; claims that cite it are resolved so
+/// the view shows which beliefs are anchored to something the machine actually
+/// saw. Pass an empty slice to render the state without that resolution.
+pub fn read(
+    core: &PhysisCore,
+    observations: &[crate::observe::Observation],
+    now: chrono::DateTime<chrono::Utc>,
+) -> Ground {
     let mut claims: Vec<Claim> = core
         .hypotheses
         .values()
@@ -112,9 +130,27 @@ pub fn read(core: &PhysisCore, now: chrono::DateTime<chrono::Utc>) -> Ground {
             statement: h.statement.clone(),
             status: format!("{:?}", h.status),
             fitness: h.fitness,
-            for_count: h.supporting_evidence.len(),
-            against_count: h.contradicting_evidence.len(),
+            // `obs:` evidence is PROVENANCE, not corroboration — it is what the
+            // claim is about, not a reason to believe it. It is rendered on its
+            // own line as `grounded in`, so counting it here too would show a
+            // freshly asserted claim as already corroborated. Same conflation
+            // `observe::promote` avoids at the status level, avoided again at
+            // the display level.
+            for_count: h
+                .supporting_evidence
+                .iter()
+                .filter(|e| !e.source.starts_with("obs:"))
+                .count(),
+            against_count: h
+                .contradicting_evidence
+                .iter()
+                .filter(|e| !e.source.starts_with("obs:"))
+                .count(),
             open_predictions: h.predictions.iter().filter(|p| p.observed_at.is_none()).count(),
+            grounded_in: crate::observe::cited_by(h, observations)
+                .iter()
+                .map(|o| format!("#{} {} {}", o.seq, o.source, o.subject))
+                .collect(),
         })
         .collect();
     // Deterministic: standing, then fitness, then id. Same state renders the
@@ -190,6 +226,9 @@ impl Ground {
                     },
                     c.statement.chars().take(92).collect::<String>()
                 ));
+                for g in &c.grounded_in {
+                    o.push_str(&format!("      ↳ grounded in {}\n", g.chars().take(86).collect::<String>()));
+                }
             }
             o.push('\n');
         }
@@ -241,7 +280,7 @@ mod tests {
         h.add_supporting_evidence(crate::hypothesis::Evidence::supports("a", "x"));
         h.add_contradicting_evidence(crate::hypothesis::Evidence::contradicts("b", "y"));
         core.hypotheses.insert(h.id.clone(), h);
-        let g = read(&core, now());
+        let g = read(&core, &[], now());
         assert_eq!(g.claims[0].for_count, 1);
         assert_eq!(g.claims[0].against_count, 1);
         let r = g.render();
@@ -252,7 +291,7 @@ mod tests {
     /// that looks like a finished report.
     #[test]
     fn an_empty_ground_says_nothing_has_been_asserted() {
-        let g = read(&PhysisCore::new(), now());
+        let g = read(&PhysisCore::new(), &[], now());
         assert!(g.claims.is_empty());
         assert!(g.render().contains("nothing can be wrong"));
     }
@@ -265,10 +304,57 @@ mod tests {
         let mut h = Hypothesis::new("predicts things", vec![]);
         h.add_prediction(crate::hypothesis::Prediction::new("the gate will pass"));
         core.hypotheses.insert(h.id.clone(), h);
-        let g = read(&core, now() + chrono::Duration::days(9));
+        let g = read(&core, &[], now() + chrono::Duration::days(9));
         assert_eq!(g.unscored.len(), 1);
         assert_eq!(g.unscored[0].days_open, 9);
         assert!(g.render().contains("PROMISED TO CHECK"));
+    }
+
+    /// The loop closed: a claim promoted from an observation must show, in the
+    /// shared view, which observation it rests on. Without this the claim path
+    /// exists in the library and is invisible to the person reading the state —
+    /// which is how `promote` and `cited_by` shipped with zero call sites.
+    #[test]
+    fn a_claim_shows_the_observation_it_rests_on() {
+        let mut o = crate::observe::Observation::new("git", "abc123").with_body("fix the null");
+        o.seq = 7;
+        let h = crate::observe::promote(&o, "the null was invalid", vec![0.1]);
+
+        let mut core = PhysisCore::new();
+        core.hypotheses.insert(h.id.clone(), h);
+
+        let g = read(&core, std::slice::from_ref(&o), now());
+        assert_eq!(g.claims[0].grounded_in.len(), 1);
+        assert!(g.claims[0].grounded_in[0].contains("#7"));
+        assert!(g.render().contains("grounded in"), "it must reach the output");
+
+        // And a claim resting on nothing in the log says so by absence, not by
+        // a fabricated citation.
+        let g2 = read(&core, &[], now());
+        assert!(g2.claims[0].grounded_in.is_empty());
+        assert!(!g2.render().contains("grounded in"));
+    }
+
+    /// A freshly promoted observation must read as *asserted*, not *corroborated*:
+    /// Candidate status, zero evidence counted, and the citation shown
+    /// separately. Getting this wrong fills the shared state with claims that
+    /// look established because someone pressed a button.
+    #[test]
+    fn provenance_is_not_counted_as_corroboration() {
+        let mut o = crate::observe::Observation::new("git", "deadbeef");
+        o.seq = 3;
+        let h = crate::observe::promote(&o, "this commit caused the regression", vec![0.0]);
+        let mut core = PhysisCore::new();
+        core.hypotheses.insert(h.id.clone(), h);
+
+        let g = read(&core, std::slice::from_ref(&o), now());
+        assert_eq!(g.claims[0].status, "Candidate");
+        assert_eq!(g.claims[0].for_count, 0, "provenance must not count as support");
+        assert_eq!(g.claims[0].against_count, 0);
+        assert_eq!(g.claims[0].grounded_in.len(), 1, "but it must still be shown");
+        let r = g.render();
+        assert!(r.contains("+0 / -0"));
+        assert!(r.contains("grounded in"));
     }
 
     /// Rendering is deterministic: same state, same bytes, for whoever opens it.
@@ -280,6 +366,6 @@ mod tests {
             core.hypotheses.insert(h.id.clone(), h);
         }
         let t = now();
-        assert_eq!(read(&core, t).render(), read(&core, t).render());
+        assert_eq!(read(&core, &[], t).render(), read(&core, &[], t).render());
     }
 }

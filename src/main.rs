@@ -220,6 +220,23 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Promote an observation into a claim that can be refuted.
+    ///
+    /// The observation stays in the log untouched; the claim cites it as
+    /// `obs:<seq>` so the evidence can always be re-read rather than trusted.
+    /// This is the step from "this was seen" to "this is so, and it might be
+    /// wrong" — the only step that lets the machine notice it was mistaken
+    /// rather than merely outdated.
+    #[command(name = "claim")]
+    Claim {
+        /// Sequence number from `physis-core observed`.
+        #[arg(long)]
+        from: u64,
+        /// What you assert on the strength of it.
+        statement: String,
+        #[arg(long, default_value_t = 0.5)]
+        confidence: f32,
+    },
     /// Did a transformation go the way it was asked to — and did it beat doing
     /// the same thing stupidly? Reads two files and answers with the null in
     /// the same pass.
@@ -547,11 +564,14 @@ fn main() -> anyhow::Result<()> {
         Command::Observed { source, concurrent, limit, json } => {
             cmd_observed(source.as_deref(), concurrent, limit, json)
         }
+        Command::Claim { from, statement, confidence } => {
+            cmd_claim(from, &statement, confidence)
+        }
         Command::DirectionCmd { before, after, want, json } => {
             cmd_direction(&before, &after, &want, json)
         }
         Command::Ground { json } => {
-            let g = physis_core::ground::read(&load_core(), chrono::Utc::now());
+            let g = physis_core::ground::read(&load_core(), &physis_core::observe::read(&physis_core::observe::log_path()).unwrap_or_default(), chrono::Utc::now());
             if json {
                 println!("{}", serde_json::to_string_pretty(&g)?);
             } else {
@@ -1963,6 +1983,34 @@ fn cmd_observed(
             o.subject.chars().take(84).collect::<String>()
         );
     }
+    Ok(())
+}
+
+fn cmd_claim(from: u64, statement: &str, confidence: f32) -> anyhow::Result<()> {
+    let log = physis_core::observe::log_path();
+    let all = physis_core::observe::read(&log)?;
+    let Some(obs) = all.iter().find(|o| o.seq == from) else {
+        anyhow::bail!(
+            "no observation #{from} in the log ({} recorded). `physis-core observed` lists them.",
+            all.len()
+        );
+    };
+    let (embedder, _) = physis_core::embed::select(384);
+    let mut h = physis_core::observe::promote(obs, statement, embedder.embed(statement));
+    h.confidence = confidence;
+
+    let mut core = load_core();
+    let id = h.id.clone();
+    core.hypotheses.insert(id.clone(), h);
+    store::ensure_data_dir()?;
+    core.persist()?;
+
+    println!("claim [{}] registered", &id[..8]);
+    println!("  cites obs:{} — {} {}", obs.seq, obs.source, obs.subject);
+    println!();
+    println!("It is a Candidate: asserted, not established. Refute or support it:");
+    println!("  physis-core hypothesis evidence {} \"<measurement>\" --polarity contradicting", &id[..8]);
+    println!("  physis-core ground        # see it beside everything else believed");
     Ok(())
 }
 
