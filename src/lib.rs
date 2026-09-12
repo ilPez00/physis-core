@@ -181,6 +181,7 @@
 //! - [`studio`]: Embedded lightweight web studio GUI and RESTful API endpoints.
 
 pub mod bench;
+pub mod act;
 pub mod becoming;
 pub mod classify;
 pub mod config_run;

@@ -197,6 +197,8 @@ enum Command {
         /// `git` — commits, with the interval since the previous commit.
         /// `terminal` — shell history, with each command's real runtime.
         /// `agent` — an agent's own session turns (model outputs and prompts).
+        /// `process` — long-lived processes, with their real age.
+        /// `browser` — visited pages (needs the `sqlite3` CLI).
         /// `all` — every source above, in one pass.
         #[arg(long, default_value = "fs")]
         source: String,
@@ -220,6 +222,26 @@ enum Command {
         concurrent: Option<u64>,
         #[arg(long, default_value_t = 20)]
         limit: usize,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Run a command, record it, and say what is already believed about it.
+    ///
+    /// Not a sandbox — `sh -c` already runs things. The contribution is that
+    /// the intent is recorded BEFORE the command runs (so an action that hangs
+    /// still leaves a record), the outcome is recorded with its real duration,
+    /// and claims bearing on it are surfaced first — especially ones already
+    /// Contradicted, which is the machine saying you established this does not
+    /// work.
+    #[command(name = "act")]
+    Act {
+        /// The command, as you would type it into a shell.
+        command: String,
+        /// Show what is already believed and STOP, without running anything.
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long, default_value_t = 5)]
+        top: usize,
         #[arg(long)]
         json: bool,
     },
@@ -566,6 +588,9 @@ fn main() -> anyhow::Result<()> {
         }
         Command::Observed { source, concurrent, limit, json } => {
             cmd_observed(source.as_deref(), concurrent, limit, json)
+        }
+        Command::Act { command, dry_run, top, json } => {
+            cmd_act(&command, dry_run, top, json)
         }
         Command::Claim { from, statement, confidence } => {
             cmd_claim(from, &statement, confidence)
@@ -1919,12 +1944,33 @@ fn cmd_watch(source: &str, path: &Path, max: usize, dry_run: bool) -> anyhow::Re
         if z.exists() { z } else { PathBuf::from(&home).join(".bash_history") }
     };
     let agent_dir = || PathBuf::from(&home).join(".claude/projects");
+    // First browser profile that exists. Firefox and Chromium have different
+    // schemas and different epochs; `watch_browser` picks by filename.
+    let browser_db = || -> Option<PathBuf> {
+        let chromium = PathBuf::from(&home).join(".config/chromium/Default/History");
+        if chromium.exists() {
+            return Some(chromium);
+        }
+        let chrome = PathBuf::from(&home).join(".config/google-chrome/Default/History");
+        if chrome.exists() {
+            return Some(chrome);
+        }
+        std::fs::read_dir(PathBuf::from(&home).join(".mozilla/firefox"))
+            .ok()?
+            .flatten()
+            .map(|e| e.path().join("places.sqlite"))
+            .find(|p| p.exists() && !p.to_string_lossy().contains(".bak-"))
+    };
 
     let mut fresh = match source {
         "fs" => physis_core::observe::watch_fs(path, &known, max),
         "git" => physis_core::observe::watch_git(path, max.min(500)),
         "terminal" => physis_core::observe::watch_shell(&shell_hist(), &known, max.min(500)),
         "agent" => physis_core::observe::watch_agent(&agent_dir(), &known, max.min(500)),
+        "process" => physis_core::observe::watch_proc(&known, 60, max.min(500)),
+        "browser" => browser_db()
+            .map(|db| physis_core::observe::watch_browser(&db, &known, max.min(500)))
+            .unwrap_or_default(),
         // The point of the substrate is that these are one timeline, so running
         // them together is the default way to use it rather than a convenience.
         "all" => {
@@ -1932,12 +1978,16 @@ fn cmd_watch(source: &str, path: &Path, max: usize, dry_run: bool) -> anyhow::Re
             v.extend(physis_core::observe::watch_git(path, max.min(200)));
             v.extend(physis_core::observe::watch_shell(&shell_hist(), &known, max.min(200)));
             v.extend(physis_core::observe::watch_agent(&agent_dir(), &known, max.min(200)));
+            v.extend(physis_core::observe::watch_proc(&known, 60, max.min(200)));
+            if let Some(db) = browser_db() {
+                v.extend(physis_core::observe::watch_browser(&db, &known, max.min(200)));
+            }
             // One timeline: sort by when it happened, not by which watcher ran.
             v.sort_by_key(|o| o.at);
             v
         }
         other => anyhow::bail!(
-            "unknown source {other:?} — try fs | git | terminal | agent | all"
+            "unknown source {other:?} — try fs | git | terminal | agent | process | browser | all"
         ),
     };
     // `git` re-reads the same history every run; drop what the log already has
@@ -2016,6 +2066,40 @@ fn cmd_observed(
             o.source,
             o.subject.chars().take(84).collect::<String>()
         );
+    }
+    Ok(())
+}
+
+fn cmd_act(command: &str, dry_run: bool, top: usize, json: bool) -> anyhow::Result<()> {
+    let (embedder, _) = physis_core::embed::select(384);
+    let core = load_core();
+    let bearing = physis_core::act::bearing_on(&core, command, embedder.as_ref(), top);
+
+    if dry_run {
+        let warnings: Vec<_> = bearing.iter().filter(|b| b.is_warning()).collect();
+        if warnings.is_empty() {
+            println!("nothing already established bears on this. {} claim(s) checked.", core.hypotheses.len());
+        } else {
+            println!("── ALREADY ESTABLISHED ──");
+            for b in warnings {
+                println!("  [{}] {:<13} rel {:.3}\n      {}", b.id, b.status, b.relevance, b.statement);
+            }
+        }
+        println!("\n(not run — drop --dry-run to execute)");
+        return Ok(());
+    }
+
+    store::ensure_data_dir()?;
+    let a = physis_core::act::run(command, bearing, &physis_core::observe::log_path())?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&a)?);
+    } else {
+        print!("{}", a.render());
+    }
+    // The command's own exit code is the caller's result; a substrate that
+    // swallowed it would break every script that wraps this.
+    if a.exit_code != Some(0) {
+        std::process::exit(a.exit_code.unwrap_or(1));
     }
     Ok(())
 }

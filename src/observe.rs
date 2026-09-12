@@ -433,6 +433,139 @@ pub fn watch_agent(dir: &Path, known: &[Observation], limit: usize) -> Vec<Obser
     out
 }
 
+/// Watch running processes: one observation per long-lived process, with its
+/// real age as the duration.
+///
+/// Reads `/proc` directly — no dependency, no shelling out. `starttime` (field
+/// 22 of `/proc/<pid>/stat`, in clock ticks since boot) plus the system boot
+/// time gives when the process began, and the elapsed time to now is a genuine
+/// interval.
+///
+/// `min_age_s` exists because a substrate that records every `ls` learns
+/// nothing. Short-lived processes are noise; a build that has been running for
+/// four minutes is a fact about what the machine is doing.
+pub fn watch_proc(known: &[Observation], min_age_s: u64, limit: usize) -> Vec<Observation> {
+    let Ok(uptime) = std::fs::read_to_string("/proc/uptime") else { return Vec::new() };
+    let Some(up) = uptime.split_whitespace().next().and_then(|x| x.parse::<f64>().ok()) else {
+        return Vec::new();
+    };
+    let now = chrono::Utc::now();
+    let boot = now - chrono::Duration::milliseconds((up * 1000.0) as i64);
+    // Linux reports `starttime` in clock ticks; USER_HZ is 100 on every
+    // mainstream configuration, and getting it exactly is not worth a libc dep
+    // for a field used only to order and age processes.
+    const TICKS_PER_SEC: f64 = 100.0;
+
+    let seen: std::collections::HashSet<&str> = known
+        .iter()
+        .filter(|o| o.source == "process")
+        .map(|o| o.subject.as_str())
+        .collect();
+
+    let Ok(rd) = std::fs::read_dir("/proc") else { return Vec::new() };
+    let mut out = Vec::new();
+    for e in rd.flatten() {
+        let name = e.file_name().to_string_lossy().to_string();
+        let Ok(pid) = name.parse::<u32>() else { continue };
+        let Ok(stat) = std::fs::read_to_string(format!("/proc/{pid}/stat")) else { continue };
+        // comm is parenthesised and may itself contain spaces, so split after
+        // the closing paren rather than on whitespace from the start.
+        let Some(close) = stat.rfind(')') else { continue };
+        let comm = stat[stat.find('(').map(|i| i + 1).unwrap_or(0)..close].to_string();
+        let fields: Vec<&str> = stat[close + 1..].split_whitespace().collect();
+        let Some(start_ticks) = fields.get(19).and_then(|x| x.parse::<f64>().ok()) else {
+            continue;
+        };
+        let started = boot + chrono::Duration::milliseconds(
+            (start_ticks / TICKS_PER_SEC * 1000.0) as i64,
+        );
+        let age_ms = (now - started).num_milliseconds().max(0) as u64;
+        if age_ms < min_age_s * 1000 {
+            continue;
+        }
+        // pid+start identifies this run: a recycled pid is a different process.
+        let subject = format!("{comm}#{pid}@{}", started.timestamp());
+        if seen.contains(subject.as_str()) {
+            continue;
+        }
+        let cmdline = std::fs::read_to_string(format!("/proc/{pid}/cmdline"))
+            .map(|c| c.replace('\0', " ").trim().to_string())
+            .unwrap_or_default();
+        let mut o = Observation::new("process", subject)
+            .with_body(cmdline.chars().take(200).collect::<String>())
+            .by("watch_proc");
+        o.at = started;
+        o.duration_ms = Some(age_ms);
+        out.push(o);
+        if out.len() >= limit {
+            break;
+        }
+    }
+    out.sort_by_key(|o| o.at);
+    out
+}
+
+/// Watch browser history: one observation per visited page.
+///
+/// Firefox `places.sqlite` and Chromium `History` are both SQLite, and this
+/// crate has no SQLite dependency by design. Rather than take one for a
+/// watcher, it shells out to the `sqlite3` CLI in **read-only immutable** mode,
+/// which is also the only safe way to read a database the browser has open.
+///
+/// Returns nothing — and says nothing — when `sqlite3` is absent. That is a
+/// missing capability, not an error: the rest of the substrate is unaffected.
+pub fn watch_browser(db: &Path, known: &[Observation], limit: usize) -> Vec<Observation> {
+    let firefox = db.file_name().and_then(|n| n.to_str()) == Some("places.sqlite");
+    // Firefox stores microseconds since epoch; Chromium stores microseconds
+    // since 1601-01-01, hence the 11644473600s offset.
+    let sql = if firefox {
+        format!(
+            "SELECT url, COALESCE(title,''), last_visit_date/1000000 FROM moz_places \
+             WHERE last_visit_date IS NOT NULL ORDER BY last_visit_date DESC LIMIT {limit};"
+        )
+    } else {
+        format!(
+            "SELECT url, COALESCE(title,''), last_visit_time/1000000-11644473600 FROM urls \
+             WHERE last_visit_time > 0 ORDER BY last_visit_time DESC LIMIT {limit};"
+        )
+    };
+    let uri = format!("file:{}?immutable=1", db.display());
+    let Ok(out) = std::process::Command::new("sqlite3")
+        .args(["-readonly", "-separator", "\u{1f}", &uri, &sql])
+        .output()
+    else {
+        return Vec::new();
+    };
+    if !out.status.success() {
+        return Vec::new();
+    }
+
+    let seen: std::collections::HashSet<&str> = known
+        .iter()
+        .filter(|o| o.source == "browser")
+        .map(|o| o.subject.as_str())
+        .collect();
+
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut obs = Vec::new();
+    for line in text.lines() {
+        let mut f = line.split('\u{1f}');
+        let (Some(url), Some(title), Some(ts)) = (f.next(), f.next(), f.next()) else {
+            continue;
+        };
+        if url.is_empty() || seen.contains(url) {
+            continue;
+        }
+        let Ok(ts) = ts.trim().parse::<i64>() else { continue };
+        let Some(at) = chrono::DateTime::from_timestamp(ts, 0) else { continue };
+        let mut o = Observation::new("browser", url).with_body(title).by("watch_browser");
+        o.at = at;
+        obs.push(o);
+    }
+    obs.reverse(); // oldest first
+    obs
+}
+
 // ── The claim path ──────────────────────────────────────────────────────────
 //
 // This is the join the survey found missing everywhere. Observers record; they
@@ -714,6 +847,45 @@ mod tests {
         assert!(obs.iter().all(|o| o.source == "agent"));
         assert!(obs[0].body.contains("[user]") || obs[1].body.contains("[user]"));
         assert!(watch_agent(&d, &obs, 10).is_empty(), "must dedupe on re-run");
+    }
+
+    /// Short-lived processes are noise; a build running for minutes is a fact.
+    /// The age gate is what keeps continuous observation affordable.
+    #[test]
+    fn the_process_watcher_gates_on_age() {
+        // This test's own process has been alive for well under an hour.
+        let long = watch_proc(&[], 3600, 50);
+        let short = watch_proc(&[], 0, 50);
+        assert!(
+            short.len() >= long.len(),
+            "a lower age gate cannot return fewer processes"
+        );
+        for o in &short {
+            assert_eq!(o.source, "process");
+            assert!(o.duration_ms.is_some(), "a process age is a real interval");
+            assert!(o.subject.contains('#'), "pid must be in the identity: {}", o.subject);
+        }
+    }
+
+    /// A recycled pid is a different process, so identity must include when it
+    /// started — otherwise re-running the watcher silently merges two runs.
+    #[test]
+    fn process_identity_includes_start_time() {
+        let obs = watch_proc(&[], 0, 5);
+        if let Some(o) = obs.first() {
+            assert!(o.subject.contains('@'), "identity needs a start stamp: {}", o.subject);
+            // Re-running with these known must produce nothing for them.
+            let again = watch_proc(&obs, 0, 5);
+            assert!(again.iter().all(|n| !obs.iter().any(|k| k.subject == n.subject)));
+        }
+    }
+
+    /// A missing `sqlite3` is a missing capability, not a failure: the watcher
+    /// returns nothing and the rest of the substrate is unaffected.
+    #[test]
+    fn the_browser_watcher_is_quiet_when_the_db_is_absent() {
+        let d = tmp("browser");
+        assert!(watch_browser(&d.join("places.sqlite"), &[], 10).is_empty());
     }
 
     #[test]
