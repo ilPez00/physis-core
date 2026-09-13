@@ -1,0 +1,714 @@
+{
+  "cells": 70,
+  "entries": 731,
+  "permutations": 200,
+  "seed": 7,
+  "embedder": "onnx-explicit",
+  "overall_fitness": 0.4377565,
+  "overall_null_mean": 0.037954863,
+  "cells_above_null": 49,
+  "cells_unmeasurable": 13,
+  "cells_failing": 8,
+  "per_cell": [
+    {
+      "cell": "BOND/BRAINSTORM",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "BOND/CREATE",
+      "entries": 18,
+      "fitness": 0.2777778,
+      "null_mean": 0.022777777,
+      "null_sd": 0.043811474,
+      "z": 5.8203936,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "BOND/DESTROY",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "BOND/GUIDE",
+      "entries": 8,
+      "fitness": 0.25,
+      "null_mean": 0.01375,
+      "null_sd": 0.04641863,
+      "z": 5.0895514,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "BOND/LEARN",
+      "entries": 4,
+      "fitness": 0.75,
+      "null_mean": 0.0025,
+      "null_sd": 0.024874689,
+      "z": 30.050627,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "BOND/LIFT",
+      "entries": 3,
+      "fitness": 0.6666667,
+      "null_mean": 0.006666667,
+      "null_sd": 0.0663325,
+      "z": 9.949875,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "BOND/MAINTAIN",
+      "entries": 15,
+      "fitness": 0.06666667,
+      "null_mean": 0.014666668,
+      "null_sd": 0.037214104,
+      "z": 1.3973197,
+      "above_null": false,
+      "unmeasurable": false
+    },
+    {
+      "cell": "BOND/MOVE",
+      "entries": 10,
+      "fitness": 0.8,
+      "null_mean": 0.0145,
+      "null_sd": 0.045163628,
+      "z": 17.392313,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "BOND/PLAN",
+      "entries": 4,
+      "fitness": 0.25,
+      "null_mean": 0.00875,
+      "null_sd": 0.063134395,
+      "z": 3.8212135,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "BOND/PLAY",
+      "entries": 3,
+      "fitness": 0.0,
+      "null_mean": 0.0016666667,
+      "null_sd": 0.023511233,
+      "z": -0.0708881,
+      "above_null": false,
+      "unmeasurable": false
+    },
+    {
+      "cell": "BOND/REST",
+      "entries": 5,
+      "fitness": 0.8,
+      "null_mean": 0.002,
+      "null_sd": 0.028213413,
+      "z": 28.28442,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "BOND/SENSE",
+      "entries": 3,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": false
+    },
+    {
+      "cell": "BOND/WALK",
+      "entries": 10,
+      "fitness": 0.4,
+      "null_mean": 0.007500001,
+      "null_sd": 0.033071905,
+      "z": 11.86808,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "BOND/WORK",
+      "entries": 19,
+      "fitness": 0.68421054,
+      "null_mean": 0.027631572,
+      "null_sd": 0.044328652,
+      "z": 14.811616,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "CONSTRUCT/BRAINSTORM",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "CONSTRUCT/CREATE",
+      "entries": 70,
+      "fitness": 0.4857143,
+      "null_mean": 0.09628575,
+      "null_sd": 0.043547783,
+      "z": 8.942557,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "CONSTRUCT/DESTROY",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "CONSTRUCT/GUIDE",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "CONSTRUCT/LEARN",
+      "entries": 5,
+      "fitness": 0.4,
+      "null_mean": 0.005,
+      "null_sd": 0.037080977,
+      "z": 10.652363,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "CONSTRUCT/LIFT",
+      "entries": 3,
+      "fitness": 1.0,
+      "null_mean": 0.0016666667,
+      "null_sd": 0.023511253,
+      "z": 42.461937,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "CONSTRUCT/MAINTAIN",
+      "entries": 27,
+      "fitness": 0.2962963,
+      "null_mean": 0.033703703,
+      "null_sd": 0.03940402,
+      "z": 6.6641064,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "CONSTRUCT/MOVE",
+      "entries": 3,
+      "fitness": 0.33333334,
+      "null_mean": 0.0016666667,
+      "null_sd": 0.02351125,
+      "z": 14.106723,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "CONSTRUCT/PLAN",
+      "entries": 16,
+      "fitness": 0.5625,
+      "null_mean": 0.0234375,
+      "null_sd": 0.0456881,
+      "z": 11.798751,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "CONSTRUCT/PLAY",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "CONSTRUCT/REST",
+      "entries": 6,
+      "fitness": 0.5,
+      "null_mean": 0.0033333334,
+      "null_sd": 0.023333313,
+      "z": 21.285732,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "CONSTRUCT/SENSE",
+      "entries": 10,
+      "fitness": 0.4,
+      "null_mean": 0.017,
+      "null_sd": 0.053018834,
+      "z": 7.2238483,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "CONSTRUCT/WALK",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "CONSTRUCT/WORK",
+      "entries": 8,
+      "fitness": 0.125,
+      "null_mean": 0.008125,
+      "null_sd": 0.03968131,
+      "z": 2.945341,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "FABRICATE/BRAINSTORM",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "FABRICATE/CREATE",
+      "entries": 26,
+      "fitness": 0.1923077,
+      "null_mean": 0.034807704,
+      "null_sd": 0.043104,
+      "z": 3.653953,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "FABRICATE/DESTROY",
+      "entries": 3,
+      "fitness": 0.6666667,
+      "null_mean": 0.0016666667,
+      "null_sd": 0.023511235,
+      "z": 28.284351,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "FABRICATE/GUIDE",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "FABRICATE/LEARN",
+      "entries": 8,
+      "fitness": 0.75,
+      "null_mean": 0.008125,
+      "null_sd": 0.037661087,
+      "z": 19.698715,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "FABRICATE/LIFT",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "FABRICATE/MAINTAIN",
+      "entries": 5,
+      "fitness": 0.4,
+      "null_mean": 0.008,
+      "null_sd": 0.04833213,
+      "z": 8.110547,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "FABRICATE/MOVE",
+      "entries": 8,
+      "fitness": 0.5,
+      "null_mean": 0.00625,
+      "null_sd": 0.034798484,
+      "z": 14.188836,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "FABRICATE/PLAN",
+      "entries": 14,
+      "fitness": 0.21428572,
+      "null_mean": 0.015714282,
+      "null_sd": 0.039872278,
+      "z": 4.980188,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "FABRICATE/PLAY",
+      "entries": 3,
+      "fitness": 0.0,
+      "null_mean": 0.0016666667,
+      "null_sd": 0.02351123,
+      "z": -0.07088812,
+      "above_null": false,
+      "unmeasurable": false
+    },
+    {
+      "cell": "FABRICATE/REST",
+      "entries": 7,
+      "fitness": 0.42857143,
+      "null_mean": 0.012142858,
+      "null_sd": 0.05302585,
+      "z": 7.8533125,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "FABRICATE/SENSE",
+      "entries": 17,
+      "fitness": 0.4117647,
+      "null_mean": 0.017941184,
+      "null_sd": 0.037295,
+      "z": 10.559688,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "FABRICATE/WALK",
+      "entries": 9,
+      "fitness": 0.33333334,
+      "null_mean": 0.00888889,
+      "null_sd": 0.039063044,
+      "z": 8.305662,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "FABRICATE/WORK",
+      "entries": 62,
+      "fitness": 0.48387095,
+      "null_mean": 0.08403232,
+      "null_sd": 0.04415911,
+      "z": 9.054499,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "HEAL/BRAINSTORM",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "HEAL/CREATE",
+      "entries": 3,
+      "fitness": 0.6666667,
+      "null_mean": 0.0033333334,
+      "null_sd": 0.033166222,
+      "z": 20.000269,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "HEAL/DESTROY",
+      "entries": 3,
+      "fitness": 0.0,
+      "null_mean": 0.0016666667,
+      "null_sd": 0.02351125,
+      "z": -0.07088805,
+      "above_null": false,
+      "unmeasurable": false
+    },
+    {
+      "cell": "HEAL/GUIDE",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "HEAL/LEARN",
+      "entries": 6,
+      "fitness": 0.8333333,
+      "null_mean": 0.01666667,
+      "null_sd": 0.06454968,
+      "z": 12.651754,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "HEAL/LIFT",
+      "entries": 5,
+      "fitness": 0.4,
+      "null_mean": 0.0070000007,
+      "null_sd": 0.041844904,
+      "z": 9.391825,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "HEAL/MAINTAIN",
+      "entries": 25,
+      "fitness": 0.28,
+      "null_mean": 0.03299998,
+      "null_sd": 0.04497779,
+      "z": 5.4915996,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "HEAL/MOVE",
+      "entries": 7,
+      "fitness": 0.2857143,
+      "null_mean": 0.005714286,
+      "null_sd": 0.034522954,
+      "z": 8.110546,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "HEAL/PLAN",
+      "entries": 3,
+      "fitness": 0.6666667,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "HEAL/PLAY",
+      "entries": 7,
+      "fitness": 0.5714286,
+      "null_mean": 0.005714286,
+      "null_sd": 0.027994152,
+      "z": 20.208303,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "HEAL/REST",
+      "entries": 8,
+      "fitness": 0.75,
+      "null_mean": 0.0125,
+      "null_sd": 0.051538844,
+      "z": 14.309596,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "HEAL/SENSE",
+      "entries": 22,
+      "fitness": 0.5,
+      "null_mean": 0.0331818,
+      "null_sd": 0.04606631,
+      "z": 10.133615,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "HEAL/WALK",
+      "entries": 10,
+      "fitness": 0.4,
+      "null_mean": 0.010500001,
+      "null_sd": 0.037944034,
+      "z": 10.265119,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "HEAL/WORK",
+      "entries": 14,
+      "fitness": 0.5,
+      "null_mean": 0.019999996,
+      "null_sd": 0.048000902,
+      "z": 9.999812,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/BRAINSTORM",
+      "entries": 4,
+      "fitness": 0.25,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/CREATE",
+      "entries": 5,
+      "fitness": 0.2,
+      "null_mean": 0.005,
+      "null_sd": 0.031224988,
+      "z": 6.2449985,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/DESTROY",
+      "entries": 1,
+      "fitness": 0.0,
+      "null_mean": 0.0,
+      "null_sd": 0.0,
+      "z": null,
+      "above_null": false,
+      "unmeasurable": true
+    },
+    {
+      "cell": "STUDY/GUIDE",
+      "entries": 8,
+      "fitness": 0.5,
+      "null_mean": 0.006875,
+      "null_sd": 0.03353521,
+      "z": 14.704695,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/LEARN",
+      "entries": 35,
+      "fitness": 0.54285717,
+      "null_mean": 0.048285745,
+      "null_sd": 0.045390822,
+      "z": 10.895846,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/LIFT",
+      "entries": 6,
+      "fitness": 0.6666667,
+      "null_mean": 0.005,
+      "null_sd": 0.036930904,
+      "z": 17.916342,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/MAINTAIN",
+      "entries": 10,
+      "fitness": 0.8,
+      "null_mean": 0.005000001,
+      "null_sd": 0.02397914,
+      "z": 33.153816,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/MOVE",
+      "entries": 3,
+      "fitness": 0.33333334,
+      "null_mean": 0.0033333334,
+      "null_sd": 0.047022477,
+      "z": 7.0179205,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/PLAN",
+      "entries": 5,
+      "fitness": 0.0,
+      "null_mean": 0.008,
+      "null_sd": 0.05600009,
+      "z": -0.14285691,
+      "above_null": false,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/PLAY",
+      "entries": 4,
+      "fitness": 0.0,
+      "null_mean": 0.00625,
+      "null_sd": 0.046351213,
+      "z": -0.13484006,
+      "above_null": false,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/REST",
+      "entries": 11,
+      "fitness": 0.8181818,
+      "null_mean": 0.016818183,
+      "null_sd": 0.047305517,
+      "z": 16.940172,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/SENSE",
+      "entries": 47,
+      "fitness": 0.4893617,
+      "null_mean": 0.060744695,
+      "null_sd": 0.047499605,
+      "z": 9.023591,
+      "above_null": true,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/WALK",
+      "entries": 3,
+      "fitness": 0.0,
+      "null_mean": 0.0033333334,
+      "null_sd": 0.0331663,
+      "z": -0.10050362,
+      "above_null": false,
+      "unmeasurable": false
+    },
+    {
+      "cell": "STUDY/WORK",
+      "entries": 52,
+      "fitness": 0.48076922,
+      "null_mean": 0.07019238,
+      "null_sd": 0.04212153,
+      "z": 9.747434,
+      "above_null": true,
+      "unmeasurable": false
+    }
+  ]
+}

@@ -222,6 +222,7 @@ pub mod quality;
 pub mod rag;
 pub mod relation;
 pub mod chain;
+pub mod grid_fitness;
 pub mod ground;
 pub mod notebook;
 pub mod store;
