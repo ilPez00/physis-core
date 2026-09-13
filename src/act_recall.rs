@@ -426,6 +426,30 @@ const UNRELATED_COMMANDS: [&str; 8] = [
     "cat /etc/os-release",
 ];
 
+/// A restatement of each target that **agrees** with it, same index.
+///
+/// The decisive negatives for `claim_identity`. Without them the twin ledger
+/// cannot answer conceptual problem 2 at all: the eight contradiction pairs are
+/// also, by construction, the eight most *similar* pairs in the corpus, so any
+/// similarity threshold isolates them perfectly and cosine scores F1 1.000 for
+/// a reason that has nothing to do with contradiction.
+///
+/// These sit at the same similarity and assert the *same* verdict. A method
+/// that flags "two claims about one fact that disagree" must take the twins and
+/// leave these; a method that flags "two claims about one fact" takes both and
+/// its precision halves. That is the whole question, and it needs both halves
+/// of the pair to be askable.
+const PARAPHRASE_AGREEMENTS: [&str; 8] = [
+    "running cargo test with all features on this crate does not get past the ort linker step",
+    "an optimised build of this crate exhausts the memory on this box during link-time optimisation",
+    "there is no prebuilt onnxruntime wheel for Python 3.13 on this platform, so the install stops",
+    "the postgres container keeps restarting under compose because its data volume has the wrong owner",
+    "the frontend bundle will not compile on the CI image because that node version predates the syntax",
+    "pushing straight to the main branch upstream is refused until someone reviews the change",
+    "running the migration a second time destroys the audit table, so it cannot be replayed safely",
+    "sending the dataset to the offsite host over the VPN stalls once it passes a gigabyte",
+];
+
 /// Contradicted claims that no command in [`PAIRS`] is about.
 ///
 /// They exist so the status null has something to be wrong about. Without them
@@ -488,6 +512,37 @@ const NEUTRAL_DISTRACTORS: [&str; 32] = [
 /// benchmark scores rather than a second one that drifts away from it.
 pub fn demo_ledger(embedder: &dyn VectorEmbed) -> PhysisCore {
     build_ledger(embedder, true).0
+}
+
+/// The twin ledger as (statement, embedding) plus the index pairs that really
+/// do contradict — target against its own affirmed twin.
+///
+/// Exists so `claim_identity` scores the corpus this module already documents
+/// rather than a second one that drifts away from it. The truth is by
+/// construction: pair `i` is `PAIRS[i].claim` against `AFFIRMED_TWINS[i]`, and
+/// nothing else in the ledger is a contradiction of anything.
+pub fn twin_pairs_corpus(
+    embedder: &dyn VectorEmbed,
+) -> (crate::claim_identity::ScoredClaims, crate::claim_identity::TruthPairs) {
+    let (_, mut index) = build_ledger(embedder, true);
+    // The agreeing restatements go in as negatives. Without them the eight
+    // contradiction pairs are also the eight most similar pairs and any
+    // threshold scores perfectly for the wrong reason.
+    for a in PARAPHRASE_AGREEMENTS.iter() {
+        index.push((format!("agree-{a:.8}"), a.to_string()));
+    }
+    let claims: Vec<(String, Vec<f32>)> = index
+        .iter()
+        .map(|(_, s)| (s.clone(), embedder.embed(s)))
+        .collect();
+    let find = |needle: &str| index.iter().position(|(_, s)| s == needle);
+    let mut truth = Vec::new();
+    for (i, p) in PAIRS.iter().enumerate() {
+        if let (Some(a), Some(b)) = (find(p.claim), find(AFFIRMED_TWINS[i])) {
+            truth.push((a, b));
+        }
+    }
+    (claims, truth)
 }
 
 /// The commands that have a refutation in the ledger, lexical phrasing.

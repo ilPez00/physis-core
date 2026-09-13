@@ -1,0 +1,236 @@
+{
+  "claims": 64,
+  "pairs_examined": 2016,
+  "known_contradictions": 8,
+  "embedder": "onnx-explicit",
+  "scores": [
+    {
+      "method": "embedding@0.30",
+      "threshold": 0.3,
+      "true_positives": 8,
+      "false_positives": 2008,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 1.0,
+      "precision": 0.003968254,
+      "f1": 0.007905139
+    },
+    {
+      "method": "structural@0.30",
+      "threshold": 0.3,
+      "true_positives": 3,
+      "false_positives": 1,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 0.375,
+      "precision": 0.75,
+      "f1": 0.5
+    },
+    {
+      "method": "embedding@0.40",
+      "threshold": 0.4,
+      "true_positives": 8,
+      "false_positives": 2008,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 1.0,
+      "precision": 0.003968254,
+      "f1": 0.007905139
+    },
+    {
+      "method": "structural@0.40",
+      "threshold": 0.4,
+      "true_positives": 3,
+      "false_positives": 1,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 0.375,
+      "precision": 0.75,
+      "f1": 0.5
+    },
+    {
+      "method": "embedding@0.50",
+      "threshold": 0.5,
+      "true_positives": 8,
+      "false_positives": 1806,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 1.0,
+      "precision": 0.0044101435,
+      "f1": 0.008781559
+    },
+    {
+      "method": "structural@0.50",
+      "threshold": 0.5,
+      "true_positives": 3,
+      "false_positives": 1,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 0.375,
+      "precision": 0.75,
+      "f1": 0.5
+    },
+    {
+      "method": "embedding@0.60",
+      "threshold": 0.6,
+      "true_positives": 8,
+      "false_positives": 508,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 1.0,
+      "precision": 0.015503876,
+      "f1": 0.030534351
+    },
+    {
+      "method": "structural@0.60",
+      "threshold": 0.6,
+      "true_positives": 3,
+      "false_positives": 0,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 0.375,
+      "precision": 1.0,
+      "f1": 0.54545456
+    },
+    {
+      "method": "embedding@0.70",
+      "threshold": 0.7,
+      "true_positives": 8,
+      "false_positives": 33,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 1.0,
+      "precision": 0.19512194,
+      "f1": 0.32653058
+    },
+    {
+      "method": "structural@0.70",
+      "threshold": 0.7,
+      "true_positives": 3,
+      "false_positives": 0,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 0.375,
+      "precision": 1.0,
+      "f1": 0.54545456
+    },
+    {
+      "method": "embedding@0.80",
+      "threshold": 0.8,
+      "true_positives": 8,
+      "false_positives": 12,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 1.0,
+      "precision": 0.4,
+      "f1": 0.5714286
+    },
+    {
+      "method": "structural@0.80",
+      "threshold": 0.8,
+      "true_positives": 2,
+      "false_positives": 0,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 0.25,
+      "precision": 1.0,
+      "f1": 0.4
+    },
+    {
+      "method": "embedding@0.85",
+      "threshold": 0.85,
+      "true_positives": 8,
+      "false_positives": 8,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 1.0,
+      "precision": 0.5,
+      "f1": 0.6666667
+    },
+    {
+      "method": "structural@0.85",
+      "threshold": 0.85,
+      "true_positives": 2,
+      "false_positives": 0,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 0.25,
+      "precision": 1.0,
+      "f1": 0.4
+    },
+    {
+      "method": "embedding@0.90",
+      "threshold": 0.9,
+      "true_positives": 8,
+      "false_positives": 4,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 1.0,
+      "precision": 0.6666667,
+      "f1": 0.8
+    },
+    {
+      "method": "structural@0.90",
+      "threshold": 0.9,
+      "true_positives": 1,
+      "false_positives": 0,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 0.125,
+      "precision": 1.0,
+      "f1": 0.22222222
+    },
+    {
+      "method": "embedding@0.95",
+      "threshold": 0.95,
+      "true_positives": 4,
+      "false_positives": 0,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 0.5,
+      "precision": 1.0,
+      "f1": 0.6666667
+    },
+    {
+      "method": "structural@0.95",
+      "threshold": 0.95,
+      "true_positives": 1,
+      "false_positives": 0,
+      "known": 8,
+      "pairs_examined": 2016,
+      "recall": 0.125,
+      "precision": 1.0,
+      "f1": 0.22222222
+    }
+  ],
+  "best_embedding": {
+    "method": "embedding@0.90",
+    "threshold": 0.9,
+    "true_positives": 8,
+    "false_positives": 4,
+    "known": 8,
+    "pairs_examined": 2016,
+    "recall": 1.0,
+    "precision": 0.6666667,
+    "f1": 0.8
+  },
+  "best_structural": {
+    "method": "structural@0.70",
+    "threshold": 0.7,
+    "true_positives": 3,
+    "false_positives": 0,
+    "known": 8,
+    "pairs_examined": 2016,
+    "recall": 0.375,
+    "precision": 1.0,
+    "f1": 0.54545456
+  },
+  "polarity_unresolved": 5,
+  "unresolved_examples": [
+    "the release build finishes on this box in four minutes — the LTO stage never runs out of memory",
+    "docker compose up leaves postgres in a restart loop because the volume is owned by root",
+    "npm run build succeeds on the CI image: node 18 parses the new syntax without complaint",
+    "git push origin main is accepted — the branch is not protected and requires no review",
+    "rsync to the backup host times out over the VPN for anything larger than a gigabyte"
+  ]
+}
