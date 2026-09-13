@@ -102,11 +102,22 @@ fn negation_hits(text: &str) -> usize {
 }
 
 /// First number-bearing word (kept as text).
+///
+/// The decimal point is part of the number. `take_while(is_alphanumeric)` used
+/// to stop at it, so "2.6" came back as "2" — which made [`decimal_number`]'s
+/// `contains('.')` filter impossible to satisfy and left the `number_clash` leg
+/// of the contradiction rule permanently `false` (PH-022). A digit-or-dot run
+/// keeps the measurement intact while still stopping at a unit or a comma.
 fn leading_number(text: &str) -> Option<String> {
     text.split_whitespace()
         .map(|t| t.trim_matches(|c: char| !c.is_alphanumeric()))
         .find(|t| t.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false))
-        .map(|t| t.chars().take_while(|c| c.is_alphanumeric()).collect())
+        .map(|t| {
+            t.chars()
+                .take_while(|c| c.is_ascii_digit() || *c == '.')
+                .collect::<String>()
+        })
+        .map(|n: String| n.trim_end_matches('.').to_string())
 }
 
 /// A number with a decimal point — i.e. a *measurement*, not an instance id.
@@ -502,6 +513,31 @@ mod tests {
             "Quantum tessellation of the mandelbrot choir sings beneath the ice.".into(),
         ));
         v
+    }
+
+    /// PH-022: `decimal_number` can never return `Some`.
+    ///
+    /// `leading_number` ends with `.take_while(|c| c.is_alphanumeric())`, which
+    /// stops at the `.` — so "2.6" becomes "2", and `decimal_number`'s
+    /// `contains('.')` filter can never match. The `number_clash` leg of the
+    /// contradiction rule is therefore dead: it has always been `false`.
+    ///
+    /// The intent in the doc comment is right and worth keeping — a measurement
+    /// differs from an instance id, and "Release 17" vs "Release 18" must not
+    /// read as a contradiction. This test pins the intent.
+    #[test]
+    fn decimal_number_actually_finds_a_decimal() {
+        assert_eq!(
+            decimal_number("valve shall open at 2.6 bar"),
+            Some("2.6".to_string()),
+            "a measurement must be recognised"
+        );
+        assert_eq!(
+            decimal_number("Release 17 deployed to staging"),
+            None,
+            "an instance id must NOT be recognised as a measurement"
+        );
+        assert_eq!(decimal_number("no numbers here"), None);
     }
 
     #[test]
