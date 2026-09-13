@@ -289,6 +289,28 @@ pub struct Revision {
 /// contradiction recall 0.50 (RESCOPE §6 item 7). Not yet done; this comment
 /// exists so the next reader does not mistake the current shape for a settled
 /// one.
+///
+/// ## Read these first — the design is published
+///
+/// - **TOKI** (arXiv 2606.06240) is a bitemporal operator algebra for exactly
+///   this: valid time and transaction time as separate dimensions, and
+///   contradiction defined as *overlapping valid intervals asserting
+///   incompatible facts*. It keeps **both** identity mechanisms, structural
+///   keys and embedding similarity, on the argument that either alone misses
+///   what the other catches. That is a stronger position than the one above and
+///   is the one to adopt or argue against, not to rediscover.
+/// - **STALE** (arXiv 2605.06527) is an external benchmark for this failure —
+///   400 conflict scenarios whose named mode, *Implicit Conflict*, is a later
+///   observation invalidating an earlier memory with no explicit negation. Its
+///   third probe, Implicit Policy Adaptation, describes what `act` is for.
+///   Scoring against it would stop the corpus being self-authored.
+/// - The ancestry this crate's `truth-maintenance` keyword claims and never
+///   cites: **AGM belief revision** (Alchourrón, Gärdenfors & Makinson, 1985)
+///   for expansion/contraction/revision under rationality postulates, and
+///   **Doyle's TMS** for the rule this type already implements by hand — a
+///   belief survives while at least one justification stays valid.
+///
+/// Full notes: `computer-remake-research/literature-2026.md` §3.
 pub struct Hypothesis {
     /// Unique identifier.
     pub id: String,
