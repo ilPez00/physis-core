@@ -171,11 +171,35 @@ def layers(obj):
         "L2 + topology": l2,
         "L3 + temporal": l3,
         "L4 + fact prose": l4,
+        # Kept beside the hashes so the graded metric can be computed without
+        # re-parsing. An exact hash says whether two runs agree; these say by
+        # how much, which is the difference between "the interpreter changed
+        # the facts" and "the interpreter changed the notation".
+        "_sets": {"entities": ents, "relations": rels, "interval": [interval], "prose": [prose]},
     }
 
 
 def h(s):
     return hashlib.sha256(s.encode()).hexdigest()[:12]
+
+
+def jaccard(a, b):
+    """Graded agreement, because an exact hash is too brittle to be informative.
+
+    The diagnostic on deploy-00 showed why. Entities: the 7B returned four and
+    the 550B returned six, and all four were a strict subset of the six -- one
+    interpreter is more complete, not in disagreement. Exact-hash scores that
+    CHANGED and tells you nothing about the size of the change.
+
+    Relations diverge harder (jaccard 0.12) and for a reason that is not
+    evidential either: the 7B writes `rollout|verified by|release 17` and the
+    550B writes `rollout|verified|true`. A relational convention against a
+    boolean-object convention. Both assert that the rollout was verified.
+    """
+    a, b = set(a), set(b)
+    if not a and not b:
+        return 1.0
+    return len(a & b) / max(1, len(a | b))
 
 
 def main():
@@ -225,6 +249,12 @@ def main():
         return 2
 
     names = ["L1 entities", "L2 + topology", "L3 + temporal", "L4 + fact prose"]
+    set_of = {
+        "L1 entities": "entities",
+        "L2 + topology": "relations",
+        "L3 + temporal": "interval",
+        "L4 + fact prose": "prose",
+    }
     result = {
         "documents": len(docs),
         "usable": len(usable),
@@ -233,11 +263,14 @@ def main():
         "failures": failures,
         "layers": [],
     }
-    print("\n  layer            swap (A1 vs B1)      control (A1 vs A2)")
+    print("\n  layer            swap identical   control identical   swap overlap")
     for n in names:
         swap = sum(1 for i in usable if h(runs["A1"][i][n]) == h(runs["B1"][i][n]))
         ctrl = sum(1 for i in usable if h(runs["A1"][i][n]) == h(runs["A2"][i][n]))
         u = len(usable)
+        k = set_of[n]
+        js = [jaccard(runs["A1"][i]["_sets"][k], runs["B1"][i]["_sets"][k]) for i in usable]
+        jmean = sum(js) / max(1, len(js))
         # A layer is only evidence about the swap where the control holds it
         # fixed. Graphiti's L4 moved under the control, which is what demoted
         # prose from signature to noise.
@@ -247,10 +280,10 @@ def main():
             verdict = "STABLE across interpreters"
         else:
             verdict = "CHANGED by the interpreter"
-        print(f"  {n:<16} {swap}/{u} identical      {ctrl}/{u} identical   {verdict}")
+        print(f"  {n:<16} {swap}/{u}              {ctrl}/{u}                 {jmean:.2f}   {verdict}")
         result["layers"].append(
             {"layer": n, "swap_identical": swap, "control_identical": ctrl, "of": u,
-             "verdict": verdict}
+             "swap_jaccard_mean": round(jmean, 3), "verdict": verdict}
         )
 
     out = Path(a.out)
