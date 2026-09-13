@@ -2136,7 +2136,25 @@ fn cmd_observed(
 fn cmd_act(command: &str, dry_run: bool, top: usize, json: bool) -> anyhow::Result<()> {
     let (embedder, embedder_kind) = physis_core::embed::select(384);
     let core = load_core();
-    let bearing = physis_core::act::bearing_on(&core, command, embedder.as_ref(), top);
+    // Cosine retrieves, BM25 ranks what it retrieved. Measured by `act-recall`
+    // (`benchmarks/results/act-recall.json`) against the plain cosine order:
+    // polarity discrimination 0.250 -> 0.875, and at `--top 1` the number of
+    // commands answered with a reassurance instead of the refutation falls
+    // from 5 of 8 to 1 of 8, at a cost of 2 false alarms — 2.00 harm removed
+    // per alarm, twice the best the warning-reserve policy managed. At the
+    // default cut it is a pure reordering: same claims, better order, and
+    // every cost column identical to the cosine policy.
+    //
+    // `act::bearing_on` keeps the cosine order as the library's frozen
+    // baseline, the way `rag::rank_by_cosine` does. This is the consumer, and
+    // the consumer is where the order is read.
+    let bearing = physis_core::act::bearing_on_with(
+        &core,
+        command,
+        embedder.as_ref(),
+        top,
+        physis_core::act::Selection::CascadeRerank { pool: top.max(5) },
+    );
 
     // Silence here means two different things and they were indistinguishable.
     // `act-recall` measured this leg at recall 0.875 on a semantic embedder and

@@ -252,6 +252,21 @@ pub enum Selection {
     /// and which nothing in the ledger has ever called. Rank-based, so it needs
     /// no normalisation and has no weight to tune; `k` damps the head.
     HybridRrf { k: f32 },
+    /// Two stages: cosine picks a pool of `pool` candidates, BM25 orders that
+    /// pool, and the top of the ordered pool is returned.
+    ///
+    /// This exists because [`Selection::Hybrid`] failed, and failed
+    /// informatively. Mixing the two scores linearly cannot use them: at a
+    /// weight high enough to keep topic recall, the lexical term is too small
+    /// to reorder a pair, and at a weight low enough to reorder it, recall has
+    /// already collapsed (0.875 → 0.125 at `alpha = 0`). One score cannot do
+    /// two jobs.
+    ///
+    /// Retrieval and ranking are different problems — the finding of arXiv
+    /// 2609.01556, whose whole axis is items that are *retrieved but not
+    /// ranked*. So: retrieve on the leg that finds the topic, rank on the leg
+    /// that reads the verdict. `pool` is how much room the second stage gets.
+    CascadeRerank { pool: usize },
 }
 
 /// Claims bearing on `command`, under an explicit selection policy.
@@ -299,6 +314,16 @@ pub fn bearing_on_with(
         }
         Selection::HybridRrf { k } => {
             fuse_by_rank(&mut v, command, k);
+            v.truncate(top);
+            return v;
+        }
+        Selection::CascadeRerank { pool } => {
+            // Stage one is the cosine order `v` is already in.
+            v.truncate(pool.max(top));
+            // Stage two orders the pool lexically. alpha = 0 is BM25 alone,
+            // and it is applied to the pool rather than to the ledger, which
+            // is the entire difference from `Hybrid { alpha: 0.0 }`.
+            refuse_or_fuse(&mut v, command, 0.0);
             v.truncate(top);
             return v;
         }

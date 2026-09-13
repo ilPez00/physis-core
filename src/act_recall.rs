@@ -208,11 +208,46 @@
 //! **Predicted, before the sweep ran** (recorded in the commit that added it):
 //! there is an interior `alpha` that beats both endpoints on `combined`,
 //! because the two legs fail on *different* pairs rather than on the same ones
-//! with different severity. If instead `combined` is monotone between the
-//! endpoints, the legs are redundant, the hybrid is dead, and the polarity
-//! discrimination has to come from somewhere other than retrieval — which
-//! promotes structural claim identity from an elegance argument to the only
-//! remaining option.
+//! with different severity.
+//!
+//! ### The prediction was wrong about the mechanism and right about the legs
+//!
+//! | policy | recall(para) | polarity(lex) | polarity(para) | combined |
+//! |---|---|---|---|---|
+//! | `hybrid@0.00` (BM25 only) | 0.125 | 0.875 | 0.625 | 0.750 |
+//! | `hybrid@0.50` | 0.625 | 0.375 | 0.125 | 0.750 |
+//! | `hybrid@0.60`–`@1.00` | 0.875 | 0.250 | 0.125 | 1.000 |
+//! | `rrf@60` | 0.625 | 0.375 | 0.125 | 0.750 |
+//! | **`cascade@5`** | **0.875** | **0.875** | **0.625** | **1.500** |
+//!
+//! **No interior `alpha` exists.** From 0.60 to 1.00 the mixture is *identical*
+//! to cosine alone — the lexical term is too small to reorder anything — and
+//! below 0.60 topic recall collapses before polarity improves. The crate's own
+//! `rrf@60` lands in the same dead zone. One score cannot do two jobs: at a
+//! weight that keeps recall the lexical leg is inert, and at a weight that
+//! reorders, recall is already gone.
+//!
+//! But the legs *are* complementary, which the endpoints show plainly: BM25
+//! alone reads the verdict at 0.875/0.625 where cosine reads it at 0.250/0.125.
+//! The mistake was mixing them into one score at all. Retrieval and ranking are
+//! different problems — the entire axis of arXiv 2609.01556, whose finding is
+//! items *retrieved but not ranked*.
+//!
+//! [`crate::act::Selection::CascadeRerank`] is the two-stage form: cosine
+//! retrieves the pool, BM25 orders it. At `pool = top` it is a **pure
+//! reordering** — recall@5 is set membership and therefore unchanged by
+//! construction, not by achievement — and polarity goes 0.250 → 0.875 and
+//! 0.125 → 0.625, both far above the 0.500 null. Past `pool = top` the second
+//! stage can push the target out of the returned list and recall falls
+//! (0.875 → 0.625 → 0.375 at pools 10 and 20) while polarity gains nothing, so
+//! the pool wants to be exactly the cut.
+//!
+//! Through the same cost arm as the reserve: at `top 5` every cost column is
+//! identical to the cosine policy, because a reordering cannot change which
+//! claims are available. At `top 1` it removes 4 of the 5 reassurances for 2
+//! false alarms — **2.00 harm removed per alarm, twice the best the reserve
+//! managed** — and raises `target_in_top` from 2/8 to 7/8. The CLI now uses it;
+//! `act::bearing_on` keeps the cosine order as the library's frozen baseline.
 //!
 //! ## What this measures and what it does not
 //!
@@ -947,6 +982,7 @@ pub fn run_selection(
         }
         crate::act::Selection::Hybrid { alpha } => format!("hybrid@{alpha:.2}"),
         crate::act::Selection::HybridRrf { k } => format!("rrf@{k:.0}"),
+        crate::act::Selection::CascadeRerank { pool } => format!("cascade@{pool}"),
     };
     // Against the relevance baseline measured in the same run, never against a
     // remembered number.
@@ -1048,6 +1084,15 @@ pub fn run_hybrid_sweep(
     // weight is worth having at all, or whether the shipped rank fusion
     // already gets there.
     policies.push(("rrf@60".to_string(), crate::act::Selection::HybridRrf { k: 60.0 }));
+    // The cascade: cosine retrieves the pool, BM25 ranks it. Pools swept
+    // because the pool size is the knob that trades the two stages, the way
+    // alpha was supposed to and did not.
+    for pool in [3usize, 5, 10, 20] {
+        policies.push((
+            format!("cascade@{pool}"),
+            crate::act::Selection::CascadeRerank { pool },
+        ));
+    }
 
     for (policy, sel) in policies {
         let paraphrase_recall = recall_at(base, base_index, Arm::Paraphrase, sel);
@@ -1102,6 +1147,19 @@ pub fn run(top: usize, embedder: &dyn VectorEmbed, embedder_kind: &str, seed: u6
                 Some(baseline),
             ));
         }
+        // The cascade goes through the same cost arm as the reserve did. A
+        // reordering cannot change which claims are *available* at top 5, so
+        // its false-alarm count should be identical there; at top 1 it picks a
+        // different single claim out of the same pool, and that is where both
+        // the benefit and any new cost have to show up.
+        selection.push(run_selection(
+            &tcore,
+            Arm::Lexical,
+            t,
+            embedder,
+            crate::act::Selection::CascadeRerank { pool: 5 },
+            Some(baseline),
+        ));
     }
 
     let hybrid = run_hybrid_sweep(&core, &index, &tcore, &tindex, top, embedder);

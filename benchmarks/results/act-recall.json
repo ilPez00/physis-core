@@ -6,7 +6,7 @@
   "null_trials": 2000,
   "embedder": "onnx-explicit",
   "physis_version": "0.1.26",
-  "git_commit": "2ed6774",
+  "git_commit": "cde0229",
   "arms": [
     {
       "arm": "lexical",
@@ -358,6 +358,16 @@
       "harm_removed_per_false_alarm": null
     },
     {
+      "policy": "cascade@5",
+      "top": 1,
+      "reassured": 1,
+      "target_in_top": 7,
+      "false_alarms": 2,
+      "pairs": 8,
+      "unrelated": 8,
+      "harm_removed_per_false_alarm": 2.0
+    },
+    {
       "policy": "relevance",
       "top": 5,
       "reassured": 0,
@@ -416,6 +426,146 @@
       "pairs": 8,
       "unrelated": 8,
       "harm_removed_per_false_alarm": null
+    },
+    {
+      "policy": "cascade@5",
+      "top": 5,
+      "reassured": 0,
+      "target_in_top": 8,
+      "false_alarms": 4,
+      "pairs": 8,
+      "unrelated": 8,
+      "harm_removed_per_false_alarm": null
+    }
+  ],
+  "hybrid": [
+    {
+      "policy": "hybrid@0.00",
+      "paraphrase_recall": 0.125,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.875,
+      "polarity_paraphrase": 0.625,
+      "combined": 0.75
+    },
+    {
+      "policy": "hybrid@0.10",
+      "paraphrase_recall": 0.25,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.625,
+      "polarity_paraphrase": 0.25,
+      "combined": 0.5
+    },
+    {
+      "policy": "hybrid@0.20",
+      "paraphrase_recall": 0.25,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.625,
+      "polarity_paraphrase": 0.125,
+      "combined": 0.375
+    },
+    {
+      "policy": "hybrid@0.30",
+      "paraphrase_recall": 0.375,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.5,
+      "polarity_paraphrase": 0.125,
+      "combined": 0.5
+    },
+    {
+      "policy": "hybrid@0.40",
+      "paraphrase_recall": 0.625,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.5,
+      "polarity_paraphrase": 0.125,
+      "combined": 0.75
+    },
+    {
+      "policy": "hybrid@0.50",
+      "paraphrase_recall": 0.625,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.375,
+      "polarity_paraphrase": 0.125,
+      "combined": 0.75
+    },
+    {
+      "policy": "hybrid@0.60",
+      "paraphrase_recall": 0.875,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.25,
+      "polarity_paraphrase": 0.125,
+      "combined": 1.0
+    },
+    {
+      "policy": "hybrid@0.70",
+      "paraphrase_recall": 0.875,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.25,
+      "polarity_paraphrase": 0.125,
+      "combined": 1.0
+    },
+    {
+      "policy": "hybrid@0.80",
+      "paraphrase_recall": 0.875,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.25,
+      "polarity_paraphrase": 0.125,
+      "combined": 1.0
+    },
+    {
+      "policy": "hybrid@0.90",
+      "paraphrase_recall": 0.875,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.25,
+      "polarity_paraphrase": 0.125,
+      "combined": 1.0
+    },
+    {
+      "policy": "hybrid@1.00",
+      "paraphrase_recall": 0.875,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.25,
+      "polarity_paraphrase": 0.125,
+      "combined": 1.0
+    },
+    {
+      "policy": "rrf@60",
+      "paraphrase_recall": 0.625,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.375,
+      "polarity_paraphrase": 0.125,
+      "combined": 0.75
+    },
+    {
+      "policy": "cascade@3",
+      "paraphrase_recall": 0.875,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.875,
+      "polarity_paraphrase": 0.625,
+      "combined": 1.5
+    },
+    {
+      "policy": "cascade@5",
+      "paraphrase_recall": 0.875,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.875,
+      "polarity_paraphrase": 0.625,
+      "combined": 1.5
+    },
+    {
+      "policy": "cascade@10",
+      "paraphrase_recall": 0.625,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.875,
+      "polarity_paraphrase": 0.625,
+      "combined": 1.25
+    },
+    {
+      "policy": "cascade@20",
+      "paraphrase_recall": 0.375,
+      "lexical_recall": 1.0,
+      "polarity_lexical": 0.875,
+      "polarity_paraphrase": 0.625,
+      "combined": 1.0
     }
   ]
 }
