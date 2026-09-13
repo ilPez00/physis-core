@@ -22,32 +22,17 @@
 
 use physis_core::models::cosine_sim;
 use physis_core::ontology::OntologyLoader;
+// PH-021: ProofStatus, Observation and StructuralMachine now live in the
+// library. They were defined here, which made the only graded-numeric-claim
+// implementation in the engine unreachable from `src/`. Imported rather than
+// re-declared — a second copy is the PH-012 duplication trap on purpose.
+use physis_core::machines::{Observation, ProofStatus, StructuralMachine};
 use serde::Serialize;
 use std::f64::consts::PI;
 use std::collections::BTreeMap;
 
 // ───────────────────────── proof-status + record types ─────────────────────────
 
-/// Proof status (mission §9): exactly one per proposition.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-enum ProofStatus {
-    /// Classical theorem, cited with witness
-    Established,
-    /// Derived inside this experiment from established propositions
-    Derived,
-    /// Verified in this run on a finite exact instance (proves the instance)
-    EstablishedFinite,
-    /// Numerically observed, error-bounded
-    Numerical,
-    /// Dream-generated compatibility only — never certification (mission §13)
-    Heuristic,
-    /// Dream output awaiting apodeixis (no Lean here: permanently untestable)
-    Conjectural,
-    /// Killed by computation or literature (preserved, mission §15)
-    Contradicted,
-    /// A genuinely new unresolved proposition (failure class F8)
-    InsufficientData,
-}
 
 #[derive(Serialize, Clone)]
 struct Proposition {
@@ -61,15 +46,6 @@ struct Proposition {
     quarantined: bool,
 }
 
-/// A machine observation: what ONE structural operator sees in the world.
-#[derive(Serialize, Clone)]
-struct Observation {
-    machine: String,
-    target: String,
-    claim: String,
-    quantity: f64,
-    status: ProofStatus,
-}
 
 /// Dream output — the type system enforces mission §13: a Dream can only
 /// produce CandidateHypothesis; certification requires an apodeixis verdict.
@@ -423,15 +399,6 @@ struct MachineObservationOut {
     observations: Vec<Observation>,
 }
 
-/// The smallest shared machine interface the existing architecture supports.///
-/// The originals' contract (physis-kairos/README: the whole machine contract
-/// collapses to one reduce() over a scaffold) is preserved: `inspect` =
-/// perceive, `propose` = reduce + elaborate. Composability without identity:
-/// each machine owns its own observation vocabulary; nothing merges them.
-trait StructuralMachine {
-    fn name(&self) -> &'static str;
-    fn inspect(&self, w: &RiemannWorld) -> Vec<Observation>;
-}
 
 // ───────────────────────── EUCLID — exact construction ─────────────────────────
 
@@ -442,7 +409,7 @@ trait StructuralMachine {
 /// anything the EXACT layer cannot see is REFUSED (recorded, not guessed).
 struct Euclid;
 
-impl StructuralMachine for Euclid {
+impl StructuralMachine<RiemannWorld> for Euclid {
     fn name(&self) -> &'static str { "euclid" }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         let ex = sieve(w.n_exact);
@@ -490,7 +457,7 @@ impl StructuralMachine for Euclid {
 /// verified instance.
 struct Logos;
 
-impl StructuralMachine for Logos {
+impl StructuralMachine<RiemannWorld> for Logos {
     fn name(&self) -> &'static str { "logos" }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         // FE symmetry residual: |ζ(ρ)| vs |ζ(1−ρ̄)| at critical-line points.
@@ -555,7 +522,7 @@ impl StructuralMachine for Logos {
 /// SELF-symmetric member — the term that is its own partner.
 struct Pythagoras;
 
-impl StructuralMachine for Pythagoras {
+impl StructuralMachine<RiemannWorld> for Pythagoras {
     fn name(&self) -> &'static str { "pythagoras" }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         // spacing ratios (Montgomery–Dyson GUE conjecture — status HEURISTIC)
@@ -606,7 +573,7 @@ impl StructuralMachine for Pythagoras {
 /// terms. Elaboration = re-deriving ψ from the compressed form.
 struct Nous;
 
-impl StructuralMachine for Nous {
+impl StructuralMachine<RiemannWorld> for Nous {
     fn name(&self) -> &'static str { "nous" }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         let ex = sieve(w.n_exact);
@@ -665,7 +632,7 @@ impl StructuralMachine for Nous {
 /// dependent; the ZERO LOCATION controls the Strife exponent.
 struct Empedocles;
 
-impl StructuralMachine for Empedocles {
+impl StructuralMachine<RiemannWorld> for Empedocles {
     fn name(&self) -> &'static str { "empedocles" }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         let ex = sieve(w.n_exact);
@@ -717,7 +684,7 @@ impl StructuralMachine for Empedocles {
 /// relative regeneration error within the exact range.
 struct Physis;
 
-impl StructuralMachine for Physis {
+impl StructuralMachine<RiemannWorld> for Physis {
     fn name(&self) -> &'static str { "physis" }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         let ex = sieve(w.n_exact);
@@ -763,7 +730,7 @@ impl StructuralMachine for Physis {
 /// λ → max(β, 1−β) — KAIROS watches the exponent, not the value.
 struct Kairos;
 
-impl StructuralMachine for Kairos {
+impl StructuralMachine<RiemannWorld> for Kairos {
     fn name(&self) -> &'static str { "kairos" }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         let ex = sieve(w.n_exact);
@@ -1117,7 +1084,7 @@ fn main() {
     };
 
     // ── machine outputs WITHOUT the adversary (§8) ──
-    let machines: Vec<Box<dyn StructuralMachine>> = vec![
+    let machines: Vec<Box<dyn StructuralMachine<RiemannWorld>>> = vec![
         Box::new(Euclid), Box::new(Logos), Box::new(Pythagoras),
         Box::new(Nous), Box::new(Empedocles), Box::new(Physis), Box::new(Kairos),
     ];

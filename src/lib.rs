@@ -201,6 +201,7 @@ pub mod epistemic;
 pub mod explanation;
 pub mod history;
 pub mod linkage;
+pub mod machines;
 pub mod map;
 pub mod tokenizer;
 pub mod hypothesis;
