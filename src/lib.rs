@@ -182,6 +182,7 @@
 
 pub mod bench;
 pub mod act;
+pub mod act_recall;
 pub mod becoming;
 pub mod classify;
 pub mod config_run;

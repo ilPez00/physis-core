@@ -188,6 +188,24 @@ enum Command {
         #[arg(long)]
         big_model: Option<String>,
     },
+    /// Measure `act`'s recall directly, against two construction-matched nulls.
+    ///
+    /// Conceptual problem 1 (`docs/plans/2026-09-13-four-conceptual-problems.md`):
+    /// the ledger is the differentiator and it reaches its data through the
+    /// context compiler, which is the commodity half and was measured weak.
+    /// This says how weak, on a seeded ledger with authored ground truth.
+    /// Writes `benchmarks/results/act-recall.json`.
+    #[command(name = "act-recall")]
+    ActRecall {
+        /// How many claims `act` surfaces. The `act` default is 5; the
+        /// measurement is only about the list the operator actually sees.
+        #[arg(long, default_value_t = 5)]
+        top: usize,
+        #[arg(long, default_value_t = 7)]
+        seed: u64,
+        #[arg(long)]
+        json: bool,
+    },
     /// Watch a source and append what changed to the observation log.
     /// Append-only: nothing here is ever rewritten. Re-running over an
     /// unchanged tree produces nothing.
@@ -618,6 +636,7 @@ fn main() -> anyhow::Result<()> {
         Command::Notebook { corpus, query, budget, json, draft, confidence } => cmd_notebook(&corpus, &query, budget, json, draft, confidence),
         Command::Context { corpus, query, budget, json } => cmd_context(&corpus, &query, budget, json),
         Command::Benchmark { order, budget, big_model } => cmd_benchmark(order, budget, big_model),
+        Command::ActRecall { top, seed, json } => cmd_act_recall(top, seed, json),
         Command::Run { config, model, ngram, query } => cmd_run(&config, model, ngram, query),
         #[cfg(feature = "studio")]
         Command::Studio { port, model } => run_studio(port, model),
@@ -2115,14 +2134,25 @@ fn cmd_observed(
 }
 
 fn cmd_act(command: &str, dry_run: bool, top: usize, json: bool) -> anyhow::Result<()> {
-    let (embedder, _) = physis_core::embed::select(384);
+    let (embedder, embedder_kind) = physis_core::embed::select(384);
     let core = load_core();
     let bearing = physis_core::act::bearing_on(&core, command, embedder.as_ref(), top);
+
+    // Silence here means two different things and they were indistinguishable.
+    // `act-recall` measured this leg at recall 0.875 on a semantic embedder and
+    // **0.000** on the random-projection fallback for a command phrased
+    // differently from the claim — so on the fallback, "nothing bears on this"
+    // is very often the matcher, not the ledger. Which one ran is now printed.
+    let floor = if embedder_kind == "random-projection" {
+        "\n  (random-projection: a lexical hash, not meaning. `act-recall` measures\n   this leg at recall 0.000 for a paraphrased command. Set PHYSIS_MODEL_DIR.)"
+    } else {
+        ""
+    };
 
     if dry_run {
         let warnings: Vec<_> = bearing.iter().filter(|b| b.is_warning()).collect();
         if warnings.is_empty() {
-            println!("nothing already established bears on this. {} claim(s) checked.", core.hypotheses.len());
+            println!("nothing already established bears on this. {} claim(s) checked.{floor}", core.hypotheses.len());
         } else {
             println!("── ALREADY ESTABLISHED ──");
             for b in warnings {
@@ -2356,6 +2386,25 @@ fn cmd_context(corpus: &Path, query: &str, budget: usize, json: bool) -> anyhow:
         println!("
 ── COMPILED CONTEXT (first {} chars) ──", 400);
         println!("{}", report.physis_context.chars().take(400).collect::<String>());
+    }
+    Ok(())
+}
+
+/// Measure `act`'s recall. The embedder is reported, never assumed: the same
+/// ledger scores differently under a lexical hash and a real model, and a
+/// recall claim made on the hash is not a recall claim.
+fn cmd_act_recall(top: usize, seed: u64, json: bool) -> anyhow::Result<()> {
+    let (embedder, embedder_kind) = physis_core::embed::select(384);
+    let run = physis_core::act_recall::run(top, embedder.as_ref(), embedder_kind, seed);
+    let dir = PathBuf::from("benchmarks/results");
+    std::fs::create_dir_all(&dir)?;
+    let path = dir.join("act-recall.json");
+    std::fs::write(&path, serde_json::to_vec_pretty(&run)?)?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&run)?);
+    } else {
+        print!("{}", run.render());
+        println!("\nartifact -> {}", path.display());
     }
     Ok(())
 }

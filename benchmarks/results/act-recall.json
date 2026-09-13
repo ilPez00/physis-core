@@ -1,0 +1,158 @@
+{
+  "ledger_size": 48,
+  "contradicted_claims": 16,
+  "top": 5,
+  "seed": 7,
+  "null_trials": 2000,
+  "embedder": "onnx-explicit",
+  "physis_version": "0.1.26",
+  "git_commit": "d468594",
+  "arms": [
+    {
+      "arm": "lexical",
+      "queries": 8,
+      "top": 5,
+      "hits": 8,
+      "recall": 1.0,
+      "warned": 8,
+      "warning_recall": 1.0,
+      "mrr": 1.0,
+      "null_uniform_recall": 0.1025625,
+      "null_status_recall": 0.317625,
+      "margin_uniform": 0.8974375,
+      "margin_status": 0.682375,
+      "verdict": "HOLDS",
+      "cases": [
+        {
+          "command": "cargo test --all-features",
+          "target": "cargo test --all-features fails on this crate: the ort linker step never resolves",
+          "rank": 1,
+          "target_relevance": 0.7984945,
+          "top_statement": "cargo test --all-features fails on this crate: the ort linker step never resolves"
+        },
+        {
+          "command": "cargo build --release",
+          "target": "the release build never finishes on this box — it runs out of memory at the LTO stage",
+          "rank": 1,
+          "target_relevance": 0.7440791,
+          "top_statement": "the release build never finishes on this box — it runs out of memory at the LTO stage"
+        },
+        {
+          "command": "pip install onnxruntime",
+          "target": "pip install onnxruntime fails on this Python: there is no manylinux wheel for 3.13",
+          "rank": 1,
+          "target_relevance": 0.8817908,
+          "top_statement": "pip install onnxruntime fails on this Python: there is no manylinux wheel for 3.13"
+        },
+        {
+          "command": "docker compose up -d",
+          "target": "docker compose up leaves postgres in a restart loop because the volume is owned by root",
+          "rank": 1,
+          "target_relevance": 0.7676858,
+          "top_statement": "docker compose up leaves postgres in a restart loop because the volume is owned by root"
+        },
+        {
+          "command": "npm run build",
+          "target": "npm run build breaks on the CI image: node 18 cannot parse the new syntax",
+          "rank": 1,
+          "target_relevance": 0.78672683,
+          "top_statement": "npm run build breaks on the CI image: node 18 cannot parse the new syntax"
+        },
+        {
+          "command": "git push origin main",
+          "target": "git push origin main is rejected — the branch is protected and requires a review",
+          "rank": 1,
+          "target_relevance": 0.86024255,
+          "top_statement": "git push origin main is rejected — the branch is protected and requires a review"
+        },
+        {
+          "command": "./scripts/migrate.sh",
+          "target": "the migrate script drops the audit table when run twice; it is not idempotent",
+          "rank": 1,
+          "target_relevance": 0.6936778,
+          "top_statement": "the migrate script drops the audit table when run twice; it is not idempotent"
+        },
+        {
+          "command": "rsync -av ./data backup:/srv/data",
+          "target": "rsync to the backup host times out over the VPN for anything larger than a gigabyte",
+          "rank": 1,
+          "target_relevance": 0.74557906,
+          "top_statement": "rsync to the backup host times out over the VPN for anything larger than a gigabyte"
+        }
+      ]
+    },
+    {
+      "arm": "paraphrase",
+      "queries": 8,
+      "top": 5,
+      "hits": 7,
+      "recall": 0.875,
+      "warned": 7,
+      "warning_recall": 0.875,
+      "mrr": 0.5833334,
+      "null_uniform_recall": 0.1025625,
+      "null_status_recall": 0.317625,
+      "margin_uniform": 0.7724375,
+      "margin_status": 0.557375,
+      "verdict": "HOLDS",
+      "cases": [
+        {
+          "command": "run the whole suite with every optional flag turned on",
+          "target": "cargo test --all-features fails on this crate: the ort linker step never resolves",
+          "rank": 3,
+          "target_relevance": 0.6270594,
+          "top_statement": "coherence is computed over the certified branches only"
+        },
+        {
+          "command": "produce an optimised binary for shipping",
+          "target": "the release build never finishes on this box — it runs out of memory at the LTO stage",
+          "rank": 1,
+          "target_relevance": 0.6357998,
+          "top_statement": "the release build never finishes on this box — it runs out of memory at the LTO stage"
+        },
+        {
+          "command": "add the neural inference package to the interpreter environment",
+          "target": "pip install onnxruntime fails on this Python: there is no manylinux wheel for 3.13",
+          "rank": null,
+          "target_relevance": 0.6400915,
+          "top_statement": "n-gram tables are interchangeable with the model that reads them"
+        },
+        {
+          "command": "bring the local service stack online in the background",
+          "target": "docker compose up leaves postgres in a restart loop because the volume is owned by root",
+          "rank": 3,
+          "target_relevance": 0.60602933,
+          "top_statement": "the web server keys session state by the tenant header"
+        },
+        {
+          "command": "compile the frontend bundle for deployment",
+          "target": "npm run build breaks on the CI image: node 18 cannot parse the new syntax",
+          "rank": 2,
+          "target_relevance": 0.65945995,
+          "top_statement": "packs are dropped into the config directory rather than compiled in"
+        },
+        {
+          "command": "publish the local commits to the shared upstream trunk",
+          "target": "git push origin main is rejected — the branch is protected and requires a review",
+          "rank": 1,
+          "target_relevance": 0.6721702,
+          "top_statement": "git push origin main is rejected — the branch is protected and requires a review"
+        },
+        {
+          "command": "apply the pending schema changes to the database",
+          "target": "the migrate script drops the audit table when run twice; it is not idempotent",
+          "rank": 2,
+          "target_relevance": 0.6500331,
+          "top_statement": "the ledger keeps a revision every time a status changes"
+        },
+        {
+          "command": "copy the dataset across to the offsite machine",
+          "target": "rsync to the backup host times out over the VPN for anything larger than a gigabyte",
+          "rank": 1,
+          "target_relevance": 0.6700768,
+          "top_statement": "rsync to the backup host times out over the VPN for anything larger than a gigabyte"
+        }
+      ]
+    }
+  ]
+}

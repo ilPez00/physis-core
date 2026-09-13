@@ -41,21 +41,40 @@
 //! does not decide anything, and it will miss a contradiction phrased
 //! differently from the command that triggers it.
 //!
-//! **How weak, measured.** The 2×2 of 2026-09-13
-//! (`docs/plans/2026-09-13-2x2-first-run.md`) scored this retrieval family at
-//! 0–1/7 against a whole-file ceiling of 5/7. So in the normal case this
-//! function does not find the contradiction it exists to surface, and the gap
-//! it closes is closed in architecture rather than in practice.
+//! **How weak, measured.** The recall of this function has now been measured
+//! directly — `act_recall.rs`, `physis-core act-recall`, artifact in
+//! `benchmarks/results/act-recall.json`. Eight commands against a 48-claim
+//! ledger of one age, each with exactly one claim that refutes it, scored
+//! against two construction-matched nulls (k random claims; k random
+//! *contradicted* claims):
 //!
-//! That is a structural dependency and not only a quality problem: `RESCOPE.md`
-//! §0 settles that the context compiler is the *commodity* half and the ledger
-//! is the differentiator — and this, the sharpest thing the ledger does,
-//! reaches its data through the compiler. Recorded as conceptual problem 1 in
-//! `docs/plans/2026-09-13-four-conceptual-problems.md`.
+//! | embedder | arm | recall@5 | MRR@5 |
+//! |---|---|---|---|
+//! | bge-base-en-v1.5 | command shares the claim's words | 1.000 | 1.000 |
+//! | bge-base-en-v1.5 | command paraphrases it | 0.875 | 0.583 |
+//! | random-projection | command shares the claim's words | 0.750 | 0.667 |
+//! | random-projection | command paraphrases it | **0.000** | 0.000 |
 //!
-//! The recall of this function has never been measured directly. It should be,
-//! and a construction-matched null is available: surface k random claims of the
-//! same age and compare.
+//! So the limit stated above is real but it is **a property of the embedder,
+//! not of this function**. On a semantic embedder the paraphrase case is found
+//! seven times in eight and the cost is rank, not presence: the warning arrives
+//! mid-list (MRR 0.583) rather than first, and at `--top 1` recall falls to
+//! 0.375. On the random-projection fallback — the supported offline mode — the
+//! paraphrase case is found *never*, and scores below both nulls.
+//!
+//! The earlier reading here, taken from the 2×2 of 2026-09-13
+//! (`docs/plans/2026-09-13-2x2-first-run.md`, 0–1/7 against a ceiling of 5/7),
+//! said this function does not find the contradiction it exists to surface in
+//! the normal case. That does not survive the direct measurement and is
+//! withdrawn: the 2×2 scored a different task on a different corpus.
+//!
+//! The structural point stands and is unaffected by the number: `RESCOPE.md` §0
+//! settles that the context compiler is the *commodity* half and the ledger is
+//! the differentiator — and this, the sharpest thing the ledger does, reaches
+//! its data through the compiler. Recorded as conceptual problem 1 in
+//! `docs/plans/2026-09-13-four-conceptual-problems.md`. What the measurement
+//! adds is which half of the dependency is load-bearing: **offline, Gap 8 is
+//! open.**
 
 use crate::embed::VectorEmbed;
 use serde::{Deserialize, Serialize};
