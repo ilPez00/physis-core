@@ -428,6 +428,39 @@ impl Hypothesis {
         self.temporal.is_valid_at(when)
     }
 
+    /// Correct this hypothesis's world-time end when later evidence shows it
+    /// stopped being true earlier than recorded. Returns whether the window
+    /// moved.
+    ///
+    /// The narrowing rules live in [`TemporalValidity::narrow_until`]; what
+    /// this adds is the thing that makes the correction legible afterwards.
+    /// **A window that moves leaves a `Revision` behind.** graphiti, which has
+    /// the same bi-temporal schema, mutates its world-time leg with no record
+    /// at all — so a boundary written from a weak first contradiction is
+    /// indistinguishable, later, from one the evidence always supported. That
+    /// is precisely what replay exists to prevent here.
+    ///
+    /// A refused narrowing records nothing: a no-op that appended to the
+    /// revision history would make the ledger report a change that never
+    /// happened.
+    pub fn narrow_validity(
+        &mut self,
+        when: chrono::DateTime<chrono::Utc>,
+        trigger: Option<String>,
+    ) -> bool {
+        let previous_until = self.temporal.valid_until;
+        if !self.temporal.narrow_until(when, trigger.clone()) {
+            return false;
+        }
+        let previous = self.status;
+        let description = match previous_until {
+            Some(old) => format!("Validity narrowed from {old} to {when}"),
+            None => format!("Validity closed at {when}"),
+        };
+        self.revise(previous, description, trigger);
+        true
+    }
+
     /// Record a prediction and its outcome.
     pub fn record_prediction(&mut self, prediction: Prediction) {
         let previous = self.status;
