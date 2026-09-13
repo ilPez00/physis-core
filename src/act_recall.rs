@@ -249,6 +249,44 @@
 //! managed** — and raises `target_in_top` from 2/8 to 7/8. The CLI now uses it;
 //! `act::bearing_on` keeps the cosine order as the library's frozen baseline.
 //!
+//! ## The relevance floor — item B, and it is absolute, not relative
+//!
+//! The cost arm found that **4 of 8** commands with nothing to warn about get a
+//! warning today. `act` has never had a floor: it takes the top five by cosine
+//! and prints whichever are refuted, however unrelated.
+//!
+//! The first floor tried was leader-relative, the rule
+//! [`crate::act::Selection::WarningReserve`] uses, and it did **nothing** at
+//! 0.80, 0.90 or 0.95 — the leader is high for both classes of command, so the
+//! ratio carries no signal. `examples/floor_spread` prints the number the sweep
+//! could not, and the classes separate on the *absolute* score:
+//!
+//! | bge-base-en-v1.5 | best claim's cosine |
+//! |---|---|
+//! | command has a refutation | min **0.717**, median 0.798, max 0.913 |
+//! | command has nothing to say | min 0.573, median 0.625, max **0.643** |
+//!
+//! Disjoint, 0.074 apart. Sweeping absolute floors through the same cost arm:
+//!
+//! | policy | reassured@1 | target@1 | alarms@1 | alarms@5 |
+//! |---|---|---|---|---|
+//! | `relevance` (today) | 5/8 | 2/8 | 0/8 | 4/8 |
+//! | `cascade@5` | 1/8 | 7/8 | 2/8 | 4/8 |
+//! | **`cascade@5+floor0.66`** | **1/8** | **7/8** | **0/8** | **0/8** |
+//! | `cascade@5+floor0.70` | 2/8 | 6/8 | 0/8 | 0/8 |
+//! | `cascade@5+floor0.75` | 2/8 | 5/8 | 0/8 | 0/8 |
+//!
+//! 0.66 is strictly better than the current default on every column, at both
+//! cuts, and the two floors above it start dropping real warnings — the window
+//! is exactly the measured gap. The CLI uses 0.66.
+//!
+//! **The price is that the number is embedder-specific.** On the
+//! random-projection fallback the same two distributions overlap completely
+//! (0.705–0.902 against 0.609–0.824) and **no floor exists**. The CLI applies
+//! none there rather than guessing one, so offline `act` keeps its false alarms
+//! — which is the honest outcome and one more entry in the list of things the
+//! hash cannot do.
+//!
 //! ## What this measures and what it does not
 //!
 //! It measures whether `bearing_on` puts the *one* contradicting claim in the
@@ -443,6 +481,24 @@ const NEUTRAL_DISTRACTORS: [&str; 32] = [
     "the web server keys session state by the tenant header",
     "voice, image and video reduce to vectors in one shared space",
 ];
+
+/// The ledger the benchmark builds, for a caller that wants to probe it.
+///
+/// Exists so `examples/floor_spread.rs` measures the *same* corpus the
+/// benchmark scores rather than a second one that drifts away from it.
+pub fn demo_ledger(embedder: &dyn VectorEmbed) -> PhysisCore {
+    build_ledger(embedder, true).0
+}
+
+/// The commands that have a refutation in the ledger, lexical phrasing.
+pub fn pair_commands() -> Vec<&'static str> {
+    PAIRS.iter().map(|p| p.lexical).collect()
+}
+
+/// The commands that have nothing to warn about.
+pub fn unrelated_commands() -> Vec<&'static str> {
+    UNRELATED_COMMANDS.to_vec()
+}
 
 /// Which phrasing of the command is issued.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -983,6 +1039,9 @@ pub fn run_selection(
         crate::act::Selection::Hybrid { alpha } => format!("hybrid@{alpha:.2}"),
         crate::act::Selection::HybridRrf { k } => format!("rrf@{k:.0}"),
         crate::act::Selection::CascadeRerank { pool } => format!("cascade@{pool}"),
+        crate::act::Selection::CascadeFloor { pool, floor } => {
+            format!("cascade@{pool}+floor{floor:.2}")
+        }
     };
     // Against the relevance baseline measured in the same run, never against a
     // remembered number.
@@ -1012,6 +1071,13 @@ pub fn run_selection(
 /// already leads, which is the relevance policy by another name and is included
 /// as the sweep's own control.
 pub const FLOORS: [f32; 5] = [0.00, 0.80, 0.90, 0.95, 1.00];
+
+/// Absolute cosine floors swept. Chosen to straddle the gap
+/// `examples/floor_spread` measured on bge-base-en-v1.5 — commands with a
+/// refutation bottom out at 0.717, commands with nothing to say top out at
+/// 0.643 — with one value below the gap and one above it, so the sweep shows
+/// the edges of the window and not only its middle.
+pub const ABS_FLOORS: [f32; 5] = [0.60, 0.66, 0.68, 0.70, 0.75];
 
 /// One mixing weight, scored on both legs at once.
 ///
@@ -1160,6 +1226,19 @@ pub fn run(top: usize, embedder: &dyn VectorEmbed, embedder_kind: &str, seed: u6
             crate::act::Selection::CascadeRerank { pool: 5 },
             Some(baseline),
         ));
+        // The floor sweep. `false_alarms` must fall and `target_in_top` must
+        // not: a floor that buys silence by dropping the refutation has bought
+        // the wrong silence, and only measuring both columns shows which.
+        for f in ABS_FLOORS {
+            selection.push(run_selection(
+                &tcore,
+                Arm::Lexical,
+                t,
+                embedder,
+                crate::act::Selection::CascadeFloor { pool: 5, floor: f },
+                Some(baseline),
+            ));
+        }
     }
 
     let hybrid = run_hybrid_sweep(&core, &index, &tcore, &tindex, top, embedder);

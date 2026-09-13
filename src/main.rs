@@ -2148,13 +2148,24 @@ fn cmd_act(command: &str, dry_run: bool, top: usize, json: bool) -> anyhow::Resu
     // `act::bearing_on` keeps the cosine order as the library's frozen
     // baseline, the way `rag::rank_by_cosine` does. This is the consumer, and
     // the consumer is where the order is read.
-    let bearing = physis_core::act::bearing_on_with(
-        &core,
-        command,
-        embedder.as_ref(),
-        top,
-        physis_core::act::Selection::CascadeRerank { pool: top.max(5) },
-    );
+    // …and a floor, on the semantic embedder only. `act-recall` measured the
+    // best-claim cosine of commands that have a refutation (min 0.717) against
+    // commands that have nothing to say (max 0.643): disjoint, 0.074 apart.
+    // A floor at 0.66 sits in that gap and takes false alarms from 4 of 8 to
+    // 0 of 8 while keeping every real warning — strictly better than no floor
+    // on every column measured, at top 1 and top 5.
+    //
+    // Not applied to the random-projection fallback, where the same two
+    // distributions overlap completely (0.705–0.902 against 0.609–0.824) and
+    // no floor exists. Guessing one there would silence real warnings to buy
+    // nothing.
+    const SEMANTIC_FLOOR: f32 = 0.66;
+    let selection = if embedder_kind == "random-projection" {
+        physis_core::act::Selection::CascadeRerank { pool: top.max(5) }
+    } else {
+        physis_core::act::Selection::CascadeFloor { pool: top.max(5), floor: SEMANTIC_FLOOR }
+    };
+    let bearing = physis_core::act::bearing_on_with(&core, command, embedder.as_ref(), top, selection);
 
     // Silence here means two different things and they were indistinguishable.
     // `act-recall` measured this leg at recall 0.875 on a semantic embedder and

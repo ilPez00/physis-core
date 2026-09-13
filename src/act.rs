@@ -252,6 +252,35 @@ pub enum Selection {
     /// and which nothing in the ledger has ever called. Rank-based, so it needs
     /// no normalisation and has no weight to tune; `k` damps the head.
     HybridRrf { k: f32 },
+    /// The cascade, plus a floor: claims scoring below `floor` of the leader's
+    /// cosine are dropped before anything is shown.
+    ///
+    /// `act` has never had a floor. It takes the top five by cosine and prints
+    /// whichever are refuted, however unrelated — measured at **4 of 8**
+    /// commands with nothing to warn about getting a warning anyway. On a real
+    /// ledger that rises, because there is always something at rank five. It is
+    /// the failure the survey attributes to Nepomuk and to every semantic
+    /// desktop that died: the system is *felt*, constantly, for nothing.
+    ///
+    /// The floor is **absolute cosine**, and that is the whole finding. A
+    /// leader-relative floor — the rule [`Selection::WarningReserve`] uses, and
+    /// the first thing tried here — does nothing at any usable setting, because
+    /// the leader is high for both classes of command. The two classes separate
+    /// on the *absolute* score and not on the ratio:
+    ///
+    /// | bge-base-en-v1.5 | best claim's cosine |
+    /// |---|---|
+    /// | commands with a refutation in the ledger | min **0.717**, median 0.798 |
+    /// | commands with nothing to warn about | median 0.625, max **0.643** |
+    ///
+    /// Disjoint, with 0.074 between them. Measured by `examples/floor_spread`.
+    ///
+    /// The price is that the number is embedder-specific and must be
+    /// re-measured per embedder — on the random-projection fallback the same
+    /// two distributions overlap completely (0.705–0.902 against 0.609–0.824)
+    /// and **no floor exists at all**, which is one more thing the hash cannot
+    /// do.
+    CascadeFloor { pool: usize, floor: f32 },
     /// Two stages: cosine picks a pool of `pool` candidates, BM25 orders that
     /// pool, and the top of the ordered pool is returned.
     ///
@@ -314,6 +343,17 @@ pub fn bearing_on_with(
         }
         Selection::HybridRrf { k } => {
             fuse_by_rank(&mut v, command, k);
+            v.truncate(top);
+            return v;
+        }
+        Selection::CascadeFloor { pool, floor } => {
+            // The floor is applied to the COSINE score, before the rerank
+            // rewrites `relevance` into a fused one. Filtering on the fused
+            // score would filter on a number whose scale is an artefact of
+            // this query's candidate set.
+            v.retain(|b| b.relevance >= floor);
+            v.truncate(pool.max(top));
+            refuse_or_fuse(&mut v, command, 0.0);
             v.truncate(top);
             return v;
         }

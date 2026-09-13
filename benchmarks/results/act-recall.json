@@ -6,7 +6,7 @@
   "null_trials": 2000,
   "embedder": "onnx-explicit",
   "physis_version": "0.1.26",
-  "git_commit": "cde0229",
+  "git_commit": "7d8ff8d",
   "arms": [
     {
       "arm": "lexical",
@@ -368,6 +368,56 @@
       "harm_removed_per_false_alarm": 2.0
     },
     {
+      "policy": "cascade@5+floor0.60",
+      "top": 1,
+      "reassured": 1,
+      "target_in_top": 7,
+      "false_alarms": 1,
+      "pairs": 8,
+      "unrelated": 8,
+      "harm_removed_per_false_alarm": 4.0
+    },
+    {
+      "policy": "cascade@5+floor0.66",
+      "top": 1,
+      "reassured": 1,
+      "target_in_top": 7,
+      "false_alarms": 0,
+      "pairs": 8,
+      "unrelated": 8,
+      "harm_removed_per_false_alarm": null
+    },
+    {
+      "policy": "cascade@5+floor0.68",
+      "top": 1,
+      "reassured": 1,
+      "target_in_top": 7,
+      "false_alarms": 0,
+      "pairs": 8,
+      "unrelated": 8,
+      "harm_removed_per_false_alarm": null
+    },
+    {
+      "policy": "cascade@5+floor0.70",
+      "top": 1,
+      "reassured": 2,
+      "target_in_top": 6,
+      "false_alarms": 0,
+      "pairs": 8,
+      "unrelated": 8,
+      "harm_removed_per_false_alarm": null
+    },
+    {
+      "policy": "cascade@5+floor0.75",
+      "top": 1,
+      "reassured": 2,
+      "target_in_top": 5,
+      "false_alarms": 0,
+      "pairs": 8,
+      "unrelated": 8,
+      "harm_removed_per_false_alarm": null
+    },
+    {
       "policy": "relevance",
       "top": 5,
       "reassured": 0,
@@ -433,6 +483,56 @@
       "reassured": 0,
       "target_in_top": 8,
       "false_alarms": 4,
+      "pairs": 8,
+      "unrelated": 8,
+      "harm_removed_per_false_alarm": null
+    },
+    {
+      "policy": "cascade@5+floor0.60",
+      "top": 5,
+      "reassured": 0,
+      "target_in_top": 8,
+      "false_alarms": 2,
+      "pairs": 8,
+      "unrelated": 8,
+      "harm_removed_per_false_alarm": null
+    },
+    {
+      "policy": "cascade@5+floor0.66",
+      "top": 5,
+      "reassured": 0,
+      "target_in_top": 8,
+      "false_alarms": 0,
+      "pairs": 8,
+      "unrelated": 8,
+      "harm_removed_per_false_alarm": null
+    },
+    {
+      "policy": "cascade@5+floor0.68",
+      "top": 5,
+      "reassured": 0,
+      "target_in_top": 8,
+      "false_alarms": 0,
+      "pairs": 8,
+      "unrelated": 8,
+      "harm_removed_per_false_alarm": null
+    },
+    {
+      "policy": "cascade@5+floor0.70",
+      "top": 5,
+      "reassured": 1,
+      "target_in_top": 7,
+      "false_alarms": 0,
+      "pairs": 8,
+      "unrelated": 8,
+      "harm_removed_per_false_alarm": null
+    },
+    {
+      "policy": "cascade@5+floor0.75",
+      "top": 5,
+      "reassured": 2,
+      "target_in_top": 5,
+      "false_alarms": 0,
       "pairs": 8,
       "unrelated": 8,
       "harm_removed_per_false_alarm": null
