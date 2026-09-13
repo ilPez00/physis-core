@@ -231,6 +231,27 @@ pub enum Selection {
     /// floor. `floor_ratio` is a fraction of the top-ranked claim's relevance;
     /// 0.0 always reserves, 1.0 never does unless the warning already leads.
     WarningReserve { floor_ratio: f32 },
+    /// Rank on `alpha · cosine + (1 − alpha) · BM25`, both min-max normalised
+    /// over the candidate set.
+    ///
+    /// The two legs were measured failing in **opposite directions** on the
+    /// same eight pairs: the semantic embedder finds the topic (paraphrase
+    /// recall 0.875) and cannot read the verdict (polarity 0.250); the lexical
+    /// hash reads the verdict (0.750) and cannot find the topic (0.000). This
+    /// is the knob between them. `alpha = 1.0` is [`Selection::Relevance`] by
+    /// another name and is the sweep's control.
+    ///
+    /// Normalisation is min-max **over the candidates of this query**, not
+    /// global: BM25 and cosine live on unrelated scales, and a fixed conversion
+    /// tuned on one embedder is meaningless on the next. The cost is that
+    /// `relevance` on the returned [`Bearing`] is then a fused score, not a
+    /// cosine — read it as a rank key and not as a similarity.
+    Hybrid { alpha: f32 },
+    /// Reciprocal rank fusion of the cosine and BM25 orders — the crate's own
+    /// hybrid, [`crate::rag::fuse_rrf`], which has existed in `rag.rs` since G5
+    /// and which nothing in the ledger has ever called. Rank-based, so it needs
+    /// no normalisation and has no weight to tune; `k` damps the head.
+    HybridRrf { k: f32 },
 }
 
 /// Claims bearing on `command`, under an explicit selection policy.
@@ -268,6 +289,16 @@ pub fn bearing_on_with(
 
     let floor_ratio = match selection {
         Selection::Relevance => {
+            v.truncate(top);
+            return v;
+        }
+        Selection::Hybrid { alpha } => {
+            refuse_or_fuse(&mut v, command, alpha);
+            v.truncate(top);
+            return v;
+        }
+        Selection::HybridRrf { k } => {
+            fuse_by_rank(&mut v, command, k);
             v.truncate(top);
             return v;
         }
@@ -356,6 +387,62 @@ pub fn run(
         bearing,
         observed: vec![first, second],
     })
+}
+
+/// Min-max normalise a slice in place, mapping a flat input to all-zero rather
+/// than to a division by zero. A leg with no spread contributes nothing, which
+/// is the correct reading: it ranked nothing.
+fn minmax(xs: &mut [f32]) {
+    let (lo, hi) = xs.iter().fold((f32::MAX, f32::MIN), |(l, h), &x| (l.min(x), h.max(x)));
+    let span = hi - lo;
+    if !(span.is_finite() && span > 0.0) {
+        xs.iter_mut().for_each(|x| *x = 0.0);
+        return;
+    }
+    xs.iter_mut().for_each(|x| *x = (*x - lo) / span);
+}
+
+/// Re-score `v` as `alpha · cosine + (1 − alpha) · BM25`, both normalised over
+/// this candidate set, and re-sort. `v` must already be cosine-scored.
+fn refuse_or_fuse(v: &mut [Bearing], command: &str, alpha: f32) {
+    let alpha = alpha.clamp(0.0, 1.0);
+    let texts: Vec<String> = v.iter().map(|b| b.statement.clone()).collect();
+    let bm = crate::rag::Bm25Index::build(&texts);
+    let terms = crate::rag::bm25_terms(command);
+    let mut lex: Vec<f32> = (0..texts.len()).map(|i| bm.score(i, &terms)).collect();
+    let mut sem: Vec<f32> = v.iter().map(|b| b.relevance).collect();
+    minmax(&mut lex);
+    minmax(&mut sem);
+    for (i, b) in v.iter_mut().enumerate() {
+        b.relevance = alpha * sem[i] + (1.0 - alpha) * lex[i];
+    }
+    v.sort_by(|a, b| {
+        b.relevance
+            .partial_cmp(&a.relevance)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.statement.cmp(&b.statement))
+    });
+}
+
+/// Re-order `v` by reciprocal rank fusion of its cosine order and its BM25
+/// order, using the crate's existing [`crate::rag::fuse_rrf`].
+fn fuse_by_rank(v: &mut Vec<Bearing>, command: &str, k: f32) {
+    let texts: Vec<String> = v.iter().map(|b| b.statement.clone()).collect();
+    let bm = crate::rag::Bm25Index::build(&texts);
+    let terms = crate::rag::bm25_terms(command);
+    // `v` is already in cosine order, so its indices are its cosine ranks.
+    let cos_order: Vec<usize> = (0..v.len()).collect();
+    let bm_order: Vec<usize> = bm.rank(&terms).into_iter().map(|(i, _)| i).collect();
+    let fused = crate::rag::fuse_rrf(&[&cos_order, &bm_order], k);
+    let mut out: Vec<Bearing> = Vec::with_capacity(v.len());
+    for (idx, score) in fused {
+        if let Some(b) = v.get(idx) {
+            let mut b = b.clone();
+            b.relevance = score;
+            out.push(b);
+        }
+    }
+    *v = out;
 }
 
 #[cfg(test)]

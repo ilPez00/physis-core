@@ -189,6 +189,31 @@
 //! nothing. That is a separate defect from the polarity one, it is larger, and
 //! it is not fixed here.
 //!
+//! ## The hybrid sweep, and the prediction recorded before it ran
+//!
+//! The polarity result says the two legs fail in opposite directions.
+//! [`crate::act::Selection::Hybrid`] is the knob between them —
+//! `alpha · cosine + (1 − alpha) · BM25`, both min-max normalised over the
+//! candidates — and [`ALPHAS`] sweeps it with **both metrics on every row**, so
+//! a weight that buys polarity by losing the topic cannot look like a win.
+//! `alpha = 1.00` is cosine only and is the control: it must reproduce the
+//! recorded 0.875 paraphrase recall and 0.125 paraphrase polarity.
+//!
+//! The sweep also includes `rrf@60` — [`crate::rag::fuse_rrf`] over the cosine
+//! and BM25 orders. That hybrid has existed in `rag.rs` since G5 and **the
+//! ledger has never called it**, which is itself an instance of the pattern the
+//! capability sweep exists to catch: the crate shipped a hybrid retriever and
+//! its sharpest consumer kept using the cosine leg alone.
+//!
+//! **Predicted, before the sweep ran** (recorded in the commit that added it):
+//! there is an interior `alpha` that beats both endpoints on `combined`,
+//! because the two legs fail on *different* pairs rather than on the same ones
+//! with different severity. If instead `combined` is monotone between the
+//! endpoints, the legs are redundant, the hybrid is dead, and the polarity
+//! discrimination has to come from somewhere other than retrieval — which
+//! promotes structural claim identity from an elegance argument to the only
+//! remaining option.
+//!
 //! ## What this measures and what it does not
 //!
 //! It measures whether `bearing_on` puts the *one* contradicting claim in the
@@ -470,6 +495,9 @@ pub struct RecallRun {
     pub polarity_ledger_size: usize,
     /// Selection policies, benefit and cost measured in the same pass.
     pub selection: Vec<SelectionResult>,
+    /// The mixing weight between the semantic and lexical legs, both metrics
+    /// on every row.
+    pub hybrid: Vec<HybridPoint>,
 }
 
 impl RecallRun {
@@ -548,6 +576,28 @@ impl RecallRun {
                     Some(v) if v.is_infinite() => "free".to_string(),
                     Some(v) => format!("{v:.2}"),
                 }
+            ));
+        }
+        o.push_str(
+            "\n── HYBRID: alpha * cosine + (1-alpha) * BM25 ──\nalpha 1.00 is cosine only (the control) · polarity null 0.500\n\n",
+        );
+        o.push_str("  policy         recall(para)  recall(lex)  polarity(lex)  polarity(para)  combined\n");
+        let best = self
+            .hybrid
+            .iter()
+            .max_by(|a, b| a.combined.partial_cmp(&b.combined).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|h| h.policy.clone())
+            .unwrap_or_default();
+        for h in &self.hybrid {
+            o.push_str(&format!(
+                "  {:<13} {:>8.3}     {:>8.3}     {:>8.3}       {:>8.3}     {:>6.3}{}\n",
+                h.policy,
+                h.paraphrase_recall,
+                h.lexical_recall,
+                h.polarity_lexical,
+                h.polarity_paraphrase,
+                h.combined,
+                if h.policy == best { "  <-- best combined" } else { "" }
             ));
         }
         o.push_str("\n  misses, most instructive first:\n");
@@ -895,6 +945,8 @@ pub fn run_selection(
         crate::act::Selection::WarningReserve { floor_ratio } => {
             format!("reserve@{floor_ratio:.2}")
         }
+        crate::act::Selection::Hybrid { alpha } => format!("hybrid@{alpha:.2}"),
+        crate::act::Selection::HybridRrf { k } => format!("rrf@{k:.0}"),
     };
     // Against the relevance baseline measured in the same run, never against a
     // remembered number.
@@ -924,6 +976,99 @@ pub fn run_selection(
 /// already leads, which is the relevance policy by another name and is included
 /// as the sweep's own control.
 pub const FLOORS: [f32; 5] = [0.00, 0.80, 0.90, 0.95, 1.00];
+
+/// One mixing weight, scored on both legs at once.
+///
+/// The point of the sweep is that the two legs are measured on the **same
+/// knob**: a weight that buys polarity by losing the topic has bought nothing,
+/// and only putting both numbers on one row makes that visible.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HybridPoint {
+    /// `hybrid@<alpha>`, or `rrf@<k>` for the rank-fusion policy.
+    pub policy: String,
+    /// The topic leg: paraphrase recall@top on the base ledger.
+    pub paraphrase_recall: f32,
+    /// The topic leg's easy case, as a floor check.
+    pub lexical_recall: f32,
+    /// The verdict leg: polarity discrimination on the twin ledger, null 0.500.
+    pub polarity_lexical: f32,
+    pub polarity_paraphrase: f32,
+    /// Both legs at once. `paraphrase_recall + polarity_paraphrase`, so a
+    /// policy that trades one for the other cannot climb it.
+    pub combined: f32,
+}
+
+/// Sweep the mixing weight and report both legs at every point.
+pub fn run_hybrid_sweep(
+    base: &PhysisCore,
+    base_index: &[(String, String)],
+    twin: &PhysisCore,
+    twin_index: &[(String, String)],
+    top: usize,
+    embedder: &dyn VectorEmbed,
+) -> Vec<HybridPoint> {
+    let mut out = Vec::new();
+    let recall_at = |core: &PhysisCore, index: &[(String, String)], arm: Arm, sel: crate::act::Selection| {
+        let hits = PAIRS
+            .iter()
+            .filter(|p| {
+                crate::act::bearing_on_with(core, arm.command(p), embedder, top, sel)
+                    .iter()
+                    .any(|b| b.statement == p.claim)
+            })
+            .count();
+        let _ = index;
+        hits as f32 / PAIRS.len() as f32
+    };
+    let polarity_at = |arm: Arm, sel: crate::act::Selection| {
+        let n = PAIRS
+            .iter()
+            .enumerate()
+            .filter(|(i, p)| {
+                let full =
+                    crate::act::bearing_on_with(twin, arm.command(p), embedder, twin_index.len(), sel);
+                let tr = full.iter().position(|b| b.statement == p.claim);
+                let wr = full.iter().position(|b| b.statement == AFFIRMED_TWINS[*i]);
+                match (tr, wr) {
+                    (Some(t), Some(w)) => t < w,
+                    (Some(_), None) => true,
+                    _ => false,
+                }
+            })
+            .count();
+        n as f32 / PAIRS.len() as f32
+    };
+
+    let mut policies: Vec<(String, crate::act::Selection)> = ALPHAS
+        .iter()
+        .map(|a| (format!("hybrid@{a:.2}"), crate::act::Selection::Hybrid { alpha: *a }))
+        .collect();
+    // The crate's own hybrid, which has existed in rag.rs since G5 and which
+    // the ledger has never called. Included so the sweep says whether the
+    // weight is worth having at all, or whether the shipped rank fusion
+    // already gets there.
+    policies.push(("rrf@60".to_string(), crate::act::Selection::HybridRrf { k: 60.0 }));
+
+    for (policy, sel) in policies {
+        let paraphrase_recall = recall_at(base, base_index, Arm::Paraphrase, sel);
+        let lexical_recall = recall_at(base, base_index, Arm::Lexical, sel);
+        let polarity_lexical = polarity_at(Arm::Lexical, sel);
+        let polarity_paraphrase = polarity_at(Arm::Paraphrase, sel);
+        out.push(HybridPoint {
+            policy,
+            paraphrase_recall,
+            lexical_recall,
+            polarity_lexical,
+            polarity_paraphrase,
+            combined: paraphrase_recall + polarity_paraphrase,
+        });
+    }
+    out
+}
+
+/// Mixing weights swept. 1.00 is the cosine-only policy and is the control:
+/// it must reproduce the recorded 0.875 / 0.125.
+pub const ALPHAS: [f32; 11] = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
 
 /// Build the ledger and score both arms.
 pub fn run(top: usize, embedder: &dyn VectorEmbed, embedder_kind: &str, seed: u64) -> RecallRun {
@@ -959,7 +1104,10 @@ pub fn run(top: usize, embedder: &dyn VectorEmbed, embedder_kind: &str, seed: u6
         }
     }
 
+    let hybrid = run_hybrid_sweep(&core, &index, &tcore, &tindex, top, embedder);
+
     RecallRun {
+        hybrid,
         selection,
         polarity,
         polarity_ledger_size: tindex.len(),
