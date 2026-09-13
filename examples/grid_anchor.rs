@@ -115,18 +115,30 @@ fn tokenize(text: &str) -> Vec<String> {
 /// `noun.artifact`, `noun.process`, `noun.cognition` and so on — which is the
 /// granularity an upper ontology actually competes with. Concentration has
 /// range again, and a cell can genuinely concentrate.
-const NOUN_SUPERSENSE: [&str; 26] = [
+/// WordNet's lexicographer files, in `lex_filenum` order.
+///
+/// The first version of this table stopped at index 25 and every synset above
+/// it printed as `lexNN`. The partition was still consistent, so the
+/// concentration numbers were unaffected — but three noun categories were
+/// unnamed in a published table, which is the kind of error that survives
+/// because nobody reads the tail of a list. Full 45 now, verbs included, since
+/// `mode_inventory` needs 29–43.
+pub const LEXNAMES: [&str; 45] = [
     "adj.all", "adj.pert", "adv.all", "noun.Tops", "noun.act", "noun.animal",
     "noun.artifact", "noun.attribute", "noun.body", "noun.cognition",
     "noun.communication", "noun.event", "noun.feeling", "noun.food", "noun.group",
     "noun.location", "noun.motive", "noun.object", "noun.person", "noun.phenomenon",
     "noun.plant", "noun.possession", "noun.process", "noun.quantity",
-    "noun.relation", "noun.shape",
+    "noun.relation", "noun.shape", "noun.state", "noun.substance", "noun.time",
+    "verb.body", "verb.change", "verb.cognition", "verb.communication",
+    "verb.competition", "verb.consumption", "verb.contact", "verb.creation",
+    "verb.emotion", "verb.motion", "verb.perception", "verb.possession",
+    "verb.social", "verb.stative", "verb.weather", "adj.ppl",
 ];
 
 fn supersense(wn: &WordNet, id: SynsetId) -> Option<String> {
     let s = wn.get_synset(id)?;
-    NOUN_SUPERSENSE
+    LEXNAMES
         .get(s.lex_filenum as usize)
         .map(|x| (*x).to_string())
         .or_else(|| Some(format!("lex{}", s.lex_filenum)))

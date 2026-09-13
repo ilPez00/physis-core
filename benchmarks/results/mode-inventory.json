@@ -1,0 +1,175 @@
+{
+  "expand": [
+    "verb.body",
+    "verb.competition",
+    "verb.consumption",
+    "verb.creation",
+    "verb.emotion",
+    "verb.perception",
+    "verb.possession",
+    "verb.social",
+    "verb.stative",
+    "verb.weather"
+  ],
+  "merge": [
+    {
+      "modes": [
+        "LEARN",
+        "PLAN"
+      ],
+      "supersense": "verb.cognition"
+    },
+    {
+      "modes": [
+        "GUIDE",
+        "WORK"
+      ],
+      "supersense": "verb.communication"
+    },
+    {
+      "modes": [
+        "MOVE",
+        "PLAY"
+      ],
+      "supersense": "verb.motion"
+    }
+  ],
+  "modes": [
+    {
+      "carves": true,
+      "dominant": "verb.communication",
+      "entries": 155,
+      "mode": "WORK",
+      "null_share": 0.14454707503318787,
+      "share": 0.18955042958259583,
+      "verbs": 823
+    },
+    {
+      "carves": false,
+      "dominant": "verb.contact",
+      "entries": 122,
+      "mode": "CREATE",
+      "null_share": 0.14566753804683685,
+      "share": 0.15853658318519592,
+      "verbs": 656
+    },
+    {
+      "carves": false,
+      "dominant": "verb.communication",
+      "entries": 99,
+      "mode": "SENSE",
+      "null_share": 0.15023551881313324,
+      "share": 0.164682537317276,
+      "verbs": 504
+    },
+    {
+      "carves": true,
+      "dominant": "verb.change",
+      "entries": 82,
+      "mode": "MAINTAIN",
+      "null_share": 0.15137691795825958,
+      "share": 0.18066157400608063,
+      "verbs": 393
+    },
+    {
+      "carves": true,
+      "dominant": "verb.cognition",
+      "entries": 58,
+      "mode": "LEARN",
+      "null_share": 0.15427301824092865,
+      "share": 0.27176782488822937,
+      "verbs": 379
+    },
+    {
+      "carves": true,
+      "dominant": "verb.cognition",
+      "entries": 42,
+      "mode": "PLAN",
+      "null_share": 0.15991376340389252,
+      "share": 0.23868313431739807,
+      "verbs": 243
+    },
+    {
+      "carves": true,
+      "dominant": "verb.contact",
+      "entries": 37,
+      "mode": "REST",
+      "null_share": 0.16408933699131012,
+      "share": 0.21739129722118378,
+      "verbs": 253
+    },
+    {
+      "carves": false,
+      "dominant": "verb.change",
+      "entries": 33,
+      "mode": "WALK",
+      "null_share": 0.16760942339897156,
+      "share": 0.17222222685813904,
+      "verbs": 180
+    },
+    {
+      "carves": true,
+      "dominant": "verb.motion",
+      "entries": 31,
+      "mode": "MOVE",
+      "null_share": 0.16348843276500702,
+      "share": 0.25,
+      "verbs": 176
+    },
+    {
+      "carves": true,
+      "dominant": "verb.communication",
+      "entries": 19,
+      "mode": "GUIDE",
+      "null_share": 0.18203769624233246,
+      "share": 0.3613445460796356,
+      "verbs": 119
+    },
+    {
+      "carves": false,
+      "dominant": "verb.motion",
+      "entries": 18,
+      "mode": "LIFT",
+      "null_share": 0.18196983635425568,
+      "share": 0.23664122819900513,
+      "verbs": 131
+    },
+    {
+      "carves": true,
+      "dominant": "verb.motion",
+      "entries": 18,
+      "mode": "PLAY",
+      "null_share": 0.1836424469947815,
+      "share": 0.2545454502105713,
+      "verbs": 110
+    },
+    {
+      "carves": false,
+      "dominant": "verb.change",
+      "entries": 9,
+      "mode": "DESTROY",
+      "null_share": 0.21671800315380096,
+      "share": 0.17582418024539948,
+      "verbs": 91
+    },
+    {
+      "carves": false,
+      "dominant": "verb.communication",
+      "entries": 8,
+      "mode": "BRAINSTORM",
+      "null_share": 0.21950142085552216,
+      "share": 0.1846153885126114,
+      "verbs": 65
+    }
+  ],
+  "permutations": 200,
+  "reference": "wordnet-3.1-verb-supersenses",
+  "retire": [
+    "CREATE",
+    "SENSE",
+    "WALK",
+    "LIFT",
+    "DESTROY",
+    "BRAINSTORM"
+  ]
+}
