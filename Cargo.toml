@@ -34,6 +34,11 @@ ureq = { version = "2.2", optional = true }
 ort = { version = "2.0.0-rc.13", optional = true }
 tokenizers = { version = "0.21", optional = true }
 
+# Epistemic control panel (opt-in, in-process over the service layer). Same
+# versions the pro TUI pins, so one registry cache serves both.
+ratatui = { version = "0.26", optional = true }
+crossterm = { version = "0.27", features = ["events"], optional = true }
+
 [features]
 default = ["cli", "studio"]
 cli = ["dep:clap"]
@@ -42,6 +47,8 @@ studio = ["dep:axum", "dep:tokio"]
 # tokenizer.json in the model dir at runtime; falls back to random projection.
 embed-onnx = ["dep:ort", "dep:tokenizers"]
 http = ["dep:ureq"]
+# The `tui` epistemic control panel (src/bin/tui.rs), in-process.
+tui = ["dep:ratatui", "dep:crossterm"]
 
 [dev-dependencies]
 tempfile = "3"
@@ -67,3 +74,10 @@ required-features = ["cli"]
 [[bin]]
 name = "physis"
 path = "src/bin/physis.rs"
+
+# The epistemic control panel. In-process over the service layer; behind the
+# `tui` feature so the engine lib stays dependency-free.
+[[bin]]
+name = "tui"
+path = "src/bin/tui.rs"
+required-features = ["tui"]

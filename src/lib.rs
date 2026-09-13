@@ -227,6 +227,7 @@ pub mod temporal;
 pub mod transplant;
 pub mod transform;
 pub mod vault;
+pub mod service;
 
 #[cfg(feature = "studio")]
 pub mod studio;

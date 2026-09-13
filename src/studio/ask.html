@@ -1,0 +1,90 @@
+<!doctype html>
+<!-- Ask console — standalone, additive, self-contained: served at /ask by
+     studio.rs, posting to /api/v1/ask. Deliberately NOT a change to the
+     existing studio SPA (app.html/app.css/app.js are untouched). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>physis · ask</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+         background: #101418; color: #d7dee6; margin: 0; padding: 2rem; }
+  h1 { font-size: 1rem; color: #7fb2e5; margin: 0 0 .25rem; }
+  .sub { color: #6d7d8d; margin-bottom: 1.25rem; }
+  form { display: grid; gap: .6rem; grid-template-columns: 1fr 14rem 7rem 7rem auto;
+         align-items: end; }
+  label { display: grid; gap: .2rem; font-size: .75rem; color: #6d7d8d; }
+  input, button { font: inherit; background: #1a2027; color: #d7dee6;
+                  border: 1px solid #2c3540; border-radius: 4px; padding: .45rem .6rem; }
+  button { background: #23425e; cursor: pointer; border-color: #375d7d; }
+  button:hover { background: #2c5273; }
+  #out { margin-top: 1.25rem; white-space: pre-wrap; }
+  .tier { color: #8fd08f; } .deg { color: #e5b567; } .err { color: #e57373; }
+  .meta { color: #6d7d8d; } .src { color: #9fb6cc; }
+</style>
+</head>
+<body>
+<h1>physis · ask</h1>
+<div class="sub">grounded answer over a local corpus — compiled context under a hard
+token budget; records the ask to the observation log.</div>
+<form id="f">
+  <label>query <input id="query" placeholder="what does the corpus say about …" required></label>
+  <label>corpus dir <input id="corpus" value="examples"></label>
+  <label>budget <input id="budget" type="number" value="1200" min="64"></label>
+  <label>draft <select id="draft"><option value="">answer</option><option value="1">draft</option></select></label>
+  <button>ask</button>
+</form>
+<div id="out"></div>
+<script>
+const out = document.getElementById('out');
+const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+document.getElementById('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const body = {
+    query: document.getElementById('query').value,
+    corpus: document.getElementById('corpus').value,
+    budget: Number(document.getElementById('budget').value) || 1200,
+    draft: document.getElementById('draft').value === '1'
+  };
+  out.textContent = '… compiling context';
+  try {
+    const r = await fetch('/api/v1/ask', { method: 'POST',
+      headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const t = await r.text();
+    if (!r.ok) { out.innerHTML = `<span class="err">${esc(t)}</span>`; return; }
+    const o = JSON.parse(t);
+    let html = '';
+    if (o.draft) {
+      html += `<span class="tier">── DRAFT (table over the retrieved context) ──</span>\n\n`
+            + esc(o.draft.render_with_gaps || o.draft_text || draftText(o.draft)) + '\n\n'
+            + `<span class="meta">table supplied ${o.draft.drafted_tokens} token(s), `
+            + `${o.draft.gaps} gap(s) left for a model · table_share `
+            + Number(tableShare(o.draft)).toFixed(2) + ` (entries: ${o.draft.table_entries})`
+            + (o.draft.looped ? ' · LOOPED (reported 0.00 by design)' : '') + '</span>';
+    } else if (o.answer) {
+      const a = o.answer;
+      html += `<span class="tier">── ANSWER · ${esc(a.tier)} ──</span>\n\n${esc(a.text.trim())}\n\n`;
+      if (a.degraded) html += `<span class="deg">!! DEGRADED: ${esc(a.degraded)}</span>\n\n`;
+      html += '<span class="tier">── SOURCES ──</span>\n' + (a.sources.length
+        ? a.sources.map((s, i) => `<span class="src">[${i+1}] ${esc(s.name)} (${Number(s.score).toFixed(3)})\n    ${esc(s.excerpt)}</span>`).join('\n')
+        : '<span class="meta">(none — the retrieval returned nothing)</span>')
+        + `\n\n<span class="meta">${a.corpus_documents} documents · context ${a.context_tokens} tokens`
+        + ` (conventional retrieval ${a.baseline_tokens}) · ${Number(a.latency_ms).toFixed(0)} ms</span>`;
+    }
+    html += `\n<span class="meta">embedder: ${esc(o.embedder)} · context ${o.context_tokens} tokens · `
+          + Number(o.elapsed_ms).toFixed(0) + ' ms'
+          + (o.recorded_seq ? ` · recorded as observation #${o.recorded_seq}` : ' · NOT recorded') + '</span>';
+    out.innerHTML = html;
+  } catch (err) { out.innerHTML = `<span class="err">${esc(String(err))}</span>`; }
+});
+function draftText(d) {
+  return d.spans.map(s => s.Grounded !== undefined ? s.Grounded
+    : (s.Gap ? s.Gap.after + ' …' : '')).join('');
+}
+function tableShare(d) {
+  return d.drafted_tokens > 0 ? d.drafted_tokens / (d.drafted_tokens + 64) : 0;
+}
+</script>
+</body>
+</html>

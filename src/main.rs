@@ -395,6 +395,41 @@ enum Command {
         #[arg(long)]
         model: Option<String>,
     },
+    /// Ask the corpus a question: compiled context under a token budget, a
+    /// grounded answer with citations (synthesised by the small model when an
+    /// oracle endpoint is configured, extractive otherwise). Every ask is
+    /// appended to the observation log. The same pipeline backs the studio's
+    /// `/ask` page and the TUI's ASK tab (physis_core::service::ask).
+    Ask {
+        /// Corpus directory (markdown/txt).
+        #[arg(long, default_value = "examples")]
+        corpus: PathBuf,
+        /// The question.
+        query: String,
+        /// Token budget for the compiled context.
+        #[arg(long, default_value_t = 1200)]
+        budget: usize,
+        /// Draft-and-fill: let the table draft and mark gaps, no generator.
+        #[arg(long)]
+        draft: bool,
+        /// Probability floor for the draft pass (higher ⇒ shorter, safer).
+        #[arg(long, default_value_t = 0.0)]
+        confidence: f32,
+        /// Machine-readable output.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Serve the meta-tool: the studio (browser surfaces incl. /ask) on one
+    /// port. Alias of `studio`, named for the one command that starts it all.
+    #[cfg(feature = "studio")]
+    Serve {
+        /// Port to listen on.
+        #[arg(long, default_value_t = 3000)]
+        port: u16,
+        /// ONNX model directory. Optional — same semantics as `studio --model`.
+        #[arg(long)]
+        model: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -621,6 +656,11 @@ fn main() -> anyhow::Result<()> {
         Command::Run { config, model, ngram, query } => cmd_run(&config, model, ngram, query),
         #[cfg(feature = "studio")]
         Command::Studio { port, model } => run_studio(port, model),
+        Command::Ask { corpus, query, budget, draft, confidence, json } => {
+            cmd_ask(&corpus, &query, budget, draft, confidence, json)
+        }
+        #[cfg(feature = "studio")]
+        Command::Serve { port, model } => run_studio(port, model),
     }
 }
 
@@ -2494,6 +2534,55 @@ fn cmd_run(config: &Path, model: Option<String>, ngram: Option<String>, query: O
 fn run_studio(port: u16, model: Option<String>) -> anyhow::Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(physis_core::studio::run_with_model(port, model))
+}
+
+/// `physis-core ask` — the service layer's ask pipeline, terminal shell.
+/// Same function the studio's `/api/v1/ask` and the TUI's ASK tab call.
+fn cmd_ask(
+    corpus: &Path,
+    query: &str,
+    budget: usize,
+    draft: bool,
+    confidence: f32,
+    json: bool,
+) -> anyhow::Result<()> {
+    let req = physis_core::service::AskRequest {
+        query: query.to_string(),
+        corpus: corpus.display().to_string(),
+        budget: Some(budget),
+        draft,
+        confidence: Some(confidence),
+    };
+    let o = physis_core::service::ask(&req)?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&o)?);
+        return Ok(());
+    }
+    if let Some(d) = &o.draft {
+        println!("── DRAFT (table over the retrieved context) ──\n");
+        println!("{}\n", d.render_with_gaps().trim());
+        println!(
+            "table supplied {} token(s), {} gap(s) left for a model",
+            d.drafted_tokens, d.gaps
+        );
+        println!(
+            "table_share    {:.2}   (table entries: {})",
+            o.table_share.unwrap_or(0.0),
+            d.table_entries
+        );
+    } else if let Some(a) = &o.answer {
+        print!("{}", a.render());
+    }
+    println!(
+        "\nembedder {} · context {} tokens · {:.0} ms · observation {}",
+        o.embedder,
+        o.context_tokens,
+        o.elapsed_ms,
+        o.recorded_seq
+            .map(|s| format!("recorded #{s}"))
+            .unwrap_or_else(|| "NOT recorded".into())
+    );
+    Ok(())
 }
 
 /// Load the persisted core (or a fresh one).

@@ -230,6 +230,11 @@ pub async fn run_with_model(port: u16, model_dir: Option<String>) -> anyhow::Res
         .route("/api/v1/epistemic/audit", get(api_epistemic_audit))
         .route("/api/v1/epistemic/replay", get(api_epistemic_replay))
         .route("/api/v1/ontology/discover", post(api_ontology_discover))
+        // Ask console (additive, 2026-09-13): a page + a JSON API over
+        // physis_core::service::ask — the same pipeline `physis-core ask` and
+        // the TUI's ASK tab call. The existing SPA is untouched.
+        .route("/ask", get(ask_page))
+        .route("/api/v1/ask", post(api_ask))
         .merge(crate::studio_lab::router())
         .with_state(state);
 
@@ -1863,6 +1868,49 @@ async fn api_ontology_discover(
     let report =
         crate::discovery::discover(&req.texts, &s.classifier, s.embedder.as_ref(), &config);
     Json(report).into_response()
+}
+
+// ── Ask console (additive) ──────────────────────────────────────────────────
+//
+// One input → token-budgeted compiled context → grounded answer with
+// citations. Synthesis happens through the oracle transport when configured
+// (a local ollama counts); without a key the extractive tier answers and
+// `degraded` says why. Every ask is appended to the observation log.
+
+const ASK_HTML: &str = include_str!("studio/ask.html");
+
+async fn ask_page() -> Html<&'static str> {
+    Html(ASK_HTML)
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct ApiAskReq {
+    query: String,
+    corpus: Option<String>,
+    budget: Option<usize>,
+    draft: Option<bool>,
+    confidence: Option<f32>,
+}
+
+async fn api_ask(axum::Json(req): axum::Json<ApiAskReq>) -> Response {
+    let request = crate::service::AskRequest {
+        query: req.query,
+        corpus: req.corpus.unwrap_or_else(|| "examples".into()),
+        budget: req.budget,
+        draft: req.draft.unwrap_or(false),
+        confidence: req.confidence,
+    };
+    // The ask embeds the corpus — potentially seconds with a semantic
+    // embedder, so it runs off the async runtime.
+    match tokio::task::spawn_blocking(move || crate::service::ask(&request)).await {
+        Ok(Ok(outcome)) => (StatusCode::OK, axum::Json(outcome)).into_response(),
+        Ok(Err(e)) => (StatusCode::BAD_REQUEST, format!("{e}")).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("ask task failed: {e}"),
+        )
+            .into_response(),
+    }
 }
 
 #[cfg(test)]

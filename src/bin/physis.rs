@@ -59,6 +59,8 @@ const CORE_COMMANDS: &[(&str, &str)] = &[
     ("replay", "Reconstruct a belief state at a past timestamp"),
     ("discover", "Propose new domains from an unmapped corpus"),
     ("studio", "Open the Core studio in a browser"),
+    ("serve", "Serve the studio — the browser surface of the meta-tool"),
+    ("ask", "Grounded answer over a corpus; records the ask to the log"),
 ];
 
 /// Subcommands served by `physis-pro`. Abridged on purpose: the full list is
