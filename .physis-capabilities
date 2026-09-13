@@ -1,0 +1,27 @@
+# physis-core — what this crate claims it can do, and the two symbols that
+# prove each claim runs.
+#
+#   capability | write path | read path
+#
+# The rule is `physis-check capabilities`: a capability is present when
+# something writes it AND something reads it, both outside the file that
+# declares them and outside the test suite. Three capabilities in this crate
+# had one half missing (PH-019, PH-021, and the observation watchers) and each
+# read as shipped until someone found it by accident. This file is that
+# accident, made into a command.
+#
+# A comma-separated field means any one of the alternatives satisfies that half.
+
+bi-temporal validity        | narrow_until                                                  | is_valid_at
+prediction scoring          | resolve_prediction                                            | predictions
+structural machines         | StructuralMachine                                             | ProofStatus
+continuous observation      | watch_fs, watch_git, watch_shell, watch_agent, watch_proc, watch_browser | read_tail, by_source
+acting against belief       | bearing_on                                                    | is_warning
+structural map              | build_map                                                     | MapReport
+context compression         | compile_context                                               | ContextReport
+token-fixed retrieval       | TokenFixedRetriever                                           | ContextReport
+interchangeable n-gram table| TableBuilder                                                  | BackoffTable
+model provider registry     | NgramDecoderModel                                             | ModelProvider
+one configuration mechanism | RunConfig                                                     | load_config
+provenance chains           | add_link                                                      | cited_intake_ids
+observation to claim        | promote                                                       | cited_by
