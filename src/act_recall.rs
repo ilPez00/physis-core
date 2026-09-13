@@ -80,6 +80,28 @@
 //! nulls. Gap 8 is closed on a semantic embedder and open on the fallback, and
 //! nothing in the CLI says which one is running when `act` prints nothing.
 //!
+//! ## The polarity arm, and the prediction recorded before it ran
+//!
+//! Every distractor above differs from its target by **topic**. None differs by
+//! **polarity**, so the two arms measure the easy discrimination and say nothing
+//! about the hard one: of two claims about this command, tell the refutation
+//! from the endorsement. [`AFFIRMED_TWINS`] adds each target's endorsement to a
+//! second ledger and asks which of the pair ranks first. The null is **0.500 by
+//! construction** — no topic separates them.
+//!
+//! Measured elsewhere and the reason for this arm: dense retrievers rank
+//! "treatment works" and "treatment does not work" alike (arXiv 2603.17580,
+//! negation is syntactic, the embedding space is not), and in 95.2–99.8% of
+//! structural-retrieval misses the false positive is more lexically similar to
+//! the query than the gold item is (arXiv 2609.01556).
+//!
+//! **Predicted, before the arm was run** (recorded in the commit that added it,
+//! so the record is checkable): recall stays near 0.875 while discrimination
+//! lands *below* 0.500 — the endorsement outranking the refutation in most
+//! pairs, because the endorsement is the more fluent, more command-like
+//! sentence. If that is wrong, the ranker has a purchase on polarity that the
+//! literature says it should not, and that is worth saying loudly.
+//!
 //! ## What this measures and what it does not
 //!
 //! It measures whether `bearing_on` puts the *one* contradicting claim in the
@@ -164,6 +186,37 @@ const PAIRS: [Pair; 8] = [
         paraphrase: "copy the dataset across to the offsite machine",
         claim: "rsync to the backup host times out over the VPN for anything larger than a gigabyte",
     },
+];
+
+/// The affirmed twin of each target in [`PAIRS`], same index.
+///
+/// ## Why these exist
+///
+/// Every distractor in the base ledger differs from its target **by topic**.
+/// Not one differs by **polarity**. So the base arms measure the easy
+/// discrimination — find the claim that is *about* this command — and say
+/// nothing about the hard one: of two claims about this command, tell the
+/// refutation from the endorsement.
+///
+/// That is the discrimination `act` actually needs. `Bearing::is_warning` reads
+/// `status`, not the ranking, so a near-twin of the opposite polarity is not a
+/// near-miss — it is a claim that will be surfaced with a *reassuring* status
+/// while the refutation sits below the cut.
+///
+/// Measured elsewhere, 2603.17580: dense retrievers rank "treatment works" and
+/// "treatment does not work" alike, because negation is syntactic and the
+/// embedding space is not. Each twin here is written to keep the target's
+/// vocabulary and invert only the verdict — a test asserts that overlap rather
+/// than trusting the author.
+const AFFIRMED_TWINS: [&str; 8] = [
+    "cargo test --all-features passes on this crate: the ort linker step resolves every time",
+    "the release build finishes on this box in four minutes — the LTO stage never runs out of memory",
+    "pip install onnxruntime succeeds on this Python: there is a manylinux wheel for 3.13",
+    "docker compose up leaves postgres healthy because the volume is owned by the right user, with no restart loop",
+    "npm run build succeeds on the CI image: node 18 parses the new syntax without complaint",
+    "git push origin main is accepted — the branch is not protected and requires no review",
+    "the migrate script leaves the audit table alone when run twice; it is idempotent",
+    "rsync to the backup host completes over the VPN for anything larger than a gigabyte",
 ];
 
 /// Contradicted claims that no command in [`PAIRS`] is about.
@@ -302,6 +355,10 @@ pub struct RecallRun {
     pub physis_version: String,
     pub git_commit: String,
     pub arms: Vec<ArmResult>,
+    /// Refutation versus its own endorsement, on a ledger that also holds the
+    /// affirmed twin of every target. Null 0.500 by construction.
+    pub polarity: Vec<PolarityResult>,
+    pub polarity_ledger_size: usize,
 }
 
 impl RecallRun {
@@ -336,6 +393,30 @@ impl RecallRun {
                  \x20       not a retrieval claim. Set PHYSIS_MODEL_DIR and re-run.\n",
             );
         }
+        o.push_str(&format!(
+            "\n── POLARITY: refutation vs its own endorsement ──\nledger {} claims (every target's affirmed twin added) · null 0.500 by construction\n\n",
+            self.polarity_ledger_size
+        ));
+        o.push_str("  arm          discrim  target@top  twin@top  reassured  verdict\n");
+        for p in &self.polarity {
+            o.push_str(&format!(
+                "  {:<11} {:>6.3}     {:>2}/{:<2}       {:>2}/{:<2}     {:>2}/{:<2}    {}\n",
+                p.arm,
+                p.discrimination,
+                p.target_in_top,
+                p.queries,
+                p.twin_in_top,
+                p.queries,
+                p.reassured_instead,
+                p.queries,
+                p.verdict
+            ));
+        }
+        if self.polarity.iter().any(|p| p.reassured_instead > 0) {
+            o.push_str(
+                "\n  `reassured` is the harmful cell: the endorsement made the list and the\n   refutation did not, so `act` printed a Supported claim about the very\n   thing a Contradicted claim refutes.\n",
+            );
+        }
         o.push_str("\n  misses, most instructive first:\n");
         for a in &self.arms {
             for c in a.cases.iter().filter(|c| c.rank.is_none()) {
@@ -357,7 +438,12 @@ impl RecallRun {
 /// Age is the variable the plan's null controls for, and the cheapest way to
 /// control for it is to remove it: nothing here is older than anything else, so
 /// nothing can be ranked by recency by accident.
-fn build_ledger(embedder: &dyn VectorEmbed) -> (PhysisCore, Vec<(String, String)>) {
+///
+/// `with_twins` adds [`AFFIRMED_TWINS`]. The base ledger keeps it off so the
+/// recall numbers already recorded stay comparable — the polarity arm asks a
+/// different question on a different ledger, and mixing the two would change
+/// both.
+fn build_ledger(embedder: &dyn VectorEmbed, with_twins: bool) -> (PhysisCore, Vec<(String, String)>) {
     let mut core = PhysisCore::new();
     // (id, statement) in insertion order, for the nulls to draw from.
     let mut index: Vec<(String, String)> = Vec::new();
@@ -375,6 +461,14 @@ fn build_ledger(embedder: &dyn VectorEmbed) -> (PhysisCore, Vec<(String, String)
 
     for p in PAIRS.iter() {
         insert(&mut core, &mut index, p.claim, true);
+    }
+    if with_twins {
+        // Supported, not Contradicted: the twin is the endorsement, and its
+        // status is what makes surfacing it instead of the target harmful
+        // rather than merely wrong.
+        for t in AFFIRMED_TWINS.iter() {
+            insert(&mut core, &mut index, t, false);
+        }
     }
     for s in CONTRADICTED_DISTRACTORS.iter() {
         insert(&mut core, &mut index, s, true);
@@ -494,14 +588,138 @@ pub fn run_arm(
     }
 }
 
+/// A pairwise discrimination: refutation versus its own endorsement.
+///
+/// The base arms ask "is the target in the top?". This asks the question that
+/// follows it: with both the refutation and its affirmed twin in the ledger,
+/// **which one comes first?** There is no topic to separate them — same
+/// subject, same vocabulary, opposite verdict — so a ranker with no purchase on
+/// polarity is a coin flip, and the null is exactly 0.500 by construction
+/// rather than by sampling.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PolarityResult {
+    /// Which phrasing of the command was issued.
+    pub arm: String,
+    pub queries: usize,
+    pub top: usize,
+    /// Pairs where the refutation outranked its endorsement.
+    pub target_first: usize,
+    /// `target_first / queries`. The null is 0.500.
+    pub discrimination: f32,
+    /// Pairs where the refutation reached the list the operator sees.
+    pub target_in_top: usize,
+    /// Pairs where the *endorsement* reached it. A high number here with a low
+    /// `target_in_top` is the harmful case: `act` prints a reassuring claim and
+    /// withholds the refutation.
+    pub twin_in_top: usize,
+    /// Pairs where the endorsement was surfaced and the refutation was not.
+    pub reassured_instead: usize,
+    pub verdict: String,
+    pub cases: Vec<PolarityCase>,
+}
+
+/// One command's refutation-versus-endorsement outcome.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PolarityCase {
+    pub command: String,
+    /// 1-based rank of the refutation over the whole ledger.
+    pub target_rank: usize,
+    /// 1-based rank of its affirmed twin.
+    pub twin_rank: usize,
+    pub target_relevance: f32,
+    pub twin_relevance: f32,
+}
+
+/// Score the polarity arm for one phrasing.
+pub fn run_polarity(
+    core: &PhysisCore,
+    index: &[(String, String)],
+    arm: Arm,
+    top: usize,
+    embedder: &dyn VectorEmbed,
+) -> PolarityResult {
+    let mut cases = Vec::new();
+    let (mut target_first, mut target_in_top, mut twin_in_top, mut reassured) = (0, 0, 0, 0);
+
+    for (i, p) in PAIRS.iter().enumerate() {
+        let command = arm.command(p);
+        let full = bearing_on(core, command, embedder, index.len());
+        let twin = AFFIRMED_TWINS[i];
+        let tr = full.iter().position(|b| b.statement == p.claim);
+        let wr = full.iter().position(|b| b.statement == twin);
+        // Both are in this ledger by construction; a missing one is a corpus
+        // bug, and ranking it last is the reading that cannot flatter the
+        // result.
+        let tr = tr.unwrap_or(full.len().saturating_sub(1));
+        let wr = wr.unwrap_or(full.len().saturating_sub(1));
+        if tr < wr {
+            target_first += 1;
+        }
+        let t_in = tr < top;
+        let w_in = wr < top;
+        if t_in {
+            target_in_top += 1;
+        }
+        if w_in {
+            twin_in_top += 1;
+        }
+        if w_in && !t_in {
+            reassured += 1;
+        }
+        cases.push(PolarityCase {
+            command: command.to_string(),
+            target_rank: tr + 1,
+            twin_rank: wr + 1,
+            target_relevance: full.get(tr).map(|b| b.relevance).unwrap_or(f32::NAN),
+            twin_relevance: full.get(wr).map(|b| b.relevance).unwrap_or(f32::NAN),
+        });
+    }
+
+    let queries = PAIRS.len();
+    let discrimination = target_first as f32 / queries as f32;
+    // One query's worth either side of the coin flip. Eight pairs cannot
+    // support a finer claim than that, and pretending otherwise would be the
+    // thing this module exists to stop.
+    let noise = 1.0 / queries as f32;
+    let verdict = if discrimination > 0.5 + noise {
+        "HOLDS — ranks the refutation over its endorsement".to_string()
+    } else if discrimination < 0.5 - noise {
+        "INVERTED — ranks the endorsement first".to_string()
+    } else {
+        "COIN FLIP — no purchase on polarity".to_string()
+    };
+
+    PolarityResult {
+        arm: arm.label().to_string(),
+        queries,
+        top,
+        target_first,
+        discrimination,
+        target_in_top,
+        twin_in_top,
+        reassured_instead: reassured,
+        verdict,
+        cases,
+    }
+}
+
 /// Build the ledger and score both arms.
 pub fn run(top: usize, embedder: &dyn VectorEmbed, embedder_kind: &str, seed: u64) -> RecallRun {
-    let (core, index) = build_ledger(embedder);
+    let (core, index) = build_ledger(embedder, false);
     let arms = vec![
         run_arm(&core, &index, Arm::Lexical, top, embedder, seed),
         run_arm(&core, &index, Arm::Paraphrase, top, embedder, seed),
     ];
+    // A second ledger, because the twins would change the base numbers if they
+    // shared one. Same construction, eight claims longer.
+    let (tcore, tindex) = build_ledger(embedder, true);
+    let polarity = vec![
+        run_polarity(&tcore, &tindex, Arm::Lexical, top, embedder),
+        run_polarity(&tcore, &tindex, Arm::Paraphrase, top, embedder),
+    ];
     RecallRun {
+        polarity,
+        polarity_ledger_size: tindex.len(),
         ledger_size: index.len(),
         contradicted_claims: PAIRS.len() + CONTRADICTED_DISTRACTORS.len(),
         top,
@@ -524,7 +742,7 @@ mod tests {
     #[test]
     fn the_ledger_is_the_shape_the_nulls_assume() {
         let e = RandomProjectionEmbedder::new(128);
-        let (core, index) = build_ledger(&e);
+        let (core, index) = build_ledger(&e, false);
         assert_eq!(index.len(), LEDGER_SIZE, "ledger size is quoted in the results");
         assert_eq!(core.hypotheses.len(), LEDGER_SIZE, "no statement collided into one id");
         let contradicted = core
@@ -543,6 +761,80 @@ mod tests {
                 index.iter().any(|(_, s)| s == p.claim),
                 "target absent from the ledger: {}",
                 p.claim
+            );
+        }
+    }
+
+    /// A twin is only a twin if it keeps the target's words and inverts only
+    /// the verdict. Written by hand, so checked by machine — the same rule as
+    /// the paraphrase arm, in the opposite direction.
+    #[test]
+    fn every_twin_shares_most_of_its_target_vocabulary() {
+        const STOP: [&str; 24] = [
+            "the", "a", "an", "and", "or", "to", "of", "in", "on", "at", "for", "with", "is",
+            "are", "it", "this", "that", "as", "by", "from", "into", "than", "not", "no",
+        ];
+        let norm = |s: &str| -> Vec<String> {
+            s.to_ascii_lowercase()
+                .split(|c: char| !c.is_ascii_alphanumeric())
+                .filter(|w| w.len() > 2 && !STOP.contains(w))
+                .map(|w| w.to_string())
+                .collect()
+        };
+        for (i, p) in PAIRS.iter().enumerate() {
+            let claim = norm(p.claim);
+            let twin = norm(AFFIRMED_TWINS[i]);
+            let shared = claim.iter().filter(|w| twin.contains(w)).count();
+            let frac = shared as f32 / claim.len() as f32;
+            assert!(
+                frac >= 0.5,
+                "twin {i} shares only {:.0}% of its target's content words — that is a \
+                 different claim, not an inverted one\n  target: {}\n  twin:   {}",
+                frac * 100.0,
+                p.claim,
+                AFFIRMED_TWINS[i]
+            );
+        }
+    }
+
+    /// The twin ledger is the base ledger plus exactly the twins. If it were
+    /// anything else, the polarity numbers and the recall numbers would not be
+    /// about the same corpus.
+    #[test]
+    fn the_twin_ledger_is_the_base_ledger_plus_the_twins() {
+        let e = RandomProjectionEmbedder::new(128);
+        let (_, base) = build_ledger(&e, false);
+        let (_, twinned) = build_ledger(&e, true);
+        assert_eq!(twinned.len(), base.len() + AFFIRMED_TWINS.len());
+        for t in AFFIRMED_TWINS.iter() {
+            assert!(twinned.iter().any(|(_, s)| s == t), "twin missing: {t}");
+            assert!(
+                !base.iter().any(|(_, s)| s == t),
+                "twin leaked into the base ledger, which would move the recall numbers: {t}"
+            );
+        }
+    }
+
+    /// The polarity null is 0.500 by construction, so a blind ranker must land
+    /// on the coin flip rather than on either verdict.
+    #[test]
+    fn a_blind_ranker_is_a_coin_flip_on_polarity() {
+        struct Blind;
+        impl VectorEmbed for Blind {
+            fn embed(&self, _t: &str) -> Vec<f32> {
+                vec![1.0; 8]
+            }
+            fn dimension(&self) -> usize {
+                8
+            }
+        }
+        let r = run(5, &Blind, "blind", 7);
+        for p in &r.polarity {
+            assert!(
+                p.verdict.starts_with("COIN FLIP") || p.verdict.starts_with("INVERTED"),
+                "a blind ranker claimed polarity discrimination on {}: {}",
+                p.arm,
+                p.verdict
             );
         }
     }
