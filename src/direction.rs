@@ -288,16 +288,68 @@ impl Verdict {
 /// match and the minimum collapses. A rewrite that keeps every point covers
 /// every sentence somewhere, so the minimum stays high. You cannot pass this by
 /// copying part of the input well; you have to keep all of it.
-fn worst_covered(before: &str, after: &str, embedder: &dyn VectorEmbed) -> f32 {
-    // `PHYSIS_DIRECTION_METRIC=cosine` restores the ORIGINAL, known-broken
-    // statistic: whole-text cosine, which rewards copying.
-    //
-    // This is not a fallback and no caller should set it. It exists so
-    // `benchmarks/direction` can run a KNOWN-BAD arm and show that it scores
-    // badly — a benchmark that cannot detect a broken metric is not evidence
-    // that the working one is good. Keeping the broken version reachable is the
-    // cheapest way to give the instrument its own control.
-    if std::env::var("PHYSIS_DIRECTION_METRIC").as_deref() == Ok("cosine") {
+/// Which retention statistic to score with.
+///
+/// The whole-text cosine is the ORIGINAL, known-broken statistic: it rewards
+/// copying. It is kept reachable so `benchmarks/direction` can run a KNOWN-BAD
+/// arm and show that it scores badly — a benchmark that cannot detect a broken
+/// metric is not evidence that the working one is good. Keeping the broken
+/// version available is the cheapest way to give the instrument its own
+/// control.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RetentionMetric {
+    /// Minimum over the original's units of their best match in the result.
+    /// The shipped statistic — see [`worst_covered`].
+    WorstCovered,
+    /// Whole-text cosine. The benchmark's designated bad arm. Never ship it.
+    WholeTextCosine,
+}
+
+impl RetentionMetric {
+    /// Read the operator escape once, at a boundary, rather than deep in the
+    /// scoring loop.
+    ///
+    /// This used to be an `std::env::var` read inside [`worst_covered`] itself,
+    /// and that is a process-global read on a hot path. `cargo test` runs on
+    /// many threads: the one test that set `PHYSIS_DIRECTION_METRIC=cosine`,
+    /// measured, and restored it — correctly noting in its own comment that the
+    /// variable is process-global — held it set for a window during which
+    /// *every concurrently running test* silently scored with the broken
+    /// metric. `truncation_gets_shorter_and_still_fails` reported a margin of
+    /// −0.165 where the null must be ~0, which is exactly what cosine does,
+    /// and the suite failed one or two tests per run at random while passing
+    /// completely under `--test-threads=1`.
+    ///
+    /// The env var is still honoured, because the benchmark's bad arm needs it.
+    /// It is read here, once, and the answer is then passed down explicitly —
+    /// so what a call scores with is visible at the call site instead of
+    /// hidden in process state.
+    pub fn from_env() -> Self {
+        Self::from_env_value(std::env::var("PHYSIS_DIRECTION_METRIC").ok().as_deref())
+    }
+
+    /// The decision itself, as a pure function of the value.
+    ///
+    /// Split out so it can be tested without touching process state. A test
+    /// that sets the variable to check the escape would put the race straight
+    /// back: `check` reads the environment, six tests call `check`, and they
+    /// all run concurrently.
+    pub fn from_env_value(value: Option<&str>) -> Self {
+        if value == Some("cosine") {
+            Self::WholeTextCosine
+        } else {
+            Self::WorstCovered
+        }
+    }
+}
+
+fn worst_covered(
+    before: &str,
+    after: &str,
+    embedder: &dyn VectorEmbed,
+    metric: RetentionMetric,
+) -> f32 {
+    if metric == RetentionMetric::WholeTextCosine {
         return crate::models::cosine_sim(&embedder.embed(before), &embedder.embed(after));
     }
     let units: Vec<&str> = before
@@ -338,6 +390,7 @@ pub fn check(
     embedder_kind: &str,
 ) -> anyhow::Result<Verdict> {
     anyhow::ensure!(!before.trim().is_empty(), "nothing to compare against");
+    let metric = RetentionMetric::from_env();
     let bt = crate::rag::count_tokens(before);
     let at = crate::rag::count_tokens(after);
 
@@ -348,8 +401,10 @@ pub fn check(
         before_tokens: bt,
         after_tokens: at,
         moved: direction.moved(bt, at),
-        retention: worst_covered(before, after, embedder),
-        null_retention: worst_covered(before, &null, embedder),
+        // Read once, here, and used for both legs — so the rewrite and its null
+        // are always scored by the same statistic.
+        retention: worst_covered(before, after, embedder, metric),
+        null_retention: worst_covered(before, &null, embedder, metric),
         // Random projection fails the crate's own semantic self-test by design,
         // so anything it reports is lexical. Reuse that test rather than
         // matching on a name, which would rot the moment a name changes.
@@ -460,8 +515,8 @@ every 400 hours. Replace the line-one seal when vibration rises after bearing we
             .take(rewrite.split_whitespace().count())
             .collect::<Vec<_>>()
             .join(" ");
-        let rw = worst_covered(LONG, rewrite, &e);
-        let pf = worst_covered(LONG, &prefix, &e);
+        let rw = worst_covered(LONG, rewrite, &e, RetentionMetric::WorstCovered);
+        let pf = worst_covered(LONG, &prefix, &e, RetentionMetric::WorstCovered);
         assert!(
             pf > rw,
             "documented limitation: under RP the prefix ({pf}) outscores the rewrite ({rw}). \
@@ -503,11 +558,53 @@ every four hundred hours. The supervisor records each replacement in the log.";
             .filter(|w| !stop.contains(&w.to_lowercase().trim_matches('.')))
             .collect::<Vec<_>>()
             .join(" ");
-        let d = worst_covered(original, &decimate, &e);
-        let k = worst_covered(original, &destop, &e);
+        let d = worst_covered(original, &decimate, &e, RetentionMetric::WorstCovered);
+        let k = worst_covered(original, &destop, &e, RetentionMetric::WorstCovered);
         assert!(
             k > d,
             "keeping every content word ({k}) must outscore dropping sentences ({d})"
+        );
+    }
+
+    /// PH-020 regression: a scored call is decided by its argument, not by
+    /// process state.
+    ///
+    /// Before the metric was a parameter, `worst_covered` read
+    /// `PHYSIS_DIRECTION_METRIC` itself on every call. Any test that set the
+    /// variable changed the statistic used by every other test running at the
+    /// same moment, and the suite failed one or two tests per run at random
+    /// while passing entirely under `--test-threads=1`.
+    ///
+    /// The scored statistic is now decided by an argument, and this module's
+    /// tests set no environment variable at all — which is the actual fix. The
+    /// escape is still tested, as a pure function, below.
+    #[test]
+    fn an_explicit_metric_decides_the_statistic() {
+        let e = e();
+        let cut: String = LONG.split_whitespace().take(12).collect::<Vec<_>>().join(" ");
+        let shipped = worst_covered(LONG, &cut, &e, RetentionMetric::WorstCovered);
+        let broken = worst_covered(LONG, &cut, &e, RetentionMetric::WholeTextCosine);
+        assert_ne!(
+            shipped, broken,
+            "the two metrics must be distinguishable, or the parameter is doing nothing"
+        );
+    }
+
+    /// The operator escape, tested without touching process state.
+    #[test]
+    fn the_escape_is_decided_by_its_value() {
+        assert_eq!(
+            RetentionMetric::from_env_value(Some("cosine")),
+            RetentionMetric::WholeTextCosine
+        );
+        assert_eq!(
+            RetentionMetric::from_env_value(None),
+            RetentionMetric::WorstCovered
+        );
+        assert_eq!(
+            RetentionMetric::from_env_value(Some("anything-else")),
+            RetentionMetric::WorstCovered,
+            "only the exact documented value may reach the known-bad arm"
         );
     }
 
@@ -517,11 +614,13 @@ every four hundred hours. The supervisor records each replacement in the log.";
     fn the_cosine_escape_produces_a_different_statistic() {
         let e = e();
         let cut: String = LONG.split_whitespace().take(12).collect::<Vec<_>>().join(" ");
-        let good = worst_covered(LONG, &cut, &e);
-        // Set, measure, restore — the variable is process-global.
-        unsafe { std::env::set_var("PHYSIS_DIRECTION_METRIC", "cosine") };
-        let broken = worst_covered(LONG, &cut, &e);
-        unsafe { std::env::remove_var("PHYSIS_DIRECTION_METRIC") };
+        // No process state is touched. The previous version of this test set
+        // PHYSIS_DIRECTION_METRIC, measured, and restored it — correct about
+        // the value, wrong about the window: every test running concurrently
+        // scored with the broken metric while it was set, which is what made
+        // this module fail one or two tests per run at random.
+        let good = worst_covered(LONG, &cut, &e, RetentionMetric::WorstCovered);
+        let broken = worst_covered(LONG, &cut, &e, RetentionMetric::WholeTextCosine);
         assert_ne!(
             good, broken,
             "the escape must restore a genuinely different statistic, or the \
