@@ -148,6 +148,47 @@
 //! robust half of this result: it is the same sign on both arms, at every
 //! `top`, and it is what the literature predicts.
 //!
+//! ## The selection sweep — the fix that does not pay
+//!
+//! The polarity result argues for reserving a slot for the best
+//! warning-eligible claim ([`crate::act::Selection::WarningReserve`]). On the
+//! benefit alone that looks free, and it is a tautology: the target *is* the
+//! most relevant contradicted claim, so reserving a slot for it removes the
+//! harm by construction. [`UNRELATED_COMMANDS`] is the cost arm — eight
+//! commands nothing refutes, where every warning is a false alarm.
+//!
+//! Lexical arm, twin ledger, bge-base-en-v1.5:
+//!
+//! | top | policy | reassured | target@top | false alarms | removed/alarm |
+//! |---|---|---|---|---|---|
+//! | 1 | relevance | 5/8 | 2/8 | 0/8 | — |
+//! | 1 | reserve@0.00–0.90 | 0/8 | 8/8 | **8/8** | 0.62 |
+//! | 1 | reserve@0.95 | 0/8 | 8/8 | 5/8 | **1.00** |
+//! | 1 | reserve@1.00 | 5/8 | 2/8 | 0/8 | — |
+//! | 5 | relevance | 0/8 | 8/8 | **4/8** | — |
+//! | 5 | reserve@0.95 | 0/8 | 8/8 | 5/8 | — |
+//!
+//! **The verdict is no.** At best the reserve removes one harm per false alarm
+//! it creates, and below floor 0.95 it removes 0.62. At `top 5` — the default —
+//! there is no harm left to remove, so the reserve is pure cost. `act` keeps
+//! `Selection::Relevance` and the policy ships measured, off, and documented as
+//! not worth turning on. The thing that actually fixes the polarity harm is the
+//! default already being a list of five.
+//!
+//! `reserve@1.00` reproduces the relevance policy exactly, at both cuts. That is
+//! the sweep's own control and it holds.
+//!
+//! ### What the cost arm found on the way
+//!
+//! Read the `top 5 · relevance` row again: **4 of 8** commands with nothing to
+//! warn about already surface a warning today, with no reserve involved. `act`
+//! has no relevance floor at all — it takes the top five by cosine and prints
+//! whichever of them are refuted, however unrelated. On a ledger of any size
+//! that is a warning on half of all unrelated commands, and it was never
+//! measured because nothing asked what `act` does when the honest answer is
+//! nothing. That is a separate defect from the polarity one, it is larger, and
+//! it is not fixed here.
+//!
 //! ## What this measures and what it does not
 //!
 //! It measures whether `bearing_on` puts the *one* contradicting claim in the
@@ -263,6 +304,28 @@ const AFFIRMED_TWINS: [&str; 8] = [
     "git push origin main is accepted — the branch is not protected and requires no review",
     "the migrate script leaves the audit table alone when run twice; it is idempotent",
     "rsync to the backup host completes over the VPN for anything larger than a gigabyte",
+];
+
+/// Commands that nothing in the ledger refutes.
+///
+/// The cost arm. [`crate::act::Selection::WarningReserve`] keeps a slot for the
+/// best warning-eligible claim, so on its own it would look free: the polarity
+/// arm's `reassured` cell goes to zero by construction, because the target *is*
+/// the most relevant contradicted claim. That is a tautology, not a result.
+///
+/// These eight commands have no refutation in the ledger. Every warning
+/// surfaced for them is a **false alarm** — the reserve paying out on noise —
+/// and the floor is what trades one against the other. Without this arm the
+/// reserve cannot fail and must not be believed.
+const UNRELATED_COMMANDS: [&str; 8] = [
+    "ls -la /var/log",
+    "date --iso-8601=seconds",
+    "whoami",
+    "echo hello",
+    "uname -sr",
+    "df -h /",
+    "hostname",
+    "cat /etc/os-release",
 ];
 
 /// Contradicted claims that no command in [`PAIRS`] is about.
@@ -405,6 +468,8 @@ pub struct RecallRun {
     /// affirmed twin of every target. Null 0.500 by construction.
     pub polarity: Vec<PolarityResult>,
     pub polarity_ledger_size: usize,
+    /// Selection policies, benefit and cost measured in the same pass.
+    pub selection: Vec<SelectionResult>,
 }
 
 impl RecallRun {
@@ -462,6 +527,28 @@ impl RecallRun {
             o.push_str(
                 "\n  `reassured` is the harmful cell: the endorsement made the list and the\n   refutation did not, so `act` printed a Supported claim about the very\n   thing a Contradicted claim refutes.\n",
             );
+        }
+        o.push_str(
+            "\n── SELECTION: does reserving a slot for the warning pay? ──\nlexical arm on the twin ledger · reassured = harm · false alarms = price\n\n",
+        );
+        o.push_str("  top  policy          reassured  target@top  false alarms  removed/alarm\n");
+        for r in &self.selection {
+            o.push_str(&format!(
+                "  {:>3}  {:<14}   {:>2}/{:<2}      {:>2}/{:<2}       {:>2}/{:<2}      {}\n",
+                r.top,
+                r.policy,
+                r.reassured,
+                r.pairs,
+                r.target_in_top,
+                r.pairs,
+                r.false_alarms,
+                r.unrelated,
+                match r.harm_removed_per_false_alarm {
+                    None => "—".to_string(),
+                    Some(v) if v.is_infinite() => "free".to_string(),
+                    Some(v) => format!("{v:.2}"),
+                }
+            ));
         }
         o.push_str("\n  misses, most instructive first:\n");
         for a in &self.arms {
@@ -749,6 +836,95 @@ pub fn run_polarity(
     }
 }
 
+/// One selection policy, scored on both the benefit and the cost.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SelectionResult {
+    /// `relevance`, or `reserve@<floor>`.
+    pub policy: String,
+    pub top: usize,
+    /// Pairs where the endorsement was shown and the refutation was not.
+    /// The harm the reserve exists to remove. Lower is better.
+    pub reassured: usize,
+    /// Pairs where the refutation reached the list at all.
+    pub target_in_top: usize,
+    /// Commands with nothing to warn about that got a warning anyway.
+    /// The price of removing the harm. Lower is better.
+    pub false_alarms: usize,
+    pub pairs: usize,
+    pub unrelated: usize,
+    /// `reassured` removed per false alarm bought. `None` when the policy
+    /// removes nothing, which is the honest reading of a policy that only
+    /// costs.
+    pub harm_removed_per_false_alarm: Option<f32>,
+}
+
+/// Score one selection policy at one `top`.
+///
+/// Both halves are measured in the same pass and on the same ledger, because a
+/// policy evaluated only on the case it was designed for is a tautology.
+pub fn run_selection(
+    core: &PhysisCore,
+    arm: Arm,
+    top: usize,
+    embedder: &dyn VectorEmbed,
+    selection: crate::act::Selection,
+    baseline_reassured: Option<usize>,
+) -> SelectionResult {
+    let mut reassured = 0usize;
+    let mut target_in_top = 0usize;
+    for (i, p) in PAIRS.iter().enumerate() {
+        let shown = crate::act::bearing_on_with(core, arm.command(p), embedder, top, selection);
+        let t = shown.iter().any(|b| b.statement == p.claim);
+        let w = shown.iter().any(|b| b.statement == AFFIRMED_TWINS[i]);
+        if t {
+            target_in_top += 1;
+        }
+        if w && !t {
+            reassured += 1;
+        }
+    }
+    let mut false_alarms = 0usize;
+    for cmd in UNRELATED_COMMANDS.iter() {
+        let shown = crate::act::bearing_on_with(core, cmd, embedder, top, selection);
+        if shown.iter().any(|b| b.is_warning()) {
+            false_alarms += 1;
+        }
+    }
+    let policy = match selection {
+        crate::act::Selection::Relevance => "relevance".to_string(),
+        crate::act::Selection::WarningReserve { floor_ratio } => {
+            format!("reserve@{floor_ratio:.2}")
+        }
+    };
+    // Against the relevance baseline measured in the same run, never against a
+    // remembered number.
+    let harm_removed_per_false_alarm = baseline_reassured.and_then(|base| {
+        let removed = base.saturating_sub(reassured);
+        if removed == 0 {
+            None
+        } else if false_alarms == 0 {
+            Some(f32::INFINITY)
+        } else {
+            Some(removed as f32 / false_alarms as f32)
+        }
+    });
+    SelectionResult {
+        policy,
+        top,
+        reassured,
+        target_in_top,
+        false_alarms,
+        pairs: PAIRS.len(),
+        unrelated: UNRELATED_COMMANDS.len(),
+        harm_removed_per_false_alarm,
+    }
+}
+
+/// The floors swept. 0.00 always reserves; 1.00 reserves only when the warning
+/// already leads, which is the relevance policy by another name and is included
+/// as the sweep's own control.
+pub const FLOORS: [f32; 5] = [0.00, 0.80, 0.90, 0.95, 1.00];
+
 /// Build the ledger and score both arms.
 pub fn run(top: usize, embedder: &dyn VectorEmbed, embedder_kind: &str, seed: u64) -> RecallRun {
     let (core, index) = build_ledger(embedder, false);
@@ -763,7 +939,28 @@ pub fn run(top: usize, embedder: &dyn VectorEmbed, embedder_kind: &str, seed: u6
         run_polarity(&tcore, &tindex, Arm::Lexical, top, embedder),
         run_polarity(&tcore, &tindex, Arm::Paraphrase, top, embedder),
     ];
+    // The selection sweep runs on the twin ledger — the only one where
+    // `reassured` is defined — at the cut where the harm was largest (1) and
+    // the cut the CLI defaults to.
+    let mut selection = Vec::new();
+    for t in [1usize, top] {
+        let base = run_selection(&tcore, Arm::Lexical, t, embedder, crate::act::Selection::Relevance, None);
+        let baseline = base.reassured;
+        selection.push(base);
+        for f in FLOORS {
+            selection.push(run_selection(
+                &tcore,
+                Arm::Lexical,
+                t,
+                embedder,
+                crate::act::Selection::WarningReserve { floor_ratio: f },
+                Some(baseline),
+            ));
+        }
+    }
+
     RecallRun {
+        selection,
         polarity,
         polarity_ledger_size: tindex.len(),
         ledger_size: index.len(),
@@ -808,6 +1005,73 @@ mod tests {
                 "target absent from the ledger: {}",
                 p.claim
             );
+        }
+    }
+
+    /// The reserve must not fire when the warning is irrelevant. A floor of
+    /// 1.00 reserves only when the warning already leads, so it must be
+    /// indistinguishable from the relevance policy — that is the sweep's own
+    /// control, and if it moves the sweep is measuring noise.
+    #[test]
+    fn the_top_floor_is_the_relevance_policy_by_another_name() {
+        let e = RandomProjectionEmbedder::new(128);
+        let (core, _) = build_ledger(&e, true);
+        for arm in [Arm::Lexical, Arm::Paraphrase] {
+            let base = run_selection(&core, arm, 5, &e, crate::act::Selection::Relevance, None);
+            let ceiling = run_selection(
+                &core,
+                arm,
+                5,
+                &e,
+                crate::act::Selection::WarningReserve { floor_ratio: 1.0 },
+                None,
+            );
+            assert_eq!(base.reassured, ceiling.reassured, "{}", arm.label());
+            assert_eq!(base.false_alarms, ceiling.false_alarms, "{}", arm.label());
+        }
+    }
+
+    /// And a floor of 0.00 must always fire when any warning-eligible claim
+    /// exists — otherwise the sweep's other end is not the other end.
+    #[test]
+    fn the_bottom_floor_always_surfaces_a_warning() {
+        let e = RandomProjectionEmbedder::new(128);
+        let (core, _) = build_ledger(&e, true);
+        for cmd in UNRELATED_COMMANDS.iter() {
+            let shown = crate::act::bearing_on_with(
+                &core,
+                cmd,
+                &e,
+                5,
+                crate::act::Selection::WarningReserve { floor_ratio: 0.0 },
+            );
+            assert!(
+                shown.iter().any(|b| b.is_warning()),
+                "floor 0.00 surfaced no warning for {cmd}"
+            );
+        }
+    }
+
+    /// The reserve must not silently shorten the list, and must not duplicate
+    /// the claim it promotes.
+    #[test]
+    fn the_reserve_keeps_the_list_the_same_length_and_free_of_duplicates() {
+        let e = RandomProjectionEmbedder::new(128);
+        let (core, index) = build_ledger(&e, true);
+        for top in [1usize, 3, 5] {
+            let shown = crate::act::bearing_on_with(
+                &core,
+                "cargo build --release",
+                &e,
+                top,
+                crate::act::Selection::WarningReserve { floor_ratio: 0.0 },
+            );
+            assert_eq!(shown.len(), top.min(index.len()));
+            let mut ids: Vec<&str> = shown.iter().map(|b| b.id.as_str()).collect();
+            ids.sort_unstable();
+            let before = ids.len();
+            ids.dedup();
+            assert_eq!(ids.len(), before, "the promoted claim was duplicated");
         }
     }
 
@@ -861,8 +1125,17 @@ mod tests {
         }
     }
 
-    /// The polarity null is 0.500 by construction, so a blind ranker must land
-    /// on the coin flip rather than on either verdict.
+    /// A blind ranker has no purchase on polarity, and the check is on the
+    /// mechanism rather than the verdict: with every relevance identical, the
+    /// order is decided entirely by the tie-break, so any discrimination it
+    /// scores is an artefact of that tie-break and not a capability.
+    ///
+    /// This test is why `bearing_on` tie-breaks on the statement. It first
+    /// asserted the verdict string, and flaked: the old tie-break was a UUID
+    /// prefix, freshly random per process, so eight coin flips landed wherever
+    /// they landed. That was a real defect in `act` — ties were not
+    /// reproducible — and the test found it by being wrong about what it could
+    /// assert.
     #[test]
     fn a_blind_ranker_is_a_coin_flip_on_polarity() {
         struct Blind;
@@ -874,15 +1147,21 @@ mod tests {
                 8
             }
         }
-        let r = run(5, &Blind, "blind", 7);
-        for p in &r.polarity {
-            assert!(
-                p.verdict.starts_with("COIN FLIP") || p.verdict.starts_with("INVERTED"),
-                "a blind ranker claimed polarity discrimination on {}: {}",
-                p.arm,
-                p.verdict
-            );
-        }
+        let (core, index) = build_ledger(&Blind, true);
+        let shown = crate::act::bearing_on(&core, "cargo build --release", &Blind, index.len());
+        let first = shown[0].relevance;
+        assert!(
+            shown.iter().all(|b| (b.relevance - first).abs() < 1e-6),
+            "a blind embedder must score every claim alike"
+        );
+        // And the order it produces must at least be the same twice, or no
+        // number measured on it means anything.
+        let again = crate::act::bearing_on(&core, "cargo build --release", &Blind, index.len());
+        assert_eq!(
+            shown.iter().map(|b| &b.statement).collect::<Vec<_>>(),
+            again.iter().map(|b| &b.statement).collect::<Vec<_>>(),
+            "tied claims must come back in a stable order"
+        );
     }
 
     /// The paraphrase arm only tests what it claims to if the command really

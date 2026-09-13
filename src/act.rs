@@ -202,6 +202,45 @@ pub fn bearing_on(
     embedder: &dyn VectorEmbed,
     top: usize,
 ) -> Vec<Bearing> {
+    bearing_on_with(core, command, embedder, top, Selection::Relevance)
+}
+
+/// How the list is cut down to `top`.
+///
+/// ## Why this is a choice and not a constant
+///
+/// Truncating on relevance alone decides who survives *before* anyone looks at
+/// status — and the only thing the consumer prints is warnings. The polarity
+/// arm of `act_recall` measured what that costs: with a claim's affirmed twin
+/// in the ledger, the endorsement outranks the refutation in six of eight
+/// pairs, so at `--top 1` the surviving claim is a `Supported` reassurance
+/// about the exact thing a `Contradicted` claim refutes, five times in eight.
+///
+/// [`Selection::WarningReserve`] keeps one slot for the most relevant
+/// warning-eligible claim. That is not free — a ledger holding any refuted
+/// claim would then always surface one — so the reserve is gated on a floor:
+/// the warning must score at least `floor_ratio` of the top claim's relevance
+/// to take the slot. The floor trades *reassured* against *false alarms*, and
+/// `act_recall` measures both arms of that trade rather than assuming a value.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Selection {
+    /// Cut on relevance. The original behaviour, and what every number
+    /// recorded before 2026-09-13 was measured on.
+    Relevance,
+    /// Keep one slot for the best warning-eligible claim, if it clears the
+    /// floor. `floor_ratio` is a fraction of the top-ranked claim's relevance;
+    /// 0.0 always reserves, 1.0 never does unless the warning already leads.
+    WarningReserve { floor_ratio: f32 },
+}
+
+/// Claims bearing on `command`, under an explicit selection policy.
+pub fn bearing_on_with(
+    core: &crate::core::PhysisCore,
+    command: &str,
+    embedder: &dyn VectorEmbed,
+    top: usize,
+    selection: Selection,
+) -> Vec<Bearing> {
     let q = embedder.embed(command);
     let mut v: Vec<Bearing> = core
         .hypotheses
@@ -215,13 +254,61 @@ pub fn bearing_on(
         })
         .filter(|b| b.relevance.is_finite())
         .collect();
+    // Tie-break on the statement, not the id. `id` is a UUID prefix, freshly
+    // random per claim, so two equally relevant claims came back in a
+    // different order in every process — `act` was not reproducible for ties,
+    // and the benchmark's blind-ranker test flaked on exactly that. Statements
+    // are the corpus, so this order is a property of the data.
     v.sort_by(|a, b| {
         b.relevance
             .partial_cmp(&a.relevance)
             .unwrap_or(std::cmp::Ordering::Equal)
-            .then(a.id.cmp(&b.id))
+            .then(a.statement.cmp(&b.statement))
     });
-    v.truncate(top);
+
+    let floor_ratio = match selection {
+        Selection::Relevance => {
+            v.truncate(top);
+            return v;
+        }
+        Selection::WarningReserve { floor_ratio } => floor_ratio,
+    };
+    if top == 0 || v.is_empty() {
+        v.truncate(top);
+        return v;
+    }
+
+    // The best warning-eligible claim, wherever it sits. If it already made the
+    // cut there is nothing to reserve.
+    let Some(w) = v.iter().position(|b| b.is_warning()) else {
+        v.truncate(top);
+        return v;
+    };
+    if w < top {
+        v.truncate(top);
+        return v;
+    }
+    // The floor is relative to the leader, not absolute: cosine scales differ
+    // per embedder, and an absolute threshold tuned on one is meaningless on
+    // the next. A non-positive leader carries no scale, so no reserve is made.
+    let lead = v[0].relevance;
+    // `lead.is_finite() && lead > 0.0` rather than a negated comparison: a NaN
+    // leader carries no scale, and the floor must refuse rather than fire.
+    if !(lead.is_finite() && lead > 0.0) || v[w].relevance < lead * floor_ratio {
+        v.truncate(top);
+        return v;
+    }
+    // Promote it into the last slot, and keep the list in relevance order so
+    // the operator still reads it as a ranking.
+    let warning = v.remove(w);
+    v.truncate(top.saturating_sub(1));
+    v.push(warning);
+    v.sort_by(|a, b| {
+        b.relevance
+            .partial_cmp(&a.relevance)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.statement.cmp(&b.statement))
+    });
     v
 }
 
