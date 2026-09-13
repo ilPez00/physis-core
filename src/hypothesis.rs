@@ -259,12 +259,44 @@ pub struct Revision {
 /// They replace implicit "current classification" with an explicit, revisable,
 /// evidence-tracked interpretation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// A belief, with everything that decides whether it survives.
+///
+/// ## Known conceptual problem: identity is prose
+///
+/// A hypothesis is identified by `statement`, and every relation that matters
+/// — contradiction, deduplication, supersession, and `act`'s recall of what is
+/// already believed — is computed on `embedding`, which is the embedding *of
+/// that sentence*.
+///
+/// Measured 2026-09-13
+/// (`computer-remake-research/experiments/graphiti/RESULTS.md`): given
+/// identical evidence, a 7B local model and a 120B hosted model produced
+/// byte-identical entities, edge topology and temporal boundaries, and
+/// differing prose — and the prose differed between two runs of the *same*
+/// model as well. Prose is not an interpreter signature; it is noise.
+///
+/// So these relations are computed on the one layer shown to be
+/// interpreter-dependent, while the layers shown to be evidence-determined are
+/// not part of a claim's identity at all. That is in tension with this crate's
+/// own thesis, that the model is a replaceable interpreter rather than the
+/// memory: a claim keyed by the sentence a model emitted is keyed by the
+/// interpreter.
+///
+/// Recorded as conceptual problem 2 in
+/// `docs/plans/2026-09-13-four-conceptual-problems.md`. The direction is a
+/// structural identity — subject, relation, object, interval — with the
+/// sentence kept beside it as attributed rendering. The baseline to beat is
+/// contradiction recall 0.50 (RESCOPE §6 item 7). Not yet done; this comment
+/// exists so the next reader does not mistake the current shape for a settled
+/// one.
 pub struct Hypothesis {
     /// Unique identifier.
     pub id: String,
-    /// Human-readable statement.
+    /// Human-readable statement. **Also the de facto identity** — see the
+    /// conceptual problem noted above.
     pub statement: String,
-    /// Semantic embedding of the statement.
+    /// Semantic embedding of the statement. Every contradiction and recall
+    /// decision runs on this.
     pub embedding: Vec<f32>,
     /// Ontology cells this hypothesis maps to (DOMAIN×MODE keys).
     pub ontology_refs: Vec<String>,

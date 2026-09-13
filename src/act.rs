@@ -40,6 +40,22 @@
 //! matches strings, not meaning. It surfaces candidates for a person to read; it
 //! does not decide anything, and it will miss a contradiction phrased
 //! differently from the command that triggers it.
+//!
+//! **How weak, measured.** The 2×2 of 2026-09-13
+//! (`docs/plans/2026-09-13-2x2-first-run.md`) scored this retrieval family at
+//! 0–1/7 against a whole-file ceiling of 5/7. So in the normal case this
+//! function does not find the contradiction it exists to surface, and the gap
+//! it closes is closed in architecture rather than in practice.
+//!
+//! That is a structural dependency and not only a quality problem: `RESCOPE.md`
+//! §0 settles that the context compiler is the *commodity* half and the ledger
+//! is the differentiator — and this, the sharpest thing the ledger does,
+//! reaches its data through the compiler. Recorded as conceptual problem 1 in
+//! `docs/plans/2026-09-13-four-conceptual-problems.md`.
+//!
+//! The recall of this function has never been measured directly. It should be,
+//! and a construction-matched null is available: surface k random claims of the
+//! same age and compare.
 
 use crate::embed::VectorEmbed;
 use serde::{Deserialize, Serialize};

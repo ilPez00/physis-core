@@ -5,6 +5,24 @@
 //! `custom_domains` (every extra domain-specific ontology), all sharing the
 //! HEAL/CONSTRUCT/FABRICATE/BOND/STUDY × LIFT/…/PLAN vocabulary.
 
+//! ## Known conceptual problem: this is the one belief that cannot be contradicted
+//!
+//! Every other belief in this crate can be supported, contradicted, superseded
+//! and replayed. The grid cannot. It is authored in advance and sits underneath
+//! the machinery that exists to make beliefs falsifiable, exempt from it.
+//!
+//! That is in tension with a conclusion this project reached on its own
+//! evidence: a fixed ontology someone authored in advance is only as good as
+//! its fit (`computer-remake-research/notes.md` §3), and E5 already found that
+//! collapsing 57 → 14 classes *gains* +0.014 kappa while E8's pre-flight STOPs
+//! on sparsity at every level.
+//!
+//! Recorded as conceptual problem 3 in
+//! `docs/plans/2026-09-13-four-conceptual-problems.md`. The direction is to
+//! treat the grid as a hypothesis like any other — give it a validity window
+//! and a fitness — so E5's result counts as evidence against the current cell
+//! count rather than as a research note beside it.
+//!
 use std::collections::HashMap;
 use std::path::Path;
 
