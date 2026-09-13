@@ -95,6 +95,57 @@ impl TemporalValidity {
         self.is_valid_at(chrono::Utc::now())
     }
 
+    /// Correct the world-time end of this window when later evidence says the
+    /// claim stopped being true earlier than recorded. Returns whether the
+    /// window actually moved.
+    ///
+    /// ## Why this only ever narrows
+    ///
+    /// The schema carried both bi-temporal legs from the start, but nothing in
+    /// this crate ever wrote `valid_until` except a constructor — so a claim's
+    /// world-time end was whatever the caller asserted at creation, and
+    /// evidence arriving later could not correct it.
+    ///
+    /// The failure that motivates the restriction was measured in graphiti,
+    /// which writes its equivalent leg once from the first contradiction it
+    /// sees and then never narrows it
+    /// (`computer-remake-research/experiments/graphiti/RESULTS.md`): an
+    /// employment fact was left recorded as ending 2026-02-20 while the same
+    /// store held a document saying it ended 2025-03-10, so a query for
+    /// mid-2025 returned two employers at once.
+    ///
+    /// Narrowing is a *correction* — the claim was always false after `when`,
+    /// and the record merely failed to say so. Widening is not: evidence that
+    /// a claim lasted longer than recorded is a new assertion about the
+    /// interval, and letting a setter make it silently would hide the one
+    /// thing replay exists to show. So a `when` at or after the current
+    /// `valid_until` changes nothing and reports `false`.
+    ///
+    /// A `when` before `valid_from` is refused for the same reason: that is a
+    /// contradiction about the interval itself, not a narrowing of it, and
+    /// quietly producing an empty window would bury it.
+    pub fn narrow_until(
+        &mut self,
+        when: chrono::DateTime<chrono::Utc>,
+        trigger: Option<String>,
+    ) -> bool {
+        if let Some(from) = self.valid_from {
+            if when < from {
+                return false;
+            }
+        }
+        if let Some(until) = self.valid_until {
+            if when >= until {
+                return false;
+            }
+        }
+        self.valid_until = Some(when);
+        if trigger.is_some() {
+            self.trigger = trigger;
+        }
+        true
+    }
+
     /// Does this overlap with another validity window?
     pub fn overlaps(&self, other: &TemporalValidity) -> bool {
         let start_a = self
@@ -131,5 +182,78 @@ mod tests {
         assert!(t.is_valid_at(start));
         assert!(t.is_valid_at(start + chrono::Duration::minutes(30)));
         assert!(!t.is_valid_at(end));
+    }
+
+    #[test]
+    fn narrow_until_closes_an_open_window() {
+        let start = chrono::Utc::now();
+        let mut t = TemporalValidity::from(start);
+        assert!(t.valid_until.is_none());
+        assert!(t.narrow_until(start + chrono::Duration::hours(1), None));
+        assert_eq!(t.valid_until, Some(start + chrono::Duration::hours(1)));
+    }
+
+    #[test]
+    fn narrow_until_refuses_to_widen() {
+        let start = chrono::Utc::now();
+        let end = start + chrono::Duration::hours(1);
+        let mut t = TemporalValidity::during(start, end);
+
+        // At the boundary and beyond it: both are widenings, both refused.
+        assert!(!t.narrow_until(end, None));
+        assert!(!t.narrow_until(end + chrono::Duration::hours(5), None));
+        assert_eq!(t.valid_until, Some(end), "window must not move");
+    }
+
+    #[test]
+    fn narrow_until_refuses_an_instant_before_the_window_opens() {
+        let start = chrono::Utc::now();
+        let mut t = TemporalValidity::during(start, start + chrono::Duration::hours(1));
+        assert!(!t.narrow_until(start - chrono::Duration::hours(1), None));
+        assert_eq!(t.valid_until, Some(start + chrono::Duration::hours(1)));
+    }
+
+    #[test]
+    fn narrow_until_records_its_trigger() {
+        let start = chrono::Utc::now();
+        let mut t = TemporalValidity::from(start);
+        assert!(t.narrow_until(
+            start + chrono::Duration::hours(1),
+            Some("contradicted by E2".to_string())
+        ));
+        assert_eq!(t.trigger.as_deref(), Some("contradicted by E2"));
+    }
+
+    /// The graphiti case, by name.
+    ///
+    /// A window is first closed at T2 by the only contradiction then
+    /// available; evidence arriving afterwards shows the claim actually ended
+    /// at T1, earlier. graphiti leaves the window at T2 forever, so a query
+    /// between T1 and T2 reports the claim as still true — measured there as
+    /// one person holding two jobs at once.
+    ///
+    /// Fails before `narrow_until` exists: there is no way to move the
+    /// boundary at all.
+    #[test]
+    fn a_window_closed_by_weak_evidence_is_corrected_by_better_evidence() {
+        let t0 = chrono::Utc::now();
+        let t1 = t0 + chrono::Duration::days(400); // when it really ended
+        let t2 = t0 + chrono::Duration::days(800); // the first, worse guess
+
+        let mut t = TemporalValidity::from(t0);
+        assert!(t.narrow_until(t2, Some("first contradiction".into())));
+        let between = t0 + chrono::Duration::days(600);
+        assert!(
+            t.is_valid_at(between),
+            "with only the weak boundary, the claim still reads as true here"
+        );
+
+        // Better evidence arrives, referring to an earlier world time.
+        assert!(t.narrow_until(t1, Some("earlier contradiction".into())));
+        assert!(
+            !t.is_valid_at(between),
+            "after the correction the claim must be false between T1 and T2"
+        );
+        assert!(t.is_valid_at(t0 + chrono::Duration::days(100)));
     }
 }
