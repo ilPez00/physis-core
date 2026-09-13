@@ -1,0 +1,641 @@
+{
+  "cells": [
+    {
+      "cell": "BOND/BRAINSTORM",
+      "concentration": 0.3333333432674408,
+      "entries": 1,
+      "null_concentration": 0.36920908093452454,
+      "parents": 6,
+      "state": "unmeasurable",
+      "top_parent": "noun.cognition"
+    },
+    {
+      "cell": "BOND/CREATE",
+      "concentration": 0.18579235672950745,
+      "entries": 18,
+      "null_concentration": 0.18893998861312866,
+      "parents": 23,
+      "state": "DISPUTED",
+      "top_parent": "noun.communication"
+    },
+    {
+      "cell": "BOND/DESTROY",
+      "concentration": 0.20000000298023224,
+      "entries": 1,
+      "null_concentration": 0.3742527663707733,
+      "parents": 7,
+      "state": "unmeasurable",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "BOND/GUIDE",
+      "concentration": 0.23943662643432617,
+      "entries": 8,
+      "null_concentration": 0.21037346124649048,
+      "parents": 14,
+      "state": "DISPUTED",
+      "top_parent": "noun.person"
+    },
+    {
+      "cell": "BOND/LEARN",
+      "concentration": 0.22857142984867096,
+      "entries": 4,
+      "null_concentration": 0.22896596789360046,
+      "parents": 9,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "BOND/LIFT",
+      "concentration": 0.2068965584039688,
+      "entries": 3,
+      "null_concentration": 0.25875046849250793,
+      "parents": 12,
+      "state": "DISPUTED",
+      "top_parent": "noun.attribute"
+    },
+    {
+      "cell": "BOND/MAINTAIN",
+      "concentration": 0.20987653732299805,
+      "entries": 15,
+      "null_concentration": 0.1994081437587738,
+      "parents": 19,
+      "state": "unsupported",
+      "top_parent": "noun.communication"
+    },
+    {
+      "cell": "BOND/MOVE",
+      "concentration": 0.20000000298023224,
+      "entries": 10,
+      "null_concentration": 0.20597288012504578,
+      "parents": 15,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "BOND/PLAN",
+      "concentration": 0.3636363744735718,
+      "entries": 4,
+      "null_concentration": 0.2417806088924408,
+      "parents": 11,
+      "state": "DISPUTED",
+      "top_parent": "noun.cognition"
+    },
+    {
+      "cell": "BOND/PLAY",
+      "concentration": 0.3529411852359772,
+      "entries": 3,
+      "null_concentration": 0.26829636096954346,
+      "parents": 8,
+      "state": "unsupported",
+      "top_parent": "noun.communication"
+    },
+    {
+      "cell": "BOND/REST",
+      "concentration": 0.21739129722118378,
+      "entries": 5,
+      "null_concentration": 0.22466212511062622,
+      "parents": 11,
+      "state": "DISPUTED",
+      "top_parent": "lex26"
+    },
+    {
+      "cell": "BOND/SENSE",
+      "concentration": 0.48148149251937866,
+      "entries": 3,
+      "null_concentration": 0.25653553009033203,
+      "parents": 7,
+      "state": "unsupported",
+      "top_parent": "noun.communication"
+    },
+    {
+      "cell": "BOND/WALK",
+      "concentration": 0.26213592290878296,
+      "entries": 10,
+      "null_concentration": 0.20850870013237,
+      "parents": 18,
+      "state": "DISPUTED",
+      "top_parent": "noun.communication"
+    },
+    {
+      "cell": "BOND/WORK",
+      "concentration": 0.30739298462867737,
+      "entries": 19,
+      "null_concentration": 0.19297942519187927,
+      "parents": 22,
+      "state": "matched",
+      "top_parent": "noun.communication"
+    },
+    {
+      "cell": "CONSTRUCT/BRAINSTORM",
+      "concentration": 0.2857142984867096,
+      "entries": 1,
+      "null_concentration": 0.38755831122398376,
+      "parents": 6,
+      "state": "unmeasurable",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "CONSTRUCT/CREATE",
+      "concentration": 0.16983240842819214,
+      "entries": 70,
+      "null_concentration": 0.18424032628536224,
+      "parents": 26,
+      "state": "DISPUTED",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "CONSTRUCT/DESTROY",
+      "concentration": 0.3636363744735718,
+      "entries": 1,
+      "null_concentration": 0.3764529824256897,
+      "parents": 7,
+      "state": "unmeasurable",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "CONSTRUCT/GUIDE",
+      "concentration": 0.30000001192092896,
+      "entries": 1,
+      "null_concentration": 0.3848058879375458,
+      "parents": 7,
+      "state": "unmeasurable",
+      "top_parent": "noun.attribute"
+    },
+    {
+      "cell": "CONSTRUCT/LEARN",
+      "concentration": 0.3965517282485962,
+      "entries": 5,
+      "null_concentration": 0.2276843637228012,
+      "parents": 10,
+      "state": "matched",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "CONSTRUCT/LIFT",
+      "concentration": 0.3658536672592163,
+      "entries": 3,
+      "null_concentration": 0.2562445104122162,
+      "parents": 9,
+      "state": "DISPUTED",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "CONSTRUCT/MAINTAIN",
+      "concentration": 0.197247713804245,
+      "entries": 27,
+      "null_concentration": 0.1902260184288025,
+      "parents": 22,
+      "state": "DISPUTED",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "CONSTRUCT/MOVE",
+      "concentration": 0.380952388048172,
+      "entries": 3,
+      "null_concentration": 0.257973849773407,
+      "parents": 7,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "CONSTRUCT/PLAN",
+      "concentration": 0.24812030792236328,
+      "entries": 16,
+      "null_concentration": 0.19859138131141663,
+      "parents": 15,
+      "state": "DISPUTED",
+      "top_parent": "noun.cognition"
+    },
+    {
+      "cell": "CONSTRUCT/PLAY",
+      "concentration": 0.25,
+      "entries": 1,
+      "null_concentration": 0.3925583064556122,
+      "parents": 6,
+      "state": "unmeasurable",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "CONSTRUCT/REST",
+      "concentration": 0.32786884903907776,
+      "entries": 6,
+      "null_concentration": 0.22705617547035217,
+      "parents": 11,
+      "state": "matched",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "CONSTRUCT/SENSE",
+      "concentration": 0.2527472674846649,
+      "entries": 10,
+      "null_concentration": 0.20647473633289337,
+      "parents": 16,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "CONSTRUCT/WALK",
+      "concentration": 0.3333333432674408,
+      "entries": 1,
+      "null_concentration": 0.38143372535705566,
+      "parents": 7,
+      "state": "unmeasurable",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "CONSTRUCT/WORK",
+      "concentration": 0.38596490025520325,
+      "entries": 8,
+      "null_concentration": 0.21170581877231598,
+      "parents": 16,
+      "state": "matched",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "FABRICATE/BRAINSTORM",
+      "concentration": 0.25,
+      "entries": 1,
+      "null_concentration": 0.37756210565567017,
+      "parents": 9,
+      "state": "unmeasurable",
+      "top_parent": "noun.person"
+    },
+    {
+      "cell": "FABRICATE/CREATE",
+      "concentration": 0.20711974799633026,
+      "entries": 26,
+      "null_concentration": 0.19005858898162842,
+      "parents": 24,
+      "state": "DISPUTED",
+      "top_parent": "noun.communication"
+    },
+    {
+      "cell": "FABRICATE/DESTROY",
+      "concentration": 0.2777777910232544,
+      "entries": 3,
+      "null_concentration": 0.25939902663230896,
+      "parents": 14,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "FABRICATE/GUIDE",
+      "concentration": 0.3333333432674408,
+      "entries": 1,
+      "null_concentration": 0.4029470682144165,
+      "parents": 6,
+      "state": "unmeasurable",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "FABRICATE/LEARN",
+      "concentration": 0.3253012001514435,
+      "entries": 8,
+      "null_concentration": 0.21131189167499542,
+      "parents": 10,
+      "state": "matched",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "FABRICATE/LIFT",
+      "concentration": 0.4000000059604645,
+      "entries": 1,
+      "null_concentration": 0.3828181326389313,
+      "parents": 5,
+      "state": "unmeasurable",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "FABRICATE/MAINTAIN",
+      "concentration": 0.28260868787765503,
+      "entries": 5,
+      "null_concentration": 0.230558380484581,
+      "parents": 12,
+      "state": "DISPUTED",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "FABRICATE/MOVE",
+      "concentration": 0.2839506268501282,
+      "entries": 8,
+      "null_concentration": 0.21726062893867493,
+      "parents": 15,
+      "state": "DISPUTED",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "FABRICATE/PLAN",
+      "concentration": 0.27835050225257874,
+      "entries": 14,
+      "null_concentration": 0.19826416671276093,
+      "parents": 19,
+      "state": "matched",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "FABRICATE/PLAY",
+      "concentration": 0.2916666567325592,
+      "entries": 3,
+      "null_concentration": 0.25821036100387573,
+      "parents": 8,
+      "state": "unsupported",
+      "top_parent": "noun.cognition"
+    },
+    {
+      "cell": "FABRICATE/REST",
+      "concentration": 0.25,
+      "entries": 7,
+      "null_concentration": 0.21806029975414276,
+      "parents": 16,
+      "state": "DISPUTED",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "FABRICATE/SENSE",
+      "concentration": 0.1726190447807312,
+      "entries": 17,
+      "null_concentration": 0.1964559704065323,
+      "parents": 19,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "FABRICATE/WALK",
+      "concentration": 0.2183908075094223,
+      "entries": 9,
+      "null_concentration": 0.2110968828201294,
+      "parents": 18,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "FABRICATE/WORK",
+      "concentration": 0.23315118253231049,
+      "entries": 62,
+      "null_concentration": 0.186775803565979,
+      "parents": 24,
+      "state": "matched",
+      "top_parent": "noun.artifact"
+    },
+    {
+      "cell": "HEAL/BRAINSTORM",
+      "concentration": 0.3333333432674408,
+      "entries": 1,
+      "null_concentration": 0.37639766931533813,
+      "parents": 8,
+      "state": "unmeasurable",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "HEAL/CREATE",
+      "concentration": 0.3404255211353302,
+      "entries": 3,
+      "null_concentration": 0.25805073976516724,
+      "parents": 12,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "HEAL/DESTROY",
+      "concentration": 0.3243243098258972,
+      "entries": 3,
+      "null_concentration": 0.26258906722068787,
+      "parents": 12,
+      "state": "unsupported",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "HEAL/GUIDE",
+      "concentration": 0.3571428656578064,
+      "entries": 1,
+      "null_concentration": 0.3744235932826996,
+      "parents": 8,
+      "state": "unmeasurable",
+      "top_parent": "noun.person"
+    },
+    {
+      "cell": "HEAL/LEARN",
+      "concentration": 0.29113924503326416,
+      "entries": 6,
+      "null_concentration": 0.22260120511054993,
+      "parents": 14,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "HEAL/LIFT",
+      "concentration": 0.3137255012989044,
+      "entries": 5,
+      "null_concentration": 0.22300250828266144,
+      "parents": 13,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "HEAL/MAINTAIN",
+      "concentration": 0.15420560538768768,
+      "entries": 25,
+      "null_concentration": 0.18830706179141998,
+      "parents": 23,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "HEAL/MOVE",
+      "concentration": 0.3965517282485962,
+      "entries": 7,
+      "null_concentration": 0.2126539796590805,
+      "parents": 12,
+      "state": "matched",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "HEAL/PLAN",
+      "concentration": 0.3611111044883728,
+      "entries": 3,
+      "null_concentration": 0.2578426003456116,
+      "parents": 10,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "HEAL/PLAY",
+      "concentration": 0.4117647111415863,
+      "entries": 7,
+      "null_concentration": 0.21811926364898682,
+      "parents": 13,
+      "state": "matched",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "HEAL/REST",
+      "concentration": 0.18333333730697632,
+      "entries": 8,
+      "null_concentration": 0.2111697643995285,
+      "parents": 15,
+      "state": "DISPUTED",
+      "top_parent": "lex26"
+    },
+    {
+      "cell": "HEAL/SENSE",
+      "concentration": 0.2016129046678543,
+      "entries": 22,
+      "null_concentration": 0.19138649106025696,
+      "parents": 23,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "HEAL/WALK",
+      "concentration": 0.239130437374115,
+      "entries": 10,
+      "null_concentration": 0.20331329107284546,
+      "parents": 19,
+      "state": "DISPUTED",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "HEAL/WORK",
+      "concentration": 0.2857142984867096,
+      "entries": 14,
+      "null_concentration": 0.1983526349067688,
+      "parents": 20,
+      "state": "matched",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "STUDY/BRAINSTORM",
+      "concentration": 0.2631579041481018,
+      "entries": 4,
+      "null_concentration": 0.24656328558921814,
+      "parents": 15,
+      "state": "DISPUTED",
+      "top_parent": "noun.cognition"
+    },
+    {
+      "cell": "STUDY/CREATE",
+      "concentration": 0.2800000011920929,
+      "entries": 5,
+      "null_concentration": 0.22605159878730774,
+      "parents": 11,
+      "state": "DISPUTED",
+      "top_parent": "noun.communication"
+    },
+    {
+      "cell": "STUDY/DESTROY",
+      "concentration": 0.75,
+      "entries": 1,
+      "null_concentration": 0.39690613746643066,
+      "parents": 2,
+      "state": "unmeasurable",
+      "top_parent": "noun.communication"
+    },
+    {
+      "cell": "STUDY/GUIDE",
+      "concentration": 0.36666667461395264,
+      "entries": 8,
+      "null_concentration": 0.20780572295188904,
+      "parents": 15,
+      "state": "matched",
+      "top_parent": "noun.communication"
+    },
+    {
+      "cell": "STUDY/LEARN",
+      "concentration": 0.20450282096862793,
+      "entries": 35,
+      "null_concentration": 0.18513481318950653,
+      "parents": 23,
+      "state": "DISPUTED",
+      "top_parent": "noun.cognition"
+    },
+    {
+      "cell": "STUDY/LIFT",
+      "concentration": 0.38461539149284363,
+      "entries": 6,
+      "null_concentration": 0.22333326935768127,
+      "parents": 12,
+      "state": "matched",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "STUDY/MAINTAIN",
+      "concentration": 0.27731093764305115,
+      "entries": 10,
+      "null_concentration": 0.2004215270280838,
+      "parents": 18,
+      "state": "matched",
+      "top_parent": "noun.communication"
+    },
+    {
+      "cell": "STUDY/MOVE",
+      "concentration": 0.2769230902194977,
+      "entries": 3,
+      "null_concentration": 0.2556004524230957,
+      "parents": 17,
+      "state": "DISPUTED",
+      "top_parent": "noun.cognition"
+    },
+    {
+      "cell": "STUDY/PLAN",
+      "concentration": 0.2954545319080353,
+      "entries": 5,
+      "null_concentration": 0.23549768328666687,
+      "parents": 16,
+      "state": "unsupported",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "STUDY/PLAY",
+      "concentration": 0.2888889014720917,
+      "entries": 4,
+      "null_concentration": 0.24603600800037384,
+      "parents": 13,
+      "state": "unsupported",
+      "top_parent": "noun.act"
+    },
+    {
+      "cell": "STUDY/REST",
+      "concentration": 0.2884615361690521,
+      "entries": 11,
+      "null_concentration": 0.20472364127635956,
+      "parents": 16,
+      "state": "matched",
+      "top_parent": "noun.cognition"
+    },
+    {
+      "cell": "STUDY/SENSE",
+      "concentration": 0.15055467188358307,
+      "entries": 47,
+      "null_concentration": 0.18614131212234497,
+      "parents": 23,
+      "state": "DISPUTED",
+      "top_parent": "noun.cognition"
+    },
+    {
+      "cell": "STUDY/WALK",
+      "concentration": 0.2978723347187042,
+      "entries": 3,
+      "null_concentration": 0.2627195119857788,
+      "parents": 14,
+      "state": "unsupported",
+      "top_parent": "noun.communication"
+    },
+    {
+      "cell": "STUDY/WORK",
+      "concentration": 0.18577075004577637,
+      "entries": 52,
+      "null_concentration": 0.18534903228282928,
+      "parents": 25,
+      "state": "DISPUTED",
+      "top_parent": "noun.cognition"
+    }
+  ],
+  "disputed": 35,
+  "embedder": "onnx-explicit",
+  "matched": 14,
+  "null_permutations": 200,
+  "reference": "wordnet-3.1-noun-supersenses",
+  "unanchored": 0,
+  "unsupported": 8
+}
