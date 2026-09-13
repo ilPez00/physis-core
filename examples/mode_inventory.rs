@@ -294,19 +294,38 @@ fn main() {
     let covered: BTreeSet<&'static str> = owned.keys().copied().collect();
     let missing: Vec<&&str> = VERB_SUPERSENSE.iter().filter(|s| !covered.contains(*s)).collect();
 
+    // An unowned supersense is only a gap if the corpus actually uses that kind
+    // of verb. WordNet cannot tell `verb.weather` from `verb.possession` in
+    // relevance terms — but the corpus can, by how often each appears. Share of
+    // all verb occurrences is the domain weight, and it separates "a kind of
+    // verb this work has no word for" from "a kind of verb this work never does".
+    let (corpus_counts, corpus_total) = stats(&flat);
     println!("\n── PROPOSAL 1: EXPAND — verb supersenses no mode owns ──");
     if missing.is_empty() {
         println!("  none: every kind of verb WordNet distinguishes has a mode that carves it.");
     } else {
         println!(
-            "  {} of {} supersenses are unowned. Each is a kind of verb the grid\n  cannot say, proposed for a mode of its own:\n",
+            "  {} of {} supersenses are unowned. Ranked by how much of the corpus's\n  verb mass they already carry — that share is what separates a real gap\n  from a category this work never enters:\n",
             missing.len(),
             VERB_SUPERSENSE.len()
         );
-        for m in &missing {
-            // A concrete verb from that supersense makes the gap readable
-            // rather than abstract.
-            println!("    {m}");
+        let mut ranked: Vec<(&str, f32, usize)> = missing
+            .iter()
+            .map(|m| {
+                let n = corpus_counts.get(**m).copied().unwrap_or(0);
+                (**m, if corpus_total == 0 { 0.0 } else { n as f32 / corpus_total as f32 }, n)
+            })
+            .collect();
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        for (m, share, n) in &ranked {
+            let verdict = if *share >= 0.05 {
+                "REAL GAP — the corpus does this constantly and cannot name it"
+            } else if *share >= 0.01 {
+                "worth asking about"
+            } else {
+                "the corpus never does this — not a gap"
+            };
+            println!("    {:<20} {:>5.1}%  ({:>4} uses)  {}", m, share * 100.0, n, verdict);
         }
     }
 
