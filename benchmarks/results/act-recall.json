@@ -6,7 +6,7 @@
   "null_trials": 2000,
   "embedder": "onnx-explicit",
   "physis_version": "0.1.26",
-  "git_commit": "d468594",
+  "git_commit": "d415488",
   "arms": [
     {
       "arm": "lexical",
@@ -154,5 +154,146 @@
         }
       ]
     }
-  ]
+  ],
+  "polarity": [
+    {
+      "arm": "lexical",
+      "queries": 8,
+      "top": 5,
+      "target_first": 2,
+      "discrimination": 0.25,
+      "target_in_top": 8,
+      "twin_in_top": 8,
+      "reassured_instead": 0,
+      "verdict": "INVERTED — ranks the endorsement first",
+      "cases": [
+        {
+          "command": "cargo test --all-features",
+          "target_rank": 2,
+          "twin_rank": 1,
+          "target_relevance": 0.7984945,
+          "twin_relevance": 0.8235169
+        },
+        {
+          "command": "cargo build --release",
+          "target_rank": 3,
+          "twin_rank": 2,
+          "target_relevance": 0.7440791,
+          "twin_relevance": 0.75387025
+        },
+        {
+          "command": "pip install onnxruntime",
+          "target_rank": 2,
+          "twin_rank": 1,
+          "target_relevance": 0.8817908,
+          "twin_relevance": 0.9125513
+        },
+        {
+          "command": "docker compose up -d",
+          "target_rank": 1,
+          "twin_rank": 2,
+          "target_relevance": 0.7676858,
+          "twin_relevance": 0.76492226
+        },
+        {
+          "command": "npm run build",
+          "target_rank": 2,
+          "twin_rank": 1,
+          "target_relevance": 0.78672683,
+          "twin_relevance": 0.7980511
+        },
+        {
+          "command": "git push origin main",
+          "target_rank": 1,
+          "twin_rank": 2,
+          "target_relevance": 0.86024255,
+          "twin_relevance": 0.8420729
+        },
+        {
+          "command": "./scripts/migrate.sh",
+          "target_rank": 2,
+          "twin_rank": 1,
+          "target_relevance": 0.6936778,
+          "twin_relevance": 0.71722287
+        },
+        {
+          "command": "rsync -av ./data backup:/srv/data",
+          "target_rank": 2,
+          "twin_rank": 1,
+          "target_relevance": 0.74557906,
+          "twin_relevance": 0.7578837
+        }
+      ]
+    },
+    {
+      "arm": "paraphrase",
+      "queries": 8,
+      "top": 5,
+      "target_first": 1,
+      "discrimination": 0.125,
+      "target_in_top": 6,
+      "twin_in_top": 8,
+      "reassured_instead": 2,
+      "verdict": "INVERTED — ranks the endorsement first",
+      "cases": [
+        {
+          "command": "run the whole suite with every optional flag turned on",
+          "target_rank": 8,
+          "twin_rank": 1,
+          "target_relevance": 0.6270594,
+          "twin_relevance": 0.6601359
+        },
+        {
+          "command": "produce an optimised binary for shipping",
+          "target_rank": 3,
+          "twin_rank": 2,
+          "target_relevance": 0.6357998,
+          "twin_relevance": 0.6533642
+        },
+        {
+          "command": "add the neural inference package to the interpreter environment",
+          "target_rank": 8,
+          "twin_rank": 3,
+          "target_relevance": 0.6400915,
+          "twin_relevance": 0.67063636
+        },
+        {
+          "command": "bring the local service stack online in the background",
+          "target_rank": 3,
+          "twin_rank": 5,
+          "target_relevance": 0.60602933,
+          "twin_relevance": 0.59696186
+        },
+        {
+          "command": "compile the frontend bundle for deployment",
+          "target_rank": 3,
+          "twin_rank": 2,
+          "target_relevance": 0.65945995,
+          "twin_relevance": 0.66331834
+        },
+        {
+          "command": "publish the local commits to the shared upstream trunk",
+          "target_rank": 2,
+          "twin_rank": 1,
+          "target_relevance": 0.6721702,
+          "twin_relevance": 0.6783158
+        },
+        {
+          "command": "apply the pending schema changes to the database",
+          "target_rank": 3,
+          "twin_rank": 2,
+          "target_relevance": 0.6500331,
+          "twin_relevance": 0.6505913
+        },
+        {
+          "command": "copy the dataset across to the offsite machine",
+          "target_rank": 2,
+          "twin_rank": 1,
+          "target_relevance": 0.6700768,
+          "twin_relevance": 0.6886146
+        }
+      ]
+    }
+  ],
+  "polarity_ledger_size": 56
 }

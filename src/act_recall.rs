@@ -95,12 +95,58 @@
 //! structural-retrieval misses the false positive is more lexically similar to
 //! the query than the gold item is (arXiv 2609.01556).
 //!
-//! **Predicted, before the arm was run** (recorded in the commit that added it,
-//! so the record is checkable): recall stays near 0.875 while discrimination
-//! lands *below* 0.500 — the endorsement outranking the refutation in most
-//! pairs, because the endorsement is the more fluent, more command-like
-//! sentence. If that is wrong, the ranker has a purchase on polarity that the
-//! literature says it should not, and that is worth saying loudly.
+//! **Predicted, before the arm was run** (recorded in commit d415488, so the
+//! record is checkable): recall stays near 0.875 while discrimination lands
+//! *below* 0.500 — the endorsement outranking the refutation in most pairs.
+//!
+//! ### What it did, and it is worse than the prediction
+//!
+//! bge-base-en-v1.5, 56-claim ledger, `discrim` = pairs where the refutation
+//! outranked its endorsement, null 0.500:
+//!
+//! | arm | discrim | target@5 | twin@5 | reassured@5 | reassured@1 |
+//! |---|---|---|---|---|---|
+//! | `lexical` | **0.250** | 8/8 | 8/8 | 0/8 | 5/8 |
+//! | `paraphrase` | **0.125** | 6/8 | 8/8 | 2/8 | 3/8 |
+//!
+//! Not a coin flip — **inverted**. The endorsement outranks the refutation in
+//! six of eight pairs on the lexical arm and seven of eight on the paraphrase
+//! arm. The prediction was that polarity would be invisible; it is worse than
+//! invisible, because the endorsement is systematically the *better* match for
+//! a command that asks to do the thing.
+//!
+//! `reassured` is the cell that matters: the endorsement made the list and the
+//! refutation did not. At `top 5` that is 0 and 2 of 8 — the operator still
+//! sees both, so the list saves it. At `top 1` it is **5 of 8 and 3 of 8**: in
+//! the majority of lexical pairs, `act --top 1` prints a Supported claim about
+//! the exact thing a Contradicted claim refutes. That is not a miss. It is the
+//! wrong answer delivered with the ledger's authority, and it is the strongest
+//! argument in this crate for showing a list rather than a best match.
+//!
+//! ### And the two embedders fail in opposite directions
+//!
+//! The same arm on the random-projection fallback:
+//!
+//! | arm | discrim | verdict |
+//! |---|---|---|
+//! | `lexical` | **0.750** | HOLDS |
+//! | `paraphrase` | 0.125 | INVERTED |
+//!
+//! The lexical hash *beats* the semantic embedder on polarity, 0.750 against
+//! 0.250, because it keys on the literal tokens — `fails`, `never`, `no` — that
+//! the semantic space smooths away. That is arXiv 2603.17580's finding
+//! reproduced from the other side: negation is syntactic, so the model that
+//! cannot read meaning is the one that can still see the "not".
+//!
+//! Neither embedder dominates. The semantic one finds the right *topic* and
+//! cannot tell the verdict; the hash can tell the verdict and cannot find the
+//! topic (paraphrase recall 0.000). Read as an instruction, that is an argument
+//! for a hybrid, and it is untested.
+//!
+//! **Do not over-read 0.750.** Eight pairs means one flip is worth 0.125, so
+//! that margin is two pairs. The inversion on the semantic embedder is the
+//! robust half of this result: it is the same sign on both arms, at every
+//! `top`, and it is what the literature predicts.
 //!
 //! ## What this measures and what it does not
 //!

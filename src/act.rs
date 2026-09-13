@@ -68,6 +68,38 @@
 //! the normal case. That does not survive the direct measurement and is
 //! withdrawn: the 2×2 scored a different task on a different corpus.
 //!
+//! **The polarity result, which is worse than the recall result.** A second
+//! ledger adds every target's *affirmed twin* — same subject, same words,
+//! opposite verdict — and asks which of the pair ranks first. No topic
+//! separates them, so the null is 0.500 by construction:
+//!
+//! | embedder | arm | refutation ranked first | reassured at `--top 1` |
+//! |---|---|---|---|
+//! | bge-base-en-v1.5 | shares the claim's words | **0.250** | 5 of 8 |
+//! | bge-base-en-v1.5 | paraphrase | **0.125** | 3 of 8 |
+//! | random-projection | shares the claim's words | 0.750 | 0 of 8 |
+//! | random-projection | paraphrase | 0.125 | 0 of 8 |
+//!
+//! On the semantic embedder this is not a coin flip, it is **inverted**: the
+//! endorsement outranks the refutation in six of eight pairs, and in seven of
+//! eight when the command is paraphrased. `is_warning` reads `status`, so the
+//! wrong one is surfaced wearing `Supported` — a reassurance about the exact
+//! thing a `Contradicted` claim refutes.
+//!
+//! At `--top 5` the list rescues it: both claims are shown in almost every
+//! pair, and a person reading five lines sees the refutation. At `--top 1` it
+//! does not: in five of eight lexical pairs the only claim printed is the
+//! endorsement. **That is the argument for the default being a list.** Do not
+//! lower `--top` to 1 on the assumption that the best match is the right one.
+//!
+//! The random-projection column inverts the ordering of the whole table and is
+//! the reason it is printed: the lexical hash keys on `fails`, `never` and `no`
+//! — the tokens the semantic space smooths away — so it reads the verdict
+//! better and the topic far worse (paraphrase recall 0.000). Neither embedder
+//! dominates, and the hybrid that would is untested. Eight pairs, so 0.750 is
+//! two pairs above chance and should not be leaned on; the semantic inversion
+//! is the robust half, same sign on both arms at every `top`.
+//!
 //! The structural point stands and is unaffected by the number: `RESCOPE.md` §0
 //! settles that the context compiler is the *commodity* half and the ledger is
 //! the differentiator — and this, the sharpest thing the ledger does, reaches
