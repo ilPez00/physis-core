@@ -161,7 +161,7 @@ impl GridFitness {
         }
         let mut worst: Vec<&CellFitness> =
             self.per_cell.iter().filter(|c| !c.above_null && !c.unmeasurable).collect();
-        worst.sort_by(|a, b| b.entries.cmp(&a.entries));
+        worst.sort_by_key(|c| std::cmp::Reverse(c.entries));
         o.push_str("  populated cells that do NOT clear their null, largest first —\n  these have entries and carve nothing with them:\n");
         o.push_str("  cell                            n   fitness    null      z\n");
         for c in worst.iter().take(20) {
