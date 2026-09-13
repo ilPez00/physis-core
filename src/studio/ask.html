@@ -38,6 +38,8 @@ token budget; records the ask to the observation log.</div>
 <div id="out"></div>
 <script>
 const out = document.getElementById('out');
+// prefill from foolproof config (file > default) — same file CLI/TUI use
+fetch('/api/v1/settings').then(r=>r.json()).then(j=>{ let c=j.config; if(c.ask?.corpus) document.getElementById('corpus').value=c.ask.corpus; if(c.ask?.budget) document.getElementById('budget').value=c.ask.budget; }).catch(()=>{});
 const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 document.getElementById('f').addEventListener('submit', async e => {
   e.preventDefault();
@@ -88,3 +90,4 @@ function tableShare(d) {
 </script>
 </body>
 </html>
+

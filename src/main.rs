@@ -430,6 +430,29 @@ enum Command {
         #[arg(long)]
         model: Option<String>,
     },
+    /// Foolproof config: show, path, workspace switching (flag > env > file > default).
+    Config {
+        #[command(subcommand)]
+        cmd: ConfigCmd,
+    },
+    /// Generate shell completions (zsh/bash/fish) — tab autocomplete for deterministic workflows.
+    Completions {
+        /// Shell: zsh, bash, fish, powershell, elvish
+        shell: String,
+    },
+    /// Learn: append recent shell history to observation log (deterministic workflows).
+    Learn {
+        /// Max commands to learn
+        #[arg(long, default_value_t = 200)]
+        max: usize,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Shell integration: print zsh snippet to source (history hook + completions).
+    Shell {
+        #[command(subcommand)]
+        cmd: ShellCmd,
+    },
 }
 
 #[derive(Subcommand)]
@@ -536,6 +559,37 @@ enum HypothesisCmd {
         #[arg(long, default_value_t = 0)]
         older_than: i64,
     },
+}
+
+#[derive(Subcommand)]
+enum ConfigCmd {
+    /// Show merged config (file + env) as JSON
+    Show { #[arg(long)] json: bool },
+    /// Print config file path
+    Path,
+    /// Workspace: list or switch
+    Workspace {
+        #[command(subcommand)]
+        cmd: WorkspaceCmd,
+    },
+    /// Set a key (oracle.url, oracle.model, oracle.key, ask.corpus, ask.budget)
+    Set { key: String, value: String },
+    /// Get a key
+    Get { key: String },
+}
+
+#[derive(Subcommand)]
+enum WorkspaceCmd {
+    /// List workspaces, mark active with *
+    List,
+    /// Switch active workspace (creates if data_dir given)
+    Use { name: String, #[arg(long)] data_dir: Option<String> },
+}
+
+#[derive(Subcommand)]
+enum ShellCmd {
+    /// Print zsh init snippet (add to ~/.zshrc: eval "$(physis-core shell init zsh)")
+    Init { shell: String },
 }
 
 #[derive(Subcommand)]
@@ -661,6 +715,10 @@ fn main() -> anyhow::Result<()> {
         }
         #[cfg(feature = "studio")]
         Command::Serve { port, model } => run_studio(port, model),
+        Command::Config { cmd } => cmd_config(cmd),
+        Command::Completions { shell } => cmd_completions(&shell),
+        Command::Learn { max, dry_run } => cmd_learn(max, dry_run),
+        Command::Shell { cmd } => cmd_shell(cmd),
     }
 }
 
@@ -1731,6 +1789,127 @@ fn run_discover(dir: Option<&std::path::Path>, min_cluster: usize) -> anyhow::Re
         }
     }
     Ok(())
+}
+
+fn cmd_config(cmd: ConfigCmd) -> anyhow::Result<()> {
+    use physis_core::config;
+    match cmd {
+        ConfigCmd::Path => { println!("{}", config::config_path().display()); Ok(()) }
+        ConfigCmd::Show { json } => {
+            let cfg = config::load();
+            if json { println!("{}", serde_json::to_string_pretty(&cfg)?); }
+            else { println!("workspace: {}\nconfig: {}\ndata_dir: {}\nworkspaces: {}", cfg.workspace, config::config_path().display(), config::data_dir(&cfg).display(), cfg.workspaces.keys().cloned().collect::<Vec<_>>().join(", ")); }
+            Ok(())
+        }
+        ConfigCmd::Get { key } => {
+            let cfg = config::load();
+            let v = match key.as_str() {
+                "workspace" => cfg.workspace.clone(),
+                "oracle.url" => cfg.oracle.url.clone().unwrap_or_default(),
+                "oracle.model" => cfg.oracle.model.clone().unwrap_or_default(),
+                "oracle.key" => cfg.oracle.key.clone().unwrap_or_else(|| "(unset)".into()),
+                "ask.corpus" => cfg.ask.corpus.clone().unwrap_or_default(),
+                "ask.budget" => cfg.ask.budget.map(|n| n.to_string()).unwrap_or_default(),
+                e if e.starts_with("workspaces.") => { let name=e.strip_prefix("workspaces.").unwrap(); cfg.workspaces.get(name).and_then(|w| w.data_dir.clone()).unwrap_or_default() }
+                _ => anyhow::bail!("unknown key {key} — try oracle.url, oracle.model, ask.corpus, ask.budget, workspace"),
+            };
+            println!("{v}");
+            Ok(())
+        }
+        ConfigCmd::Set { key, value } => {
+            let mut cfg = config::load();
+            match key.as_str() {
+                "oracle.url" => cfg.oracle.url = Some(value),
+                "oracle.model" => cfg.oracle.model = Some(value),
+                "oracle.key" => cfg.oracle.key = Some(value),
+                "ask.corpus" => cfg.ask.corpus = Some(value),
+                "ask.budget" => cfg.ask.budget = Some(value.parse()?),
+                "ask.confidence" => cfg.ask.confidence = Some(value.parse()?),
+                "workspace" => cfg.workspace = value,
+                _ => anyhow::bail!("unknown key {key}"),
+            }
+            config::save(&cfg)?;
+            println!("set {key}");
+            Ok(())
+        }
+        ConfigCmd::Workspace { cmd } => match cmd {
+            WorkspaceCmd::List => {
+                let cfg = config::load();
+                for (name, ws) in &cfg.workspaces {
+                    let mark = if *name == cfg.workspace { "*" } else { " " };
+                    println!("{mark} {name} -> {}", ws.data_dir.as_deref().unwrap_or("~/.physis-core"));
+                }
+                Ok(())
+            }
+            WorkspaceCmd::Use { name, data_dir } => {
+                let mut cfg = config::load();
+                if !cfg.workspaces.contains_key(&name) {
+                    cfg.workspaces.insert(name.clone(), physis_core::config::Workspace { data_dir: data_dir.clone() });
+                } else if let Some(d) = data_dir { cfg.workspaces.get_mut(&name).unwrap().data_dir = Some(d); }
+                cfg.workspace = name.clone();
+                config::save(&cfg)?;
+                println!("workspace -> {name} ({})", config::data_dir(&cfg).display());
+                Ok(())
+            }
+        },
+    }
+}
+
+fn cmd_completions(shell: &str) -> anyhow::Result<()> {
+    // ponytail: no new dep — emit minimal static completions covering main commands
+    let cmds = ["classify","ontology","facet","scan","search","node-edit","node-delete","node-search","vault","history","praxis","snapshot","assert","dream","quality","hypothesis","contradiction","audit","replay","discover","studio","ask","serve","config","completions","learn","shell","watch","observed","act","claim","direction","ground","chain","notebook","context","demo","model","ngram"];
+    match shell {
+        "zsh" => {
+            println!("#compdef physis-core");
+            println!("_physis_core() {{ local -a completions; completions=({})", cmds.join(" "));
+            println!("  _describe 'command' completions }}");
+            println!("compdef _physis_core physis-core; compdef _physis_core physis");
+            println!("# install: physis-core completions zsh > ~/.zsh/completions/_physis-core && fpath=(~/.zsh/completions $fpath)");
+        }
+        "bash" => {
+            println!("_physis_complete() {{ local cur=${{COMP_WORDS[COMP_CWORD]}}; COMPREPLY=($(compgen -W \"{}\" -- \"$cur\")); }}", cmds.join(" "));
+            println!("complete -F _physis_complete physis-core physis");
+        }
+        "fish" => {
+            for c in cmds { println!("complete -c physis-core -f -a {c}"); }
+        }
+        _ => anyhow::bail!("unknown shell {shell} — try zsh, bash, fish"),
+    }
+    Ok(())
+}
+
+fn cmd_learn(max: usize, dry_run: bool) -> anyhow::Result<()> {
+    let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+    let hist = { let z = home.join(".zsh_history"); if z.exists() { z } else { home.join(".bash_history") } };
+    let log = physis_core::observe::log_path();
+    let known = physis_core::observe::read_tail(&log, 20_000).unwrap_or_default();
+    let obs = physis_core::observe::watch_shell(&hist, &known, max);
+    if obs.is_empty() { println!("nothing new to learn ({} known, hist {})", known.iter().filter(|o| o.source=="terminal").count(), hist.display()); return Ok(()); }
+    println!("learn: {} new terminal command(s) from {}", obs.len(), hist.display());
+    for o in &obs { println!("  {} ({}ms)", o.subject, o.duration_ms.unwrap_or(0)); }
+    if dry_run { println!("dry_run — not appended"); return Ok(()); }
+    let mut v = obs.clone();
+    let (a,b) = physis_core::observe::append(&log, &mut v)?;
+    println!("appended #{a}..#{b} to {}", log.display());
+    Ok(())
+}
+
+fn cmd_shell(cmd: ShellCmd) -> anyhow::Result<()> {
+    match cmd {
+        ShellCmd::Init { shell } => {
+            if shell=="zsh" {
+                println!(r#"# physis shell init — add to ~/.zshrc: eval "$(physis-core shell init zsh)""#);
+                println!(r#"# 1) completions: physis-core completions zsh > ~/.zsh/completions/_physis-core"#);
+                println!(r#"# 2) history hook — every command gets learned on next `physis learn` / `watch --source terminal`"#);
+                println!(r#"setopt EXTENDED_HISTORY INC_APPEND_HISTORY SHARE_HISTORY"#);
+                println!(r#"# optional: auto-learn in background after each command"#);
+                println!(r#"physis_learn_hook() {{ (physis-core learn --max 20 >/dev/null 2>&1 &); }}"#);
+                println!(r#"autoload -Uz add-zsh-hook; add-zsh-hook precmd physis_learn_hook"#);
+                println!(r#"# deterministic workflows: `physis observed --source terminal --limit 50` shows your command ledger"#);
+            } else { anyhow::bail!("only zsh supported for shell init, got {shell}"); }
+            Ok(())
+        }
+    }
 }
 
 #[cfg(feature = "studio")]

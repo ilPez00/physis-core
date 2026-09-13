@@ -39,7 +39,7 @@ use ratatui::{
 
 use physis_core::{observe::Observation, service, store};
 
-const TABS: [&str; 4] = ["STATUS", "LEDGER", "ASK", "WATCH"];
+const TABS: [&str; 5] = ["STATUS", "LEDGER", "ASK", "WATCH", "CONFIG"];
 
 fn usage() -> ! {
     eprintln!(
@@ -119,6 +119,10 @@ impl App {
                 }
                 Err(e) => self.msg = format!("watch failed: {e}"),
             },
+            4 => {
+                let cfg = physis_core::config::load();
+                self.msg = format!("config: workspace {} @ {} · oracle {} · corpus {} · budget {}", cfg.workspace, physis_core::config::data_dir(&cfg).display(), cfg.oracle.model.as_deref().unwrap_or("—"), cfg.ask.corpus.as_deref().unwrap_or("examples"), cfg.ask.budget.unwrap_or(1200));
+            }
             _ => {}
         }
     }
@@ -256,6 +260,19 @@ fn main() {
                     app.refresh();
                 }
                 KeyCode::Char('r') | KeyCode::Char('R') => app.refresh(),
+                KeyCode::Char('w') | KeyCode::Char('W') if app.tab==4 => {
+                    // cycle workspaces live
+                    let mut cfg = physis_core::config::load();
+                    let names: Vec<String> = cfg.workspaces.keys().cloned().collect();
+                    if !names.is_empty() {
+                        let idx = names.iter().position(|n| n==&cfg.workspace).unwrap_or(0);
+                        cfg.workspace = names[(idx+1)%names.len()].clone();
+                        let _ = physis_core::config::save(&cfg);
+                        app.data_dir = physis_core::config::data_dir(&cfg);
+                        app.msg = format!("workspace -> {} ({})", cfg.workspace, app.data_dir.display());
+                        app.refresh();
+                    }
+                }
                 KeyCode::Up => app.sel = app.sel.saturating_sub(1),
                 KeyCode::Down => app.sel = app.sel.saturating_add(1),
                 KeyCode::Backspace => {
@@ -305,7 +322,8 @@ fn draw(f: &mut ratatui::Frame, app: &mut App) {
         0 => draw_status(f, app, root[1]),
         1 => draw_ledger(f, app, root[1]),
         2 => draw_ask(f, app, root[1]),
-        _ => draw_watch(f, app, root[1]),
+        3 => draw_watch(f, app, root[1]),
+        _ => draw_config(f, app, root[1]),
     }
     f.render_widget(
         Paragraph::new(app.msg.as_str()).style(Style::default().fg(Color::DarkGray)),
@@ -508,6 +526,26 @@ fn draw_watch(f: &mut ratatui::Frame, app: &App, area: Rect) {
     } else {
         f.render_widget(list, area);
     }
+}
+
+fn draw_config(f: &mut ratatui::Frame, app: &App, area: Rect) {
+    let cfg = physis_core::config::load();
+    let ws: String = cfg.workspaces.iter().map(|(k,v)| format!("{}->{} {}", k, v.data_dir.as_deref().unwrap_or("~/.physis-core"), if k==&cfg.workspace {"*"} else {""})).collect::<Vec<_>>().join("\n");
+    let text = vec![
+        Line::from(vec![Span::styled("workspaces ", Style::default().fg(Color::DarkGray)), Span::raw(cfg.workspace.clone()), Span::styled("  (w to cycle)", Style::default().fg(Color::DarkGray))]),
+        Line::from(ws),
+        Line::from(""),
+        Line::from(vec![Span::styled("oracle url   ", Style::default().fg(Color::DarkGray)), Span::raw(cfg.oracle.url.clone().unwrap_or_else(|| "(env PHYSIS_ORACLE_URL)".into()))]),
+        Line::from(vec![Span::styled("oracle model ", Style::default().fg(Color::DarkGray)), Span::raw(cfg.oracle.model.clone().unwrap_or_else(|| "(env)".into()))]),
+        Line::from(vec![Span::styled("ask corpus   ", Style::default().fg(Color::DarkGray)), Span::raw(cfg.ask.corpus.clone().unwrap_or_else(|| "examples".into()))]),
+        Line::from(vec![Span::styled("ask budget   ", Style::default().fg(Color::DarkGray)), Span::raw(cfg.ask.budget.unwrap_or(1200).to_string())]),
+        Line::from(vec![Span::styled("ask draft    ", Style::default().fg(Color::DarkGray)), Span::raw(cfg.ask.draft.unwrap_or(false).to_string())]),
+        Line::from(""),
+        Line::from(Span::styled("edit: physis-core config set <key> <value>  ·  show: config show  ·  path: config path  (CLI, same file)", Style::default().fg(Color::DarkGray))),
+        Line::from(Span::styled("web: /settings persists to same file  ·  env still wins over file", Style::default().fg(Color::DarkGray))),
+        Line::from(format!("config file: {}  ·  data_dir: {}", physis_core::config::config_path().display(), app.data_dir.display())),
+    ];
+    f.render_widget(Paragraph::new(text).block(block("CONFIG (foolproof: flag>env>file>default)")).wrap(Wrap{trim:false}), area);
 }
 
 fn shorten(s: &str, max: usize) -> String {

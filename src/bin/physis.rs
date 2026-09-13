@@ -61,6 +61,21 @@ const CORE_COMMANDS: &[(&str, &str)] = &[
     ("studio", "Open the Core studio in a browser"),
     ("serve", "Serve the studio — the browser surface of the meta-tool"),
     ("ask", "Grounded answer over a corpus; records the ask to the log"),
+    ("watch", "Append what changed to the observation log"),
+    ("observed", "Read the observation log"),
+    ("act", "Run a command, record it, say what is believed"),
+    ("claim", "Promote an observation into a refutable claim"),
+    ("ground", "Shared human/machine belief state"),
+    ("chain", "Structure + context + gaps + drift (one pass)"),
+    ("notebook", "Grounded answer with citations (two tiers)"),
+    ("context", "Token-budget compiled context"),
+    ("direction", "Did the transformation go as asked?"),
+    ("benchmark", "Deterministic benchmark with artifacts"),
+    ("run", "Run pipeline from JSON config"),
+    ("config", "Foolproof config (file>env>default, workspaces)"),
+    ("completions", "Generate shell completions (tab autocomplete)"),
+    ("learn", "Learn recent shell history to observation log"),
+    ("shell", "Shell integration (zsh hook + completions)"),
 ];
 
 /// Subcommands served by `physis-pro`. Abridged on purpose: the full list is

@@ -14,7 +14,26 @@ pub const DATA_DIR_ENV: &str = "PHYSIS_CORE_DIR";
 /// graph, containers with a mounted volume, or a second graph kept per project.
 /// Unset, it stays `$HOME/.physis-core` so the shared default is unchanged.
 pub fn data_dir() -> PathBuf {
-    resolve_data_dir(std::env::var_os(DATA_DIR_ENV), std::env::var_os("HOME"))
+    // Config file is the foolproof layer: workspaces live there. Env still wins.
+    if let Some(dir) = std::env::var_os(DATA_DIR_ENV).filter(|v| !v.is_empty()) {
+        return PathBuf::from(dir);
+    }
+    // Try XDG config workspaces (tolerate missing/broken -> default)
+    if let Ok(s) = std::fs::read_to_string(crate::config::config_path()) {
+        if let Ok(cfg) = serde_json::from_str::<crate::config::PhysisConfig>(&s) {
+            if let Some(ws) = cfg.workspaces.get(&cfg.workspace) {
+                if let Some(d) = ws.data_dir.as_deref().filter(|s| !s.is_empty()) {
+                    let expanded = if let Some(rest) = d.strip_prefix("~/") {
+                        if let Some(home) = std::env::var_os("HOME") {
+                            PathBuf::from(home).join(rest).to_string_lossy().to_string()
+                        } else { d.to_string() }
+                    } else { d.to_string() };
+                    return PathBuf::from(expanded);
+                }
+            }
+        }
+    }
+    resolve_data_dir(None, std::env::var_os("HOME"))
 }
 
 /// The branching behind [`data_dir`], kept pure so it is testable without

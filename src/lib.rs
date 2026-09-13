@@ -223,6 +223,7 @@ pub mod chain;
 pub mod ground;
 pub mod notebook;
 pub mod store;
+pub mod config;
 pub mod temporal;
 pub mod transplant;
 pub mod transform;

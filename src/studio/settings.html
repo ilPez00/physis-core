@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>physis · settings</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font: 14px/1.5 ui-monospace, monospace; background:#101418; color:#d7dee6; margin:0; padding:2rem; max-width: 720px; }
+  h1 { font-size:1rem; color:#7fb2e5; margin:0 0 .25rem; } .sub{color:#6d7d8d;margin-bottom:1.25rem}
+  label{ display:grid; gap:.2rem; font-size:.8rem; color:#6d7d8d; margin-bottom:.7rem}
+  input,select{ font:inherit; background:#1a2027; color:#d7dee6; border:1px solid #2c3540; border-radius:4px; padding:.45rem .6rem}
+  button{ font:inherit; background:#23425e; color:#d7dee6; border:1px solid #375d7d; border-radius:4px; padding:.45rem .9rem; cursor:pointer}
+  button:hover{ background:#2c5273} .msg{ margin-top:1rem; white-space:pre-wrap}
+  a{ color:#7fb2e5}
+</style></head>
+<body>
+<h1>physis · settings</h1>
+<div class="sub">foolproof config — same file CLI, TUI, web read: <code id="path"></code> · precedence flag&gt;env&gt;file&gt;default · <a href="/ask">ask</a> · <a href="/">studio</a></div>
+<form id="f">
+  <label>workspace <input id="workspace"></label>
+  <label>data_dir (for this workspace) <input id="data_dir" placeholder="~/.physis-core"></label>
+  <label>oracle url <input id="oracle_url" placeholder="http://localhost:11434/v1"></label>
+  <label>oracle model <input id="oracle_model" placeholder="qwen2.5:3b"></label>
+  <label>oracle key <input id="oracle_key" placeholder="ollama"></label>
+  <label>ask corpus <input id="ask_corpus" placeholder="examples"></label>
+  <label>ask budget <input id="ask_budget" type="number" placeholder="1200"></label>
+  <button>save</button>
+</form>
+<div id="msg" class="msg"></div>
+<script>
+async function load(){
+  let r = await fetch('/api/v1/settings'); let j = await r.json();
+  document.getElementById('path').textContent = j.path;
+  let c=j.config;
+  document.getElementById('workspace').value=c.workspace||'main';
+  document.getElementById('data_dir').value=(c.workspaces?.[c.workspace]?.data_dir)||'';
+  document.getElementById('oracle_url').value=c.oracle?.url||'';
+  document.getElementById('oracle_model').value=c.oracle?.model||'';
+  document.getElementById('oracle_key').value=c.oracle?.key||'';
+  document.getElementById('ask_corpus').value=c.ask?.corpus||'';
+  document.getElementById('ask_budget').value=c.ask?.budget||'';
+}
+document.getElementById('f').onsubmit=async e=>{
+  e.preventDefault();
+  let payload={
+    workspace: document.getElementById('workspace').value,
+    data_dir: document.getElementById('data_dir').value,
+    oracle:{url: document.getElementById('oracle_url').value, model: document.getElementById('oracle_model').value, key: document.getElementById('oracle_key').value},
+    ask:{corpus: document.getElementById('ask_corpus').value, budget: document.getElementById('ask_budget').value? parseInt(document.getElementById('ask_budget').value):null}
+  };
+  let r=await fetch('/api/v1/settings',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+  document.getElementById('msg').textContent=await r.text();
+  load();
+};
+load();
+</script>
+</body></html>

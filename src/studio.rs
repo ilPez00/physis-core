@@ -235,6 +235,8 @@ pub async fn run_with_model(port: u16, model_dir: Option<String>) -> anyhow::Res
         // the TUI's ASK tab call. The existing SPA is untouched.
         .route("/ask", get(ask_page))
         .route("/api/v1/ask", post(api_ask))
+        .route("/settings", get(settings_page))
+        .route("/api/v1/settings", get(api_settings_get).post(api_settings_post))
         .merge(crate::studio_lab::router())
         .with_state(state);
 
@@ -1878,9 +1880,58 @@ async fn api_ontology_discover(
 // `degraded` says why. Every ask is appended to the observation log.
 
 const ASK_HTML: &str = include_str!("studio/ask.html");
+const SETTINGS_HTML: &str = include_str!("studio/settings.html");
 
 async fn ask_page() -> Html<&'static str> {
     Html(ASK_HTML)
+}
+
+async fn settings_page() -> Html<&'static str> {
+    Html(SETTINGS_HTML)
+}
+
+async fn api_settings_get() -> axum::Json<serde_json::Value> {
+    let cfg = crate::config::load();
+    let path = crate::config::config_path();
+    axum::Json(serde_json::json!({"config": cfg, "path": path.display().to_string()}))
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct SettingsPost {
+    workspace: Option<String>,
+    data_dir: Option<String>,
+    oracle: Option<OracleIn>,
+    ask: Option<AskIn>,
+}
+#[derive(Debug, serde::Deserialize)]
+struct OracleIn { url: Option<String>, model: Option<String>, key: Option<String> }
+#[derive(Debug, serde::Deserialize)]
+struct AskIn { corpus: Option<String>, budget: Option<usize> }
+
+async fn api_settings_post(axum::Json(req): axum::Json<SettingsPost>) -> axum::response::Response {
+    let mut cfg = crate::config::load();
+    if let Some(ws) = req.workspace.filter(|s| !s.trim().is_empty()) {
+        if !cfg.workspaces.contains_key(&ws) {
+            cfg.workspaces.insert(ws.clone(), crate::config::Workspace { data_dir: None });
+        }
+        cfg.workspace = ws;
+    }
+    if let Some(d) = req.data_dir.filter(|s| !s.trim().is_empty()) {
+        cfg.workspaces.entry(cfg.workspace.clone()).or_insert(crate::config::Workspace { data_dir: None }).data_dir = Some(d);
+    }
+    if let Some(o) = req.oracle {
+        if let Some(v) = o.url.filter(|s| !s.trim().is_empty()) { cfg.oracle.url = Some(v); }
+        if let Some(v) = o.model.filter(|s| !s.trim().is_empty()) { cfg.oracle.model = Some(v); }
+        if let Some(v) = o.key.filter(|s| !s.trim().is_empty()) { cfg.oracle.key = Some(v); }
+    }
+    if let Some(a) = req.ask {
+        if let Some(v) = a.corpus.filter(|s| !s.trim().is_empty()) { cfg.ask.corpus = Some(v); }
+        if let Some(v) = a.budget { cfg.ask.budget = Some(v); }
+    }
+    match crate::config::save(&cfg) {
+        Ok(_) => (axum::http::StatusCode::OK, "saved").into_response(),
+        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, format!("save failed: {e}")).into_response(),
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -1893,12 +1944,15 @@ struct ApiAskReq {
 }
 
 async fn api_ask(axum::Json(req): axum::Json<ApiAskReq>) -> Response {
+    let cfg = crate::config::load();
+    let def_corpus = cfg.ask.corpus.clone().unwrap_or_else(|| "examples".into());
+    let def_budget = cfg.ask.budget;
     let request = crate::service::AskRequest {
         query: req.query,
-        corpus: req.corpus.unwrap_or_else(|| "examples".into()),
-        budget: req.budget,
+        corpus: req.corpus.filter(|s| !s.trim().is_empty()).unwrap_or(def_corpus),
+        budget: req.budget.or(def_budget),
         draft: req.draft.unwrap_or(false),
-        confidence: req.confidence,
+        confidence: req.confidence.or(cfg.ask.confidence),
     };
     // The ask embeds the corpus — potentially seconds with a semantic
     // embedder, so it runs off the async runtime.
