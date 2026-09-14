@@ -524,3 +524,53 @@ fn a_closed_pipe_ends_output_instead_of_panicking() {
         "head should still receive its two lines"
     );
 }
+
+#[test]
+fn predict_reads_the_workspace_record_and_says_when_there_is_none() {
+    let (_temp, ws) = workspace();
+
+    // An unread store and an empty one look identical, and both would round to
+    // "nothing ever fails".
+    let empty = json(&cli(&ws, &["predict", "--", "cargo", "test"]));
+    assert_eq!(empty["data"]["status"].as_str().unwrap(), "NOT MEASURED");
+    assert_eq!(empty["data"]["runs_total"].as_u64().unwrap(), 0);
+
+    for _ in 0..3 {
+        let failed = cli(&ws, &["run", "--intent", "probe", "--", "false"]);
+        assert!(!failed.status.success(), "`false` should fail");
+    }
+    let ok = cli(&ws, &["run", "--intent", "probe", "--", "true"]);
+    assert!(ok.status.success());
+
+    let seen = json(&cli(&ws, &["predict", "--", "false"]));
+    let data = &seen["data"];
+    assert_eq!(data["runs_of_this_kind"].as_u64().unwrap(), 3);
+    assert_eq!(data["failures_of_this_kind"].as_u64().unwrap(), 3);
+    assert_eq!(data["runs_total"].as_u64().unwrap(), 4);
+    let p = data["failure_probability"].as_f64().unwrap();
+    assert!(p > 0.7 && p < 1.0, "smoothed away from a bare 3/3: {p}");
+    assert!(!data["recent"].as_array().unwrap().is_empty());
+
+    // A kind with no record of its own falls back to the workspace's own rate,
+    // not to zero and not to the failing kind's rate.
+    let unseen = json(&cli(&ws, &["predict", "--", "some-command-never-run"]));
+    let unseen = &unseen["data"];
+    assert_eq!(unseen["runs_of_this_kind"].as_u64().unwrap(), 0);
+    let backoff = unseen["failure_probability"].as_f64().unwrap();
+    let workspace_rate = unseen["workspace_failure_rate"].as_f64().unwrap();
+    assert!((backoff - workspace_rate).abs() < 1e-9, "{backoff} vs {workspace_rate}");
+
+    // `cargo test` and `cargo build` are different kinds; `ls -la` is not two.
+    assert_eq!(
+        json(&cli(&ws, &["predict", "--", "cargo", "test"]))["data"]["kind"]
+            .as_str()
+            .unwrap(),
+        "cargo test"
+    );
+    assert_eq!(
+        json(&cli(&ws, &["predict", "--", "ls", "-la"]))["data"]["kind"]
+            .as_str()
+            .unwrap(),
+        "ls"
+    );
+}

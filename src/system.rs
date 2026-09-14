@@ -146,6 +146,7 @@ impl Workspace {
                 {"name":"list", "writes":false, "purpose":"List addressable file objects"},
                 {"name":"find", "writes":false, "purpose":"Rank files and remembered outcomes using BM25"},
                 {"name":"pack", "writes":false, "purpose":"Assemble a token-budgeted context bundle of line windows"},
+                {"name":"predict", "writes":false, "purpose":"Read this workspace's own record of how this kind of action has gone"},
                 {"name":"read", "writes":false, "purpose":"Read a path (optionally path:start-end), file ID or prefix, or obs:sequence"},
                 {"name":"history", "writes":false, "purpose":"Read this workspace's recorded work"},
                 {"name":"remember", "writes":true, "purpose":"Append a note with an explicit outcome"},
@@ -587,6 +588,95 @@ impl Workspace {
         }))
     }
 
+    /// What this workspace's own record says is likely to happen if you run
+    /// this.
+    ///
+    /// The log already holds every `run` this interface executed, with the exit
+    /// status reality gave it. Nothing read those back at the moment a decision
+    /// was made, which is a write with no read one level up from the symbols
+    /// rule 1 checks. This is the read.
+    ///
+    /// Measured on 9466 recorded actions from agent transcripts (E71,
+    /// `research/E71_ANTICIPATING_OUTCOMES.md`): the failure rate of *this kind
+    /// of action*, accumulated across sessions, carries essentially all of the
+    /// available signal — AUC 0.620 against 0.500 for a base rate, and online
+    /// within-session adaptation did not improve on it. So this returns the
+    /// prior and the counts behind it, and claims nothing else.
+    pub fn predict(&self, argv: &[String]) -> Result<Value> {
+        ensure!(!argv.is_empty(), "predict needs the argv it would run");
+        let kind = action_kind(argv);
+        let mut kind_runs = 0u32;
+        let mut kind_failures = 0u32;
+        let mut all_runs = 0u32;
+        let mut all_failures = 0u32;
+        let mut recent: Vec<Value> = Vec::new();
+        for record in self.records()? {
+            if record.source != "system.run.finish" {
+                continue;
+            }
+            let payload: Value = serde_json::from_str(&record.body).unwrap_or(Value::Null);
+            let Some(recorded) = payload.get("argv").and_then(Value::as_array) else {
+                continue;
+            };
+            let recorded: Vec<String> = recorded
+                .iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect();
+            if recorded.is_empty() {
+                continue;
+            }
+            // A spawn failure is a failure; a missing success flag is not
+            // evidence of one, so it is skipped rather than assumed.
+            let Some(success) = payload.get("process_success").and_then(Value::as_bool) else {
+                continue;
+            };
+            all_runs += 1;
+            all_failures += u32::from(!success);
+            if action_kind(&recorded) == kind {
+                kind_runs += 1;
+                kind_failures += u32::from(!success);
+                recent.push(json!({
+                    "seq": record.seq,
+                    "argv": recorded,
+                    "failed": !success,
+                    "exit_code": payload.get("exit_code").cloned().unwrap_or(Value::Null),
+                }));
+            }
+        }
+        if all_runs == 0 {
+            // Rule 6: an empty store and an unread store look identical, and
+            // both would round to "nothing ever fails".
+            return Ok(json!({
+                "kind": kind,
+                "status": "NOT MEASURED",
+                "reason": "this workspace's log holds no completed run, so there is no prior to read",
+                "runs_of_this_kind": 0, "runs_total": 0, "log": self.log_path(),
+            }));
+        }
+        let global = f64::from(all_failures) / f64::from(all_runs);
+        // Laplace toward the workspace's own global rate: two pseudo-counts, so
+        // one unlucky first run of a kind does not read as a 100% failure rate.
+        let smoothed = (f64::from(kind_failures) + 2.0 * global) / (f64::from(kind_runs) + 2.0);
+        recent.reverse();
+        recent.truncate(5);
+        Ok(json!({
+            "kind": kind,
+            "argv": argv,
+            "failure_probability": smoothed,
+            "runs_of_this_kind": kind_runs,
+            "failures_of_this_kind": kind_failures,
+            "runs_total": all_runs,
+            "failures_total": all_failures,
+            "workspace_failure_rate": global,
+            "recent": recent,
+            "method": "Laplace-smoothed failure rate of this action kind in this workspace's log",
+            "evidence": "E71: the per-kind prior carried the signal (AUC 0.620 vs 0.500); \
+online within-session adaptation did not improve on it",
+            "not_claimed": "process exit only; a command can exit 0 and still not do what was wanted",
+            "history_window": HISTORY_WINDOW,
+        }))
+    }
+
     pub fn read(&self, target: &str, max_bytes: usize) -> Result<Value> {
         if let Some(seq) = target.strip_prefix("obs:") {
             let seq: u64 = seq
@@ -777,6 +867,32 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<()> {
     serde_json::to_writer_pretty(&mut file, value)?;
     writeln!(file)?;
     Ok(())
+}
+
+/// The coarse action type a prior is kept for: the program being run, without
+/// its path, or the interface operation. E71 found this granularity is where
+/// the predictive signal lives — finer (the exact argv) is too sparse to
+/// accumulate, coarser (just "a run") is the base rate.
+fn action_kind(argv: &[String]) -> String {
+    let Some(program) = argv.first() else {
+        return "?".to_string();
+    };
+    let base = Path::new(program)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| program.clone());
+    // `cargo test` and `cargo build` fail for entirely different reasons, and
+    // the subcommand is free to read.
+    match argv.get(1) {
+        Some(sub) if !sub.starts_with('-') && base_takes_subcommand(&base) => {
+            format!("{base} {sub}")
+        }
+        _ => base,
+    }
+}
+
+fn base_takes_subcommand(base: &str) -> bool {
+    matches!(base, "cargo" | "git" | "npm" | "pnpm" | "yarn" | "just" | "docker" | "python3" | "python")
 }
 
 /// Split a trailing `:start-end` line range off a read target. A path

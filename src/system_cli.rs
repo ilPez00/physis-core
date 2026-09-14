@@ -61,6 +61,12 @@ enum SystemCommand {
         #[arg(long, default_value_t = false)]
         no_bridge: bool,
     },
+    /// What this workspace's log says about how this kind of action has gone.
+    Predict {
+        /// The argv you would run, after `--`.
+        #[arg(last = true, required = true)]
+        argv: Vec<String>,
+    },
     /// Read a relative path, file:<id>, or obs:<sequence>. Append :start-end for one region.
     Read {
         target: String,
@@ -103,6 +109,7 @@ impl SystemCommand {
             Self::List { .. } => "list",
             Self::Find { .. } => "find",
             Self::Pack { .. } => "pack",
+            Self::Predict { .. } => "predict",
             Self::Read { .. } => "read",
             Self::History { .. } => "history",
             Self::Remember { .. } => "remember",
@@ -154,6 +161,7 @@ impl SystemArgs {
                     },
                     !no_bridge,
                 )?,
+                SystemCommand::Predict { argv } => workspace.predict(argv)?,
                 SystemCommand::Read { target, max_bytes } => {
                     workspace.read(target, *max_bytes as usize)?
                 }
@@ -313,6 +321,38 @@ fn render(operation: &str, data: &Value) {
                 "budget counted by {}; re-read a region with `system read path:start-end`",
                 data["token_counter"].as_str().unwrap_or("")
             );
+        }
+        "predict" => {
+            if data["status"] == "NOT MEASURED" {
+                println!(
+                    "NOT MEASURED · {} · {}",
+                    data["kind"].as_str().unwrap_or(""),
+                    data["reason"].as_str().unwrap_or("")
+                );
+            } else {
+                println!(
+                    "{}  failure probability {:.2}  ({} of {} run(s) of this kind failed; \
+workspace rate {:.2} over {} run(s))",
+                    data["kind"].as_str().unwrap_or(""),
+                    data["failure_probability"].as_f64().unwrap_or(0.0),
+                    data["failures_of_this_kind"],
+                    data["runs_of_this_kind"],
+                    data["workspace_failure_rate"].as_f64().unwrap_or(0.0),
+                    data["runs_total"]
+                );
+                for entry in data["recent"].as_array().into_iter().flatten() {
+                    println!(
+                        "  obs:{}  {}  {}",
+                        entry["seq"],
+                        if entry["failed"] == true { "failed " } else { "ok     " },
+                        entry["argv"]
+                            .as_array()
+                            .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(" "))
+                            .unwrap_or_default()
+                    );
+                }
+                println!("{}", data["not_claimed"].as_str().unwrap_or(""));
+            }
         }
         "find" => {
             println!(
