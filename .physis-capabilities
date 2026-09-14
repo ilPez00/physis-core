@@ -1,27 +1,19 @@
-# physis-core — what this crate claims it can do, and the two symbols that
-# prove each claim runs.
+# capability | write path | read path
 #
-#   capability | write path | read path
+# A capability is present when BOTH halves run: something writes it, and
+# something reads it. A write with no read is a field nobody consults; a read
+# with no write always returns the default. `physis-check capabilities` checks
+# each half against the rule-1 scan, so a capability deleted from the source
+# stops passing here instead of surviving in prose.
 #
-# The rule is `physis-check capabilities`: a capability is present when
-# something writes it AND something reads it, both outside the file that
-# declares them and outside the test suite. Three capabilities in this crate
-# had one half missing (PH-019, PH-021, and the observation watchers) and each
-# read as shipped until someone found it by accident. This file is that
-# accident, made into a command.
-#
-# A comma-separated field means any one of the alternatives satisfies that half.
+# Comma-separated alternatives satisfy a half if any one of them is live.
 
-bi-temporal validity        | narrow_until                                                  | is_valid_at
-prediction scoring          | resolve_prediction                                            | predictions
-structural machines         | StructuralMachine                                             | ProofStatus
-continuous observation      | watch_fs, watch_git, watch_shell, watch_agent, watch_proc, watch_browser | read_tail, by_source
-acting against belief       | bearing_on                                                    | is_warning
-structural map              | build_map                                                     | MapReport
-context compression         | compile_context                                               | ContextReport
-token-fixed retrieval       | TokenFixedRetriever                                           | ContextReport
-interchangeable n-gram table| TableBuilder                                                  | BackoffTable
-model provider registry     | NgramDecoderModel                                             | ModelProvider
-one configuration mechanism | RunConfig                                                     | load_config
-provenance chains           | add_link                                                      | cited_intake_ids
-observation to claim        | promote                                                       | cited_by
+append-only observation log   | append                | read, read_tail
+filesystem observation        | watch_fs              | by_source, read_tail
+process observation           | watch_proc            | by_source, read_tail
+bi-temporal validity          | narrow_until          | is_valid_at
+workspace interface           | Workspace::record, remember | history, find
+token-budgeted packing        | pack_with             | PackStrategy, chunks
+line-window ranking           | Bm25Index             | rank, score
+hypothesis fitness            | evidence, with_weight | fitness, status
+world states from log order   | mutual_knn            | components, structural_descriptor
