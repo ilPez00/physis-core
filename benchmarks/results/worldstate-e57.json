@@ -1,0 +1,105 @@
+{
+  "arms": [
+    {
+      "arm": "cosine (blind)",
+      "queries": 150,
+      "top1": 0.0,
+      "top1_ci": [
+        0.0,
+        0.0
+      ],
+      "top3": 0.0
+    },
+    {
+      "arm": "cosine + pos",
+      "queries": 150,
+      "top1": 0.013333333333333334,
+      "top1_ci": [
+        0.0,
+        0.03333333333333333
+      ],
+      "top3": 0.06
+    },
+    {
+      "arm": "recency only",
+      "queries": 150,
+      "top1": 0.0,
+      "top1_ci": [
+        0.0,
+        0.0
+      ],
+      "top3": 0.20666666666666667
+    },
+    {
+      "arm": "entity+pos+cos",
+      "queries": 150,
+      "top1": 0.7,
+      "top1_ci": [
+        0.6266666666666667,
+        0.7733333333333333
+      ],
+      "top3": 0.9933333333333333
+    },
+    {
+      "arm": "shuffled null",
+      "queries": 150,
+      "top1": 0.0,
+      "top1_ci": [
+        0.0,
+        0.0
+      ],
+      "top3": 0.006666666666666667
+    },
+    {
+      "arm": "bm25 + position",
+      "queries": 150,
+      "top1": 0.013333333333333334,
+      "top1_ci": [
+        0.0,
+        0.03333333333333333
+      ],
+      "top3": 0.05333333333333334
+    },
+    {
+      "arm": "shared word + cos",
+      "queries": 150,
+      "top1": 0.013333333333333334,
+      "top1_ci": [
+        0.0,
+        0.03333333333333333
+      ],
+      "top3": 0.06
+    }
+  ],
+  "by_gap": [
+    {
+      "gap": 3,
+      "hits": 22,
+      "queries": 31
+    },
+    {
+      "gap": 5,
+      "hits": 24,
+      "queries": 33
+    },
+    {
+      "gap": 7,
+      "hits": 18,
+      "queries": 30
+    },
+    {
+      "gap": 9,
+      "hits": 22,
+      "queries": 32
+    },
+    {
+      "gap": 11,
+      "hits": 19,
+      "queries": 24
+    }
+  ],
+  "corpus": "corpus-large.jsonl (GENERATED)",
+  "corpus_sha256": "2eaff7bb33d76ff29fb3892a7ebf3af96b844bdad023b4f4bd038074a42efd76",
+  "embedder": "onnx-explicit",
+  "n_sentences": 1320
+}

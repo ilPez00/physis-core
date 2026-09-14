@@ -1,0 +1,148 @@
+{
+  "ablation": [
+    {
+      "corpus": "corpus.jsonl (hand)",
+      "f1": 0.462686567164179,
+      "precision": 0.96875,
+      "recall": 0.30392156862745096,
+      "rules": "id"
+    },
+    {
+      "corpus": "corpus.jsonl (hand)",
+      "f1": 0.07547169811320754,
+      "precision": 1.0,
+      "recall": 0.0392156862745098,
+      "rules": "cap"
+    },
+    {
+      "corpus": "corpus.jsonl (hand)",
+      "f1": 0.5512820512820512,
+      "precision": 0.4195121951219512,
+      "recall": 0.8037383177570093,
+      "rules": "df"
+    },
+    {
+      "corpus": "corpus.jsonl (hand)",
+      "f1": 0.5072463768115942,
+      "precision": 0.9722222222222222,
+      "recall": 0.3431372549019608,
+      "rules": "id+cap"
+    },
+    {
+      "corpus": "corpus-large (generated)",
+      "f1": 0.9468223086900129,
+      "precision": 0.9279661016949152,
+      "recall": 0.9664607237422771,
+      "rules": "id"
+    },
+    {
+      "corpus": "corpus-large (generated)",
+      "f1": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "rules": "cap"
+    },
+    {
+      "corpus": "corpus-large (generated)",
+      "f1": 0.2784134248665141,
+      "precision": 0.1626318134561117,
+      "recall": 0.9664607237422771,
+      "rules": "df"
+    },
+    {
+      "corpus": "corpus-large (generated)",
+      "f1": 0.9468223086900129,
+      "precision": 0.9279661016949152,
+      "recall": 0.9664607237422771,
+      "rules": "id+cap"
+    }
+  ],
+  "arms": [
+    {
+      "arm": "gold links",
+      "queries": 150,
+      "top1": 0.7,
+      "top1_ci": [
+        0.6266666666666667,
+        0.7733333333333333
+      ],
+      "top3": 0.9933333333333333
+    },
+    {
+      "arm": "extracted (all 3)",
+      "queries": 150,
+      "top1": 0.013333333333333334,
+      "top1_ci": [
+        0.0,
+        0.03333333333333333
+      ],
+      "top3": 0.06
+    },
+    {
+      "arm": "extracted (id)",
+      "queries": 150,
+      "top1": 0.7,
+      "top1_ci": [
+        0.6266666666666667,
+        0.7733333333333333
+      ],
+      "top3": 0.9933333333333333
+    },
+    {
+      "arm": "extracted (id+cap)",
+      "queries": 150,
+      "top1": 0.7,
+      "top1_ci": [
+        0.6266666666666667,
+        0.7733333333333333
+      ],
+      "top3": 0.9933333333333333
+    }
+  ],
+  "by_gap": [
+    {
+      "gap": 3,
+      "hits": 22,
+      "queries": 31
+    },
+    {
+      "gap": 5,
+      "hits": 24,
+      "queries": 33
+    },
+    {
+      "gap": 7,
+      "hits": 18,
+      "queries": 30
+    },
+    {
+      "gap": 9,
+      "hits": 22,
+      "queries": 32
+    },
+    {
+      "gap": 11,
+      "hits": 19,
+      "queries": 24
+    }
+  ],
+  "corpus_sha256": "2eaff7bb33d76ff29fb3892a7ebf3af96b844bdad023b4f4bd038074a42efd76",
+  "embedder": "onnx-explicit",
+  "extraction": [
+    {
+      "corpus": "corpus.jsonl (hand)",
+      "f1": 0.5579937304075234,
+      "n": 72,
+      "precision": 0.4258373205741627,
+      "recall": 0.8090909090909091
+    },
+    {
+      "corpus": "corpus-large (generated)",
+      "f1": 0.27707489878542507,
+      "n": 1320,
+      "precision": 0.16171909614532565,
+      "recall": 0.9664607237422771
+    }
+  ],
+  "min_df": 3
+}

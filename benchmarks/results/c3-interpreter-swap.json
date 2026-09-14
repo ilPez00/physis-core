@@ -1,6 +1,6 @@
 {
   "documents": 8,
-  "usable": 4,
+  "usable": 3,
   "local_model": "qwen2.5:7b-instruct-q4_K_M",
   "hosted_model": "nvidia/nemotron-3-ultra-550b-a55b",
   "failures": [],
@@ -8,29 +8,33 @@
     {
       "layer": "L1 entities",
       "swap_identical": 0,
-      "control_identical": 4,
-      "of": 4,
+      "control_identical": 3,
+      "of": 3,
+      "swap_jaccard_mean": 0.667,
       "verdict": "CHANGED by the interpreter"
     },
     {
       "layer": "L2 + topology",
       "swap_identical": 0,
-      "control_identical": 4,
-      "of": 4,
+      "control_identical": 3,
+      "of": 3,
+      "swap_jaccard_mean": 0.232,
       "verdict": "CHANGED by the interpreter"
     },
     {
       "layer": "L3 + temporal",
       "swap_identical": 0,
-      "control_identical": 4,
-      "of": 4,
+      "control_identical": 3,
+      "of": 3,
+      "swap_jaccard_mean": 1.0,
       "verdict": "CHANGED by the interpreter"
     },
     {
       "layer": "L4 + fact prose",
       "swap_identical": 0,
-      "control_identical": 4,
-      "of": 4,
+      "control_identical": 3,
+      "of": 3,
+      "swap_jaccard_mean": 0.0,
       "verdict": "CHANGED by the interpreter"
     }
   ]

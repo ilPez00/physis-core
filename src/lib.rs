@@ -210,6 +210,7 @@ pub mod hypothesis;
 pub mod model_provider;
 pub mod models;
 pub mod ngram_table;
+pub mod nlq;
 pub mod oracle;
 pub mod observe;
 pub mod ontology;
@@ -230,6 +231,7 @@ pub mod temporal;
 pub mod transplant;
 pub mod transform;
 pub mod vault;
+pub mod worldstate;
 
 #[cfg(feature = "studio")]
 pub mod studio;

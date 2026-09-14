@@ -67,3 +67,7 @@ required-features = ["cli"]
 [[bin]]
 name = "physis"
 path = "src/bin/physis.rs"
+
+[[bin]]
+name = "physis-world"
+path = "src/bin/world.rs"

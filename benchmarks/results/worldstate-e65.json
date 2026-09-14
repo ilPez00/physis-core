@@ -1,0 +1,34 @@
+[
+  {
+    "corpus": "hand-written",
+    "lexical_margin": 0.26545015680846323,
+    "loser": "bm25 NOT RUN",
+    "n": 72,
+    "redundancy": 0.47096260221260233,
+    "winner": "entity link 0.357"
+  },
+  {
+    "corpus": "documentation",
+    "lexical_margin": 0.23491758172185523,
+    "loser": "entity link 0.209",
+    "n": 168,
+    "redundancy": 0.17197626282447703,
+    "winner": "bm25+pos 0.535"
+  },
+  {
+    "corpus": "machine log",
+    "lexical_margin": 0.5196802977973682,
+    "loser": "entity link 0.296",
+    "n": 388,
+    "redundancy": 0.7855952656985412,
+    "winner": "bm25+pos 0.447"
+  },
+  {
+    "corpus": "generated templates",
+    "lexical_margin": 0.04409198803480791,
+    "loser": "bm25+pos 0.013",
+    "n": 1320,
+    "redundancy": 0.8020543093270363,
+    "winner": "entity link 0.700"
+  }
+]
