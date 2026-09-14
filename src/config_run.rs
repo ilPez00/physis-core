@@ -3,8 +3,14 @@
 //! The pipeline reads [`RunConfig`] (JSON), never a hardcoded model/table/corpus.
 //! Command-line flags overrides the file. Result:
 //!
-//!     physis-core run --config demo.json
-//!     physis-core run --config demo.json --model smollm2-360m --ngram my-5gram
+//! An indented block in a doc comment is a *Rust* doctest, so these two shell
+//! lines were compiled as Rust and failed the suite; the fence says what they
+//! are.
+//!
+//! ```text
+//! physis-core run --config demo.json
+//! physis-core run --config demo.json --model smollm2-360m --ngram my-5gram
+//! ```
 //!
 //! Changing model or n-gram never requires a source change and never shuffles
 //! Physis — the boundaries stay dirty-clean per the infra directive.
