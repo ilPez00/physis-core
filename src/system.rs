@@ -603,75 +603,100 @@ impl Workspace {
     /// within-session adaptation did not improve on it. So this returns the
     /// prior and the counts behind it, and claims nothing else.
     pub fn predict(&self, argv: &[String]) -> Result<Value> {
+        self.predict_with(argv, None)
+    }
+
+    /// `predict`, optionally backing off to another store's record.
+    ///
+    /// A kind this workspace has never run is exactly the case where its own
+    /// log says nothing, and E73 measured what to do about it: a prior from
+    /// another machine transferred as well as the target's own history when the
+    /// kinds overlapped, and not at all when they did not. So a borrowed prior
+    /// is used only above [`PRIOR_COVERAGE_GATE`], or when the local log is
+    /// empty (the cold start, where borrowed beat own at 0.635 against 0.494),
+    /// and the coverage that decided it is in the answer either way.
+    pub fn predict_with(&self, argv: &[String], shared: Option<&Path>) -> Result<Value> {
         ensure!(!argv.is_empty(), "predict needs the argv it would run");
         let kind = action_kind(argv);
-        let mut kind_runs = 0u32;
-        let mut kind_failures = 0u32;
-        let mut all_runs = 0u32;
-        let mut all_failures = 0u32;
-        let mut recent: Vec<Value> = Vec::new();
-        for record in self.records()? {
-            if record.source != "system.run.finish" {
-                continue;
+        let local = Tally::from_runs(&self.records()?, Some(&kind));
+        let shared_tally = match shared {
+            None => None,
+            Some(path) => {
+                let log = if path.is_dir() {
+                    path.join("observations.jsonl")
+                } else {
+                    path.to_path_buf()
+                };
+                ensure!(log.exists(), "shared prior log not found: {}", log.display());
+                let records = observe::read(&log)?;
+                Some((log, Tally::from_runs(&records, Some(&kind))))
             }
-            let payload: Value = serde_json::from_str(&record.body).unwrap_or(Value::Null);
-            let Some(recorded) = payload.get("argv").and_then(Value::as_array) else {
-                continue;
-            };
-            let recorded: Vec<String> = recorded
-                .iter()
-                .filter_map(|v| v.as_str().map(str::to_string))
-                .collect();
-            if recorded.is_empty() {
-                continue;
-            }
-            // A spawn failure is a failure; a missing success flag is not
-            // evidence of one, so it is skipped rather than assumed.
-            let Some(success) = payload.get("process_success").and_then(Value::as_bool) else {
-                continue;
-            };
-            all_runs += 1;
-            all_failures += u32::from(!success);
-            if action_kind(&recorded) == kind {
-                kind_runs += 1;
-                kind_failures += u32::from(!success);
-                recent.push(json!({
-                    "seq": record.seq,
-                    "argv": recorded,
-                    "failed": !success,
-                    "exit_code": payload.get("exit_code").cloned().unwrap_or(Value::Null),
-                }));
-            }
-        }
-        if all_runs == 0 {
-            // Rule 6: an empty store and an unread store look identical, and
-            // both would round to "nothing ever fails".
+        };
+        let coverage = shared_tally
+            .as_ref()
+            .and_then(|(_, other)| local.coverage_by(other));
+        let local_runs_of_kind = local.per_kind.get(&kind).copied().unwrap_or((0, 0)).0;
+
+        // Order: this workspace's own record for this kind, then a borrowed one
+        // if the gate allows, then this workspace's own global rate.
+        let borrowed_allowed = shared_tally.as_ref().is_some_and(|(_, other)| {
+            other.per_kind.contains_key(&kind)
+                && (local.runs == 0 || coverage.is_some_and(|c| c >= PRIOR_COVERAGE_GATE))
+        });
+        let (probability, source) = if local_runs_of_kind > 0 {
+            (local.smoothed(&kind), "workspace")
+        } else if borrowed_allowed {
+            let (_, other) = shared_tally.as_ref().unwrap();
+            (other.smoothed(&kind), "shared")
+        } else if local.runs > 0 {
+            (local.smoothed(&kind), "workspace base rate")
+        } else {
             return Ok(json!({
                 "kind": kind,
                 "status": "NOT MEASURED",
-                "reason": "this workspace's log holds no completed run, so there is no prior to read",
-                "runs_of_this_kind": 0, "runs_total": 0, "log": self.log_path(),
+                "reason": if shared.is_some() {
+                    "neither this workspace's log nor the shared store has a completed run of this kind"
+                } else {
+                    "this workspace's log holds no completed run, so there is no prior to read"
+                },
+                "runs_of_this_kind": 0, "runs_total": 0,
+                "shared_coverage": coverage, "log": self.log_path(),
             }));
-        }
-        let global = f64::from(all_failures) / f64::from(all_runs);
-        // Laplace toward the workspace's own global rate: two pseudo-counts, so
-        // one unlucky first run of a kind does not read as a 100% failure rate.
-        let smoothed = (f64::from(kind_failures) + 2.0 * global) / (f64::from(kind_runs) + 2.0);
+        };
+
+        let shared_view = shared_tally.as_ref().map(|(log, other)| {
+            let (runs, failures) = other.per_kind.get(&kind).copied().unwrap_or((0, 0));
+            json!({
+                "log": log,
+                "runs_of_this_kind": runs,
+                "failures_of_this_kind": failures,
+                "runs_total": other.runs,
+                "failure_rate": other.rate(),
+                "coverage_of_this_workspace": coverage,
+                "coverage_gate": PRIOR_COVERAGE_GATE,
+                "used": source == "shared",
+            })
+        });
+        let (kind_runs, kind_failures) = local.per_kind.get(&kind).copied().unwrap_or((0, 0));
+        let mut recent = local.recent.clone();
         recent.reverse();
         recent.truncate(5);
         Ok(json!({
             "kind": kind,
             "argv": argv,
-            "failure_probability": smoothed,
+            "failure_probability": probability,
+            "source": source,
             "runs_of_this_kind": kind_runs,
             "failures_of_this_kind": kind_failures,
-            "runs_total": all_runs,
-            "failures_total": all_failures,
-            "workspace_failure_rate": global,
+            "runs_total": local.runs,
+            "failures_total": local.failures,
+            "workspace_failure_rate": local.rate(),
+            "shared": shared_view,
             "recent": recent,
-            "method": "Laplace-smoothed failure rate of this action kind in this workspace's log",
-            "evidence": "E71: the per-kind prior carried the signal (AUC 0.620 vs 0.500); \
-online within-session adaptation did not improve on it",
+            "method": "Laplace-smoothed failure rate of this action kind, from the log named in `source`",
+            "evidence": "E71: the per-kind prior carried the signal (AUC 0.620 vs 0.500). \
+E73: it transfers between machines (0.644 vs an in-corpus 0.642) when coverage is high, \
+and not at 0.24-0.64 coverage",
             "not_claimed": "process exit only; a command can exit 0 and still not do what was wanted",
             "history_window": HISTORY_WINDOW,
         }))
@@ -872,6 +897,97 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<()> {
     writeln!(file)?;
     Ok(())
 }
+
+/// Failure counts per action kind, read out of any observation log.
+///
+/// Kept separate from [`Workspace`] because the point of E73 is that this can
+/// come from *another* workspace: a prior fitted on one machine predicted
+/// another machine's failures as well as that machine's own history did
+/// (0.644 against an in-corpus 0.642), provided the kinds overlapped.
+#[derive(Debug, Default)]
+struct Tally {
+    per_kind: BTreeMap<String, (u32, u32)>, // kind -> (runs, failures)
+    runs: u32,
+    failures: u32,
+    recent: Vec<Value>,
+}
+
+impl Tally {
+    fn from_runs(records: &[Observation], kind_wanted: Option<&str>) -> Self {
+        let mut tally = Tally::default();
+        for record in records {
+            if record.source != "system.run.finish" {
+                continue;
+            }
+            let payload: Value = serde_json::from_str(&record.body).unwrap_or(Value::Null);
+            let Some(argv) = payload.get("argv").and_then(Value::as_array) else {
+                continue;
+            };
+            let argv: Vec<String> = argv
+                .iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect();
+            if argv.is_empty() {
+                continue;
+            }
+            // A missing success flag is not evidence of failure, so it is
+            // skipped rather than assumed either way.
+            let Some(success) = payload.get("process_success").and_then(Value::as_bool) else {
+                continue;
+            };
+            let kind = action_kind(&argv);
+            tally.runs += 1;
+            tally.failures += u32::from(!success);
+            let entry = tally.per_kind.entry(kind.clone()).or_insert((0, 0));
+            entry.0 += 1;
+            entry.1 += u32::from(!success);
+            if kind_wanted == Some(kind.as_str()) {
+                tally.recent.push(json!({
+                    "seq": record.seq, "argv": argv, "failed": !success,
+                    "exit_code": payload.get("exit_code").cloned().unwrap_or(Value::Null),
+                }));
+            }
+        }
+        tally
+    }
+
+    fn rate(&self) -> f64 {
+        if self.runs == 0 {
+            0.0
+        } else {
+            f64::from(self.failures) / f64::from(self.runs)
+        }
+    }
+
+    /// Laplace toward the store's own global rate, so one unlucky first run of
+    /// a kind does not read as a 100% failure rate.
+    fn smoothed(&self, kind: &str) -> f64 {
+        let (runs, failures) = self.per_kind.get(kind).copied().unwrap_or((0, 0));
+        (f64::from(failures) + 2.0 * self.rate()) / (f64::from(runs) + 2.0)
+    }
+
+    /// E73's gate: the share of *this* store's runs whose kind the other store
+    /// has also seen. Every transferring pair measured 0.93-0.96; every failing
+    /// pair 0.24-0.64. Computable before trusting a borrowed prior.
+    fn coverage_by(&self, other: &Tally) -> Option<f64> {
+        if self.runs == 0 {
+            return None;
+        }
+        let covered: u32 = self
+            .per_kind
+            .iter()
+            .filter(|(kind, _)| other.per_kind.contains_key(*kind))
+            .map(|(_, (runs, _))| *runs)
+            .sum();
+        Some(f64::from(covered) / f64::from(self.runs))
+    }
+}
+
+/// Below this share of local actions in kinds the other store has seen, a
+/// borrowed prior is reported but not used. E73: transfer held at 0.93-0.96 and
+/// failed at 0.24-0.64; 0.90 is the round number between them, and it is a
+/// threshold rather than a law.
+const PRIOR_COVERAGE_GATE: f64 = 0.90;
 
 /// The coarse action type a prior is kept for: the program being run, without
 /// its path, or the interface operation. E71 found this granularity is where

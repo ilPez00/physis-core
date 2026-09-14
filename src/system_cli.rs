@@ -63,6 +63,11 @@ enum SystemCommand {
     },
     /// What this workspace's log says about how this kind of action has gone.
     Predict {
+        /// Another store to borrow a prior from when this workspace has never
+        /// run this kind: a directory holding observations.jsonl, or the file.
+        /// Used only above the coverage gate, or on a cold start (E73).
+        #[arg(long, value_name = "PATH")]
+        prior_from: Option<PathBuf>,
         /// The argv you would run, after `--`.
         #[arg(last = true, required = true)]
         argv: Vec<String>,
@@ -161,7 +166,9 @@ impl SystemArgs {
                     },
                     !no_bridge,
                 )?,
-                SystemCommand::Predict { argv } => workspace.predict(argv)?,
+                SystemCommand::Predict { argv, prior_from } => {
+                    workspace.predict_with(argv, prior_from.as_deref())?
+                }
                 SystemCommand::Read { target, max_bytes } => {
                     workspace.read(target, *max_bytes as usize)?
                 }
@@ -331,15 +338,27 @@ fn render(operation: &str, data: &Value) {
                 );
             } else {
                 println!(
-                    "{}  failure probability {:.2}  ({} of {} run(s) of this kind failed; \
+                    "{}  failure probability {:.2}  [{}]  ({} of {} run(s) of this kind failed here; \
 workspace rate {:.2} over {} run(s))",
                     data["kind"].as_str().unwrap_or(""),
                     data["failure_probability"].as_f64().unwrap_or(0.0),
+                    data["source"].as_str().unwrap_or(""),
                     data["failures_of_this_kind"],
                     data["runs_of_this_kind"],
                     data["workspace_failure_rate"].as_f64().unwrap_or(0.0),
                     data["runs_total"]
                 );
+                if let Some(shared) = data["shared"].as_object() {
+                    let coverage = shared["coverage_of_this_workspace"].as_f64();
+                    println!(
+                        "  shared store: {} of {} run(s) of this kind failed · coverage {} · {}",
+                        shared["failures_of_this_kind"],
+                        shared["runs_of_this_kind"],
+                        coverage.map_or("n/a (this workspace has no runs)".to_string(),
+                                        |c| format!("{c:.2}")),
+                        if shared["used"] == true { "used" } else { "not used" }
+                    );
+                }
                 for entry in data["recent"].as_array().into_iter().flatten() {
                     println!(
                         "  obs:{}  {}  {}",

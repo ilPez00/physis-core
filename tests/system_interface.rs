@@ -35,6 +35,11 @@ fn cli(ws: &Workspace, args: &[&str]) -> Output {
         .unwrap()
 }
 
+/// `cli`, for arguments that must keep their own `--` separated tail.
+fn cli_with(ws: &Workspace, args: &[&str]) -> Output {
+    cli(ws, args)
+}
+
 fn json(output: &Output) -> Value {
     serde_json::from_slice(&output.stdout).unwrap_or_else(|e| {
         panic!(
@@ -593,4 +598,60 @@ fn a_run_carries_the_prior_it_was_about_to_defy() {
     // The prior is read before the run, so it cannot include it.
     let fourth = json(&cli(&ws, &["run", "--intent", "probe", "--", "false"]));
     assert_eq!(fourth["data"]["prior"]["runs_of_this_kind"].as_u64().unwrap(), 3);
+}
+
+#[test]
+fn a_borrowed_prior_is_used_only_when_its_coverage_earns_it() {
+    let (_shared_temp, shared) = workspace();
+    // The other store has run `false` (always fails) and `true` (never does).
+    for _ in 0..4 {
+        cli(&shared, &["run", "--intent", "probe", "--", "false"]);
+    }
+    for _ in 0..4 {
+        cli(&shared, &["run", "--intent", "probe", "--", "true"]);
+    }
+    let shared_log = shared.state.join("observations.jsonl");
+
+    // Cold start: this workspace has no record at all, so the borrowed prior is
+    // used — E73 measured borrowed beating own on exactly this case.
+    let (_cold_temp, cold) = workspace();
+    let cold_out = json(&cli_with(
+        &cold,
+        &["predict", "--prior-from", shared_log.to_str().unwrap(), "--", "false"],
+    ));
+    let cold_data = &cold_out["data"];
+    assert_eq!(cold_data["source"].as_str().unwrap(), "shared");
+    assert!(cold_data["failure_probability"].as_f64().unwrap() > 0.6, "{cold_data}");
+    assert!(cold_data["shared"]["used"].as_bool().unwrap());
+
+    // A workspace whose own work is entirely in kinds the shared store has
+    // never seen: coverage is below the gate, so the borrowed prior is reported
+    // and NOT used.
+    let (_thin_temp, thin) = workspace();
+    for _ in 0..6 {
+        cli(&thin, &["run", "--intent", "probe", "--", "printf", "x"]);
+    }
+    let thin_out = json(&cli_with(
+        &thin,
+        &["predict", "--prior-from", shared_log.to_str().unwrap(), "--", "false"],
+    ));
+    let thin_data = &thin_out["data"];
+    let coverage = thin_data["shared"]["coverage_of_this_workspace"].as_f64().unwrap();
+    assert!(coverage < 0.9, "coverage should be low, was {coverage}");
+    assert_eq!(thin_data["shared"]["used"].as_bool().unwrap(), false);
+    assert_eq!(thin_data["source"].as_str().unwrap(), "workspace base rate");
+
+    // Its own record always wins over a borrowed one.
+    let own = json(&cli_with(
+        &thin,
+        &["predict", "--prior-from", shared_log.to_str().unwrap(), "--", "printf", "x"],
+    ));
+    assert_eq!(own["data"]["source"].as_str().unwrap(), "workspace");
+
+    // A missing shared log is an error, not a silent fall-back to local.
+    let missing = cli_with(
+        &thin,
+        &["predict", "--prior-from", "/nonexistent/observations.jsonl", "--", "false"],
+    );
+    assert!(!missing.status.success());
 }
