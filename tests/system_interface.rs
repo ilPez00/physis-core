@@ -457,3 +457,41 @@ fn history_display_does_not_reprint_the_note_it_just_printed() {
     assert!(text.contains("outcome=failure"), "{text}");
     assert!(!text.contains("\"workspace\""), "raw payload leaked:\n{text}");
 }
+
+#[test]
+fn build_directories_are_hidden_by_default_and_returnable_by_name() {
+    let (_temp, ws) = workspace();
+    fs::create_dir(ws.root.join("dist")).unwrap();
+    fs::write(
+        ws.root.join("dist/bundle.js"),
+        "// pump calibration, compiled\n",
+    )
+    .unwrap();
+
+    // Default: a published artifact's own contents are invisible, and the file
+    // count is confidently wrong about what is there.
+    let hidden = cli(&ws, &["list", "--limit", "50"]);
+    let hidden = json(&hidden);
+    let paths = hidden["data"]["inventory"]["objects"].to_string();
+    assert!(!paths.contains("bundle.js"), "{paths}");
+
+    let shown = cli(&ws, &["list", "--limit", "50", "--include-dir", "dist"]);
+    let shown = json(&shown);
+    assert!(
+        shown["data"]["inventory"]["objects"]
+            .to_string()
+            .contains("bundle.js"),
+        "--include-dir did not return the directory: {}",
+        shown["data"]["inventory"]["objects"]
+    );
+
+    // The contract says which names are excluded *now*, not only the defaults,
+    // so a caller can tell which run it is reading.
+    let caps = json(&cli(&ws, &["capabilities", "--include-dir", "dist"]));
+    let excluded = caps["data"]["limits"]["excluded_directories"].to_string();
+    assert!(!excluded.contains("dist"), "{excluded}");
+    assert!(excluded.contains("vendor"), "{excluded}");
+    assert!(caps["data"]["limits"]["default_excluded_directories"]
+        .to_string()
+        .contains("dist"));
+}

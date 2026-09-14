@@ -99,6 +99,12 @@ pub struct Hit {
 pub struct Workspace {
     pub root: PathBuf,
     pub state: PathBuf,
+    /// Directory names skipped during enumeration. Defaults to [`SKIP_DIRS`];
+    /// a caller inspecting a *published* artifact (an npm package is mostly
+    /// `dist/`, a vendored crate mostly `vendor/`) needs those back, and
+    /// without this the interface reports a confident file count over the
+    /// handful of files that are not the thing being inspected.
+    pub skip_dirs: Vec<String>,
 }
 
 impl Workspace {
@@ -112,7 +118,18 @@ impl Workspace {
         } else {
             std::env::current_dir()?.join(state)
         };
-        Ok(Self { root, state })
+        Ok(Self {
+            root,
+            state,
+            skip_dirs: SKIP_DIRS.iter().map(|d| d.to_string()).collect(),
+        })
+    }
+
+    /// Stop skipping these directory names. Unknown names are kept, so a typo
+    /// is visible in `capabilities` output rather than silently doing nothing.
+    pub fn including(mut self, dirs: &[String]) -> Self {
+        self.skip_dirs.retain(|d| !dirs.iter().any(|keep| keep == d));
+        self
     }
 
     pub fn capabilities(&self) -> Value {
@@ -139,7 +156,8 @@ impl Workspace {
                 "pack_window_lines":PACK_WINDOW_LINES, "pack_file_shortlist":PACK_FILE_SHORTLIST,
                 "pack_token_counter":"heuristic; budget is in Physis tokens, not the caller's BPE",
                 "search_bytes":SEARCH_BYTES, "history_tail_records":HISTORY_WINDOW,
-                "hidden_paths":"excluded from enumeration", "excluded_directories":SKIP_DIRS},
+                "hidden_paths":"excluded from enumeration", "excluded_directories":self.skip_dirs,
+                "default_excluded_directories":SKIP_DIRS},
             "execution": "ordinary host permissions; workspace is cwd, not a sandbox; no automatic retries"
         })
     }
@@ -208,7 +226,9 @@ impl Workspace {
                 continue;
             }
             if kind.is_dir() {
-                if !SKIP_DIRS.contains(&name.as_ref()) && entry.path() != self.state {
+                if !self.skip_dirs.iter().any(|d| d == name.as_ref())
+                    && entry.path() != self.state
+                {
                     self.walk(&entry.path(), result)?;
                 }
             } else if kind.is_file() {

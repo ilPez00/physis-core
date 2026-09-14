@@ -19,6 +19,11 @@ pub struct SystemArgs {
     /// Emit one versioned JSON response, including structured errors.
     #[arg(long, global = true)]
     json: bool,
+    /// Stop excluding this build/vendor directory name (repeatable). A
+    /// published package is mostly `dist/`, so the defaults hide the thing
+    /// being inspected: `--include-dir dist`.
+    #[arg(long = "include-dir", global = true, value_name = "NAME")]
+    include_dir: Vec<String>,
     #[command(subcommand)]
     command: SystemCommand,
 }
@@ -121,7 +126,7 @@ impl SystemArgs {
                         .map(PathBuf::from)
                 })
                 .unwrap_or_else(|| root.join(".physis/system"));
-            let workspace = Workspace::open(&root, &state)?;
+            let workspace = Workspace::open(&root, &state)?.including(&self.include_dir);
             let data = match &self.command {
                 SystemCommand::Capabilities => workspace.capabilities(),
                 SystemCommand::Inspect => workspace.inspect()?,
