@@ -233,6 +233,8 @@ pub mod transform;
 pub mod vault;
 pub mod worldstate;
 pub mod system;
+pub mod system_delegation;
+pub mod system_mcp;
 
 /// Restore the default `SIGPIPE` behaviour for a command-line program.
 ///

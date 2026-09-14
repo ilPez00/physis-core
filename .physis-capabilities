@@ -18,3 +18,7 @@ line-window ranking           | Bm25Index             | rank, score
 hypothesis fitness            | evidence, with_weight | fitness, status
 world states from log order   | mutual_knn            | components, structural_descriptor
 prediction from the record    | run, record           | predict
+delegation plans and reservations | delegation_create, delegation_reserve | delegation_tasks, delegation_show
+# MCP calls remember for notes and serves workspace queries through the CLI boundary.
+# workspace_tools is an internal same-file dispatch helper, not an external consumer.
+workspace MCP queries and notes | remember | serve_workspace

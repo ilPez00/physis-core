@@ -305,7 +305,10 @@ fn pack_stays_inside_its_budget_and_carries_line_provenance() {
         .collect();
     fs::write(ws.root.join("long.txt"), long).unwrap();
 
-    let out = cli(&ws, &["pack", "pump calibration pressure", "--budget", "300"]);
+    let out = cli(
+        &ws,
+        &["pack", "pump calibration pressure", "--budget", "300"],
+    );
     assert!(out.status.success());
     let data = &json(&out)["data"];
     let used = data["used_tokens"].as_u64().unwrap();
@@ -409,7 +412,10 @@ fn reads_accept_a_line_range_and_an_unambiguous_id_prefix() {
     let full = data["object"]["id"].as_str().unwrap().to_string();
     let short = format!("file:{}", &full.strip_prefix("file:").unwrap()[..12]);
     let by_prefix = cli(&ws, &["read", &short]);
-    assert!(by_prefix.status.success(), "prefix ID was rejected: {short}");
+    assert!(
+        by_prefix.status.success(),
+        "prefix ID was rejected: {short}"
+    );
     assert_eq!(
         json(&by_prefix)["data"]["object"]["id"].as_str().unwrap(),
         full
@@ -435,7 +441,14 @@ fn history_display_does_not_reprint_the_note_it_just_printed() {
         .env_remove("PHYSIS_CORE_DIR")
         .args(["system", "--root"])
         .arg(&ws.root)
-        .args(["remember", note, "--outcome", "failure", "--actor", "worker3"])
+        .args([
+            "remember",
+            note,
+            "--outcome",
+            "failure",
+            "--actor",
+            "worker3",
+        ])
         .output()
         .unwrap();
     assert!(recorded.status.success());
@@ -452,15 +465,14 @@ fn history_display_does_not_reprint_the_note_it_just_printed() {
         .unwrap();
     let text = String::from_utf8(shown.stdout).unwrap();
     assert!(text.contains(note), "the note itself must still be shown");
-    assert_eq!(
-        text.matches(note).count(),
-        1,
-        "note printed twice:\n{text}"
-    );
+    assert_eq!(text.matches(note).count(), 1, "note printed twice:\n{text}");
     // The fields the subject does not carry are what the second line is for.
     assert!(text.contains("actor=worker3"), "{text}");
     assert!(text.contains("outcome=failure"), "{text}");
-    assert!(!text.contains("\"workspace\""), "raw payload leaked:\n{text}");
+    assert!(
+        !text.contains("\"workspace\""),
+        "raw payload leaked:\n{text}"
+    );
 }
 
 #[test]
@@ -521,7 +533,10 @@ fn a_closed_pipe_ends_output_instead_of_panicking() {
         .output()
         .unwrap();
     let stderr = String::from_utf8_lossy(&piped.stderr);
-    assert!(!stderr.contains("panicked"), "panic on closed pipe:\n{stderr}");
+    assert!(
+        !stderr.contains("panicked"),
+        "panic on closed pipe:\n{stderr}"
+    );
     assert!(!stderr.contains("Broken pipe"), "{stderr}");
     assert_eq!(
         String::from_utf8_lossy(&piped.stdout).lines().count(),
@@ -563,7 +578,10 @@ fn predict_reads_the_workspace_record_and_says_when_there_is_none() {
     assert_eq!(unseen["runs_of_this_kind"].as_u64().unwrap(), 0);
     let backoff = unseen["failure_probability"].as_f64().unwrap();
     let workspace_rate = unseen["workspace_failure_rate"].as_f64().unwrap();
-    assert!((backoff - workspace_rate).abs() < 1e-9, "{backoff} vs {workspace_rate}");
+    assert!(
+        (backoff - workspace_rate).abs() < 1e-9,
+        "{backoff} vs {workspace_rate}"
+    );
 
     // `cargo test` and `cargo build` are different kinds; `ls -la` is not two.
     assert_eq!(
@@ -593,11 +611,18 @@ fn a_run_carries_the_prior_it_was_about_to_defy() {
     assert_eq!(prior["kind"].as_str().unwrap(), "false");
     assert_eq!(prior["runs_of_this_kind"].as_u64().unwrap(), 2);
     assert_eq!(prior["failures_of_this_kind"].as_u64().unwrap(), 2);
-    assert_eq!(third["data"]["result"]["process_success"].as_bool().unwrap(), false);
+    assert!(!third["data"]["result"]["process_success"]
+        .as_bool()
+        .unwrap());
 
     // The prior is read before the run, so it cannot include it.
     let fourth = json(&cli(&ws, &["run", "--intent", "probe", "--", "false"]));
-    assert_eq!(fourth["data"]["prior"]["runs_of_this_kind"].as_u64().unwrap(), 3);
+    assert_eq!(
+        fourth["data"]["prior"]["runs_of_this_kind"]
+            .as_u64()
+            .unwrap(),
+        3
+    );
 }
 
 #[test]
@@ -617,11 +642,20 @@ fn a_borrowed_prior_is_used_only_when_its_coverage_earns_it() {
     let (_cold_temp, cold) = workspace();
     let cold_out = json(&cli_with(
         &cold,
-        &["predict", "--prior-from", shared_log.to_str().unwrap(), "--", "false"],
+        &[
+            "predict",
+            "--prior-from",
+            shared_log.to_str().unwrap(),
+            "--",
+            "false",
+        ],
     ));
     let cold_data = &cold_out["data"];
     assert_eq!(cold_data["source"].as_str().unwrap(), "shared");
-    assert!(cold_data["failure_probability"].as_f64().unwrap() > 0.6, "{cold_data}");
+    assert!(
+        cold_data["failure_probability"].as_f64().unwrap() > 0.6,
+        "{cold_data}"
+    );
     assert!(cold_data["shared"]["used"].as_bool().unwrap());
 
     // A workspace whose own work is entirely in kinds the shared store has
@@ -633,25 +667,46 @@ fn a_borrowed_prior_is_used_only_when_its_coverage_earns_it() {
     }
     let thin_out = json(&cli_with(
         &thin,
-        &["predict", "--prior-from", shared_log.to_str().unwrap(), "--", "false"],
+        &[
+            "predict",
+            "--prior-from",
+            shared_log.to_str().unwrap(),
+            "--",
+            "false",
+        ],
     ));
     let thin_data = &thin_out["data"];
-    let coverage = thin_data["shared"]["coverage_of_this_workspace"].as_f64().unwrap();
+    let coverage = thin_data["shared"]["coverage_of_this_workspace"]
+        .as_f64()
+        .unwrap();
     assert!(coverage < 0.9, "coverage should be low, was {coverage}");
-    assert_eq!(thin_data["shared"]["used"].as_bool().unwrap(), false);
+    assert!(!thin_data["shared"]["used"].as_bool().unwrap());
     assert_eq!(thin_data["source"].as_str().unwrap(), "workspace base rate");
 
     // Its own record always wins over a borrowed one.
     let own = json(&cli_with(
         &thin,
-        &["predict", "--prior-from", shared_log.to_str().unwrap(), "--", "printf", "x"],
+        &[
+            "predict",
+            "--prior-from",
+            shared_log.to_str().unwrap(),
+            "--",
+            "printf",
+            "x",
+        ],
     ));
     assert_eq!(own["data"]["source"].as_str().unwrap(), "workspace");
 
     // A missing shared log is an error, not a silent fall-back to local.
     let missing = cli_with(
         &thin,
-        &["predict", "--prior-from", "/nonexistent/observations.jsonl", "--", "false"],
+        &[
+            "predict",
+            "--prior-from",
+            "/nonexistent/observations.jsonl",
+            "--",
+            "false",
+        ],
     );
     assert!(!missing.status.success());
 }

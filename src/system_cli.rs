@@ -7,6 +7,7 @@ use clap::{Args, Subcommand};
 use serde_json::{json, Value};
 
 use crate::system::{PackStrategy, Workspace, API_VERSION};
+use crate::system_delegation as delegation;
 
 #[derive(Debug, Args)]
 pub struct SystemArgs {
@@ -30,6 +31,13 @@ pub struct SystemArgs {
 
 #[derive(Debug, Subcommand)]
 enum SystemCommand {
+    /// Serve workspace tools over MCP stdio (no model or licence required).
+    Serve,
+    /// Plan, record and reserve delegated tasks; does not launch workers.
+    Delegation {
+        #[command(subcommand)]
+        command: DelegationCommand,
+    },
     /// Discover operations, state location, representations, and limits.
     Capabilities,
     /// Inspect workspace files and recent recorded work.
@@ -106,9 +114,87 @@ enum SystemCommand {
     Export { destination: PathBuf },
 }
 
+#[derive(Debug, Subcommand)]
+enum DelegationCommand {
+    /// Read-only preview using an explicit task and worker registry.
+    Plan {
+        #[arg(long)]
+        task: PathBuf,
+        #[arg(long)]
+        registry: PathBuf,
+    },
+    /// Record a planned task in the shared observation log.
+    Create {
+        #[arg(long)]
+        task: PathBuf,
+        #[arg(long)]
+        registry: PathBuf,
+    },
+    /// List recorded tasks and their current reservation state.
+    List,
+    /// Read a task, its source evidence, context and proposed argv.
+    Show { id: String },
+    /// Reserve a future worktree slot; does not create it or start a worker.
+    Reserve {
+        id: String,
+        #[arg(long, default_value_t = 900)]
+        seconds: u32,
+    },
+    /// Release an unstarted reservation using its current ownership token.
+    Release {
+        id: String,
+        #[arg(long)]
+        token: String,
+    },
+    /// Export a task snapshot into a new browsable directory.
+    Export { id: String, destination: PathBuf },
+}
+
+impl DelegationCommand {
+    fn run(&self, workspace: &Workspace) -> Result<Value> {
+        Ok(match self {
+            Self::Plan { task, registry } => serde_json::to_value(delegation::delegation_plan(
+                workspace,
+                &delegation::load_json(task)?,
+                &delegation::load_json(registry)?,
+            )?)?,
+            Self::Create { task, registry } => {
+                serde_json::to_value(delegation::delegation_create(
+                    workspace,
+                    &delegation::load_json(task)?,
+                    &delegation::load_json(registry)?,
+                )?)?
+            }
+            Self::List => {
+                let tasks = delegation::delegation_tasks(workspace)?;
+                let now = chrono::Utc::now();
+                let rows: Vec<_> = tasks.iter().map(|t| json!({
+                    "task_id":t.plan.task.id,"intent":t.plan.request.intent,"worker":t.plan.worker.id,
+                    "observation":t.observation,"status":match &t.reservation {
+                        Some(r) if r.expires_at > now => "reserved",
+                        Some(_) => "expired",
+                        None => "planned",
+                    },"worktree":t.plan.worktree
+                })).collect();
+                json!({"tasks":rows,"count":rows.len(),"workers_started":0})
+            }
+            Self::Show { id } => serde_json::to_value(delegation::delegation_show(workspace, id)?)?,
+            Self::Reserve { id, seconds } => {
+                serde_json::to_value(delegation::delegation_reserve(workspace, id, *seconds)?)?
+            }
+            Self::Release { id, token } => delegation::delegation_release(workspace, id, token)?,
+            Self::Export { id, destination } => {
+                delegation::delegation_export(workspace, id, destination)?
+            }
+        })
+    }
+}
+
 impl SystemCommand {
     fn name(&self) -> &'static str {
         match self {
+            Self::Serve => "serve",
+            Self::Delegation { .. } => "delegation",
             Self::Capabilities => "capabilities",
             Self::Inspect => "inspect",
             Self::List { .. } => "list",
@@ -140,6 +226,11 @@ impl SystemArgs {
                 .unwrap_or_else(|| root.join(".physis/system"));
             let workspace = Workspace::open(&root, &state)?.including(&self.include_dir);
             let data = match &self.command {
+                SystemCommand::Serve => {
+                    crate::system_mcp::serve_workspace(&workspace)?;
+                    Value::Null
+                }
+                SystemCommand::Delegation { command } => command.run(&workspace)?,
                 SystemCommand::Capabilities => workspace.capabilities(),
                 SystemCommand::Inspect => workspace.inspect()?,
                 SystemCommand::List { limit } => {
@@ -191,6 +282,9 @@ impl SystemArgs {
         })();
         match result {
             Ok((workspace, data)) => {
+                if operation == "serve" {
+                    return Ok(());
+                }
                 let failed = operation == "run" && data["result"]["process_success"] == false;
                 if self.json {
                     println!(
@@ -230,6 +324,48 @@ impl SystemArgs {
 
 fn render(operation: &str, data: &Value) {
     match operation {
+        "delegation" => {
+            if let Some(tasks) = data["tasks"].as_array() {
+                for t in tasks {
+                    println!(
+                        "{}  {}  {}  {}",
+                        t["task_id"].as_str().unwrap_or(""),
+                        t["status"].as_str().unwrap_or(""),
+                        t["worker"].as_str().unwrap_or(""),
+                        t["intent"].as_str().unwrap_or("")
+                    );
+                }
+                println!("{} tasks; no workers started", tasks.len());
+            } else {
+                let plan = data.get("plan").unwrap_or(data);
+                if plan.get("invocation").is_some() {
+                    println!(
+                        "{}  {}\nworker: {}\nfuture worktree: {}",
+                        plan["task"]["id"].as_str().unwrap_or(""),
+                        plan["request"]["intent"].as_str().unwrap_or(""),
+                        plan["worker"]["id"].as_str().unwrap_or(""),
+                        plan["worktree"].as_str().unwrap_or("")
+                    );
+                    println!(
+                        "context: {} / {} Physis tokens; {} scoped files",
+                        plan["context"]["used_tokens"],
+                        plan["request"]["budget"],
+                        plan["source"]["scoped_files"]
+                    );
+                    println!(
+                        "source: {}\nargv (JSON array): {}",
+                        plan["source"]["head"].as_str().unwrap_or(""),
+                        plan["invocation"]
+                    );
+                    for notice in plan["notices"].as_array().into_iter().flatten() {
+                        println!("{}", notice.as_str().unwrap_or(""));
+                    }
+                    println!("Use --json for context, source changes, acceptance checks and reservations.");
+                } else {
+                    println!("{}", serde_json::to_string_pretty(data).unwrap());
+                }
+            }
+        }
         "capabilities" => {
             println!(
                 "Physis workspace interface ({})",
@@ -288,7 +424,10 @@ fn render(operation: &str, data: &Value) {
         }
         "read" => {
             if let Some(text) = data["text"].as_str() {
-                let range = match (data["lines"]["start_line"].as_u64(), data["lines"]["end_line"].as_u64()) {
+                let range = match (
+                    data["lines"]["start_line"].as_u64(),
+                    data["lines"]["end_line"].as_u64(),
+                ) {
                     (Some(a), Some(b)) => format!(":{a}-{b}"),
                     _ => String::new(),
                 };
@@ -354,19 +493,33 @@ workspace rate {:.2} over {} run(s))",
                         "  shared store: {} of {} run(s) of this kind failed · coverage {} · {}",
                         shared["failures_of_this_kind"],
                         shared["runs_of_this_kind"],
-                        coverage.map_or("n/a (this workspace has no runs)".to_string(),
-                                        |c| format!("{c:.2}")),
-                        if shared["used"] == true { "used" } else { "not used" }
+                        coverage
+                            .map_or("n/a (this workspace has no runs)".to_string(), |c| format!(
+                                "{c:.2}"
+                            )),
+                        if shared["used"] == true {
+                            "used"
+                        } else {
+                            "not used"
+                        }
                     );
                 }
                 for entry in data["recent"].as_array().into_iter().flatten() {
                     println!(
                         "  obs:{}  {}  {}",
                         entry["seq"],
-                        if entry["failed"] == true { "failed " } else { "ok     " },
+                        if entry["failed"] == true {
+                            "failed "
+                        } else {
+                            "ok     "
+                        },
                         entry["argv"]
                             .as_array()
-                            .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(" "))
+                            .map(|a| a
+                                .iter()
+                                .filter_map(|v| v.as_str())
+                                .collect::<Vec<_>>()
+                                .join(" "))
                             .unwrap_or_default()
                     );
                 }
@@ -421,8 +574,8 @@ workspace rate {:.2} over {} run(s))",
                 // The payload of a note repeats its subject verbatim, so
                 // printing both doubled the cost of every recall. Print the
                 // fields the subject does not carry, and only those.
-                let body: Value =
-                    serde_json::from_str(record["body"].as_str().unwrap_or("")).unwrap_or(Value::Null);
+                let body: Value = serde_json::from_str(record["body"].as_str().unwrap_or(""))
+                    .unwrap_or(Value::Null);
                 match &body {
                     Value::Object(map) => {
                         let extras: Vec<String> = map

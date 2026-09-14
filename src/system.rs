@@ -128,7 +128,8 @@ impl Workspace {
     /// Stop skipping these directory names. Unknown names are kept, so a typo
     /// is visible in `capabilities` output rather than silently doing nothing.
     pub fn including(mut self, dirs: &[String]) -> Self {
-        self.skip_dirs.retain(|d| !dirs.iter().any(|keep| keep == d));
+        self.skip_dirs
+            .retain(|d| !dirs.iter().any(|keep| keep == d));
         self
     }
 
@@ -142,6 +143,7 @@ impl Workspace {
             "representation": "BM25 lexical retrieval; no model or inferred intent",
             "operations": [
                 {"name":"capabilities", "writes":false, "purpose":"Discover this contract"},
+                {"name":"serve", "writes":true, "purpose":"MCP stdio: workspace queries and explicit notes; no command execution"},
                 {"name":"inspect", "writes":false, "purpose":"Inventory files and recent observations"},
                 {"name":"list", "writes":false, "purpose":"List addressable file objects"},
                 {"name":"find", "writes":false, "purpose":"Rank files and remembered outcomes using BM25"},
@@ -149,6 +151,7 @@ impl Workspace {
                 {"name":"predict", "writes":false, "purpose":"Read this workspace's own record of how this kind of action has gone"},
                 {"name":"read", "writes":false, "purpose":"Read a path (optionally path:start-end), file ID or prefix, or obs:sequence"},
                 {"name":"history", "writes":false, "purpose":"Read this workspace's recorded work"},
+                {"name":"delegation", "writes":true, "purpose":"Plan/list/show are read-only; create/reserve/release record unstarted tasks; export writes a snapshot; no worker launch"},
                 {"name":"remember", "writes":true, "purpose":"Append a note with an explicit outcome"},
                 {"name":"run", "writes":true, "purpose":"Run explicit argv and record intent, logs, and exit status"},
                 {"name":"export", "writes":true, "purpose":"Create a new folder snapshot of the same references"}
@@ -227,8 +230,7 @@ impl Workspace {
                 continue;
             }
             if kind.is_dir() {
-                if !self.skip_dirs.iter().any(|d| d == name.as_ref())
-                    && entry.path() != self.state
+                if !self.skip_dirs.iter().any(|d| d == name.as_ref()) && entry.path() != self.state
                 {
                     self.walk(&entry.path(), result)?;
                 }
@@ -393,7 +395,13 @@ impl Workspace {
     /// how many windows one file may contribute, because a single long file
     /// otherwise fills the budget with one region's neighbours.
     pub fn pack(&self, query: &str, budget: usize, per_file: usize) -> Result<Value> {
-        self.pack_with(query, budget, per_file, PackStrategy::FilesThenWindows, true)
+        self.pack_with(
+            query,
+            budget,
+            per_file,
+            PackStrategy::FilesThenWindows,
+            true,
+        )
     }
 
     /// `pack`, with the ranking stage named so the two can be measured against
@@ -406,6 +414,32 @@ impl Workspace {
         strategy: PackStrategy,
         bridge_gaps: bool,
     ) -> Result<Value> {
+        self.pack_selected(query, budget, per_file, strategy, bridge_gaps, None)
+    }
+
+    /// Pack only the supplied workspace-relative paths (files or directories).
+    /// Filtering happens before content is read or ranked.
+    pub fn pack_paths(&self, query: &str, budget: usize, paths: &[PathBuf]) -> Result<Value> {
+        ensure!(!paths.is_empty(), "scoped packing requires paths");
+        self.pack_selected(
+            query,
+            budget,
+            3,
+            PackStrategy::FilesThenWindows,
+            true,
+            Some(paths),
+        )
+    }
+
+    fn pack_selected(
+        &self,
+        query: &str,
+        budget: usize,
+        per_file: usize,
+        strategy: PackStrategy,
+        bridge_gaps: bool,
+        paths: Option<&[PathBuf]>,
+    ) -> Result<Value> {
         ensure!(!query.trim().is_empty(), "pack needs a non-empty query");
         ensure!(budget > 0, "pack needs a positive token budget");
         let inventory = self.inventory()?;
@@ -415,14 +449,19 @@ impl Workspace {
         let mut used_bytes = 0usize;
         let mut content_truncated = 0;
         for object in &inventory.objects {
+            if paths
+                .is_some_and(|paths| !paths.iter().any(|p| Path::new(&object.path).starts_with(p)))
+            {
+                continue;
+            }
             let available = SEARCH_BYTES
                 .saturating_sub(used_bytes)
                 .min(FILE_PREFIX as usize);
             if available == 0 {
                 continue;
             }
-            let content = read_prefix(&self.root.join(&object.path), available as u64)
-                .unwrap_or_default();
+            let content =
+                read_prefix(&self.root.join(&object.path), available as u64).unwrap_or_default();
             used_bytes += content.len();
             if object.bytes > content.len() as u64 {
                 content_truncated += 1;
@@ -627,7 +666,11 @@ impl Workspace {
                 } else {
                     path.to_path_buf()
                 };
-                ensure!(log.exists(), "shared prior log not found: {}", log.display());
+                ensure!(
+                    log.exists(),
+                    "shared prior log not found: {}",
+                    log.display()
+                );
                 let records = observe::read(&log)?;
                 Some((log, Tally::from_runs(&records, Some(&kind))))
             }
@@ -695,8 +738,8 @@ impl Workspace {
             "recent": recent,
             "method": "Laplace-smoothed failure rate of this action kind, from the log named in `source`",
             "evidence": "E71: the per-kind prior carried the signal (AUC 0.620 vs 0.500). \
-E73: it transfers between machines (0.644 vs an in-corpus 0.642) when coverage is high, \
-and not at 0.24-0.64 coverage",
+        E73: it transfers between machines (0.644 vs an in-corpus 0.642) when coverage is high, \
+        and not at 0.24-0.64 coverage",
             "not_claimed": "process exit only; a command can exit 0 and still not do what was wanted",
             "history_window": HISTORY_WINDOW,
         }))
@@ -751,7 +794,10 @@ and not at 0.24-0.64 coverage",
         let (text, range) = match lines {
             None => (text, Value::Null),
             Some((from, to)) => {
-                ensure!(from >= 1 && to >= from, "line range must be start-end, 1-indexed");
+                ensure!(
+                    from >= 1 && to >= from,
+                    "line range must be start-end, 1-indexed"
+                );
                 let all: Vec<&str> = text.lines().collect();
                 ensure!(
                     from <= all.len(),
@@ -765,14 +811,17 @@ and not at 0.24-0.64 coverage",
                 )
             }
         };
-        Ok(
-            json!({"object":object, "text":text, "lines":range,
+        Ok(json!({"object":object, "text":text, "lines":range,
             "truncated":object.bytes > whole_bytes,
-            "read_at":chrono::Utc::now(), "provenance":"current workspace file; content is not a historical snapshot"}),
-        )
+            "read_at":chrono::Utc::now(), "provenance":"current workspace file; content is not a historical snapshot"}))
     }
 
-    fn record(&self, source: &str, subject: &str, mut payload: Value) -> Result<Observation> {
+    pub(crate) fn record(
+        &self,
+        source: &str,
+        subject: &str,
+        mut payload: Value,
+    ) -> Result<Observation> {
         fs::create_dir_all(&self.state)?;
         // Cooperative lock for interface writers. Other existing observation
         // writers do not yet acquire this lock; do not claim global transactions.
@@ -842,9 +891,11 @@ and not at 0.24-0.64 coverage",
             "stdout":stdout, "stderr":stderr,
             "assessment":"process exit only; task correctness is not inferred"});
         let finish = self.record("system.run.finish", intent, payload.clone())?;
-        Ok(json!({"id":id, "prior":prior, "start_id":format!("obs:{}",start.seq),
+        Ok(
+            json!({"id":id, "prior":prior, "start_id":format!("obs:{}",start.seq),
             "finish_id":format!("obs:{}",finish.seq), "result":payload,
-            "stdout_tail":read_tail_text(&stdout, 8192)?, "stderr_tail":read_tail_text(&stderr, 8192)?}))
+            "stdout_tail":read_tail_text(&stdout, 8192)?, "stderr_tail":read_tail_text(&stderr, 8192)?}),
+        )
     }
 
     /// Creates a NEW ordinary directory. Refuses overwrite. Entries contain
@@ -1012,7 +1063,10 @@ fn action_kind(argv: &[String]) -> String {
 }
 
 fn base_takes_subcommand(base: &str) -> bool {
-    matches!(base, "cargo" | "git" | "npm" | "pnpm" | "yarn" | "just" | "docker" | "python3" | "python")
+    matches!(
+        base,
+        "cargo" | "git" | "npm" | "pnpm" | "yarn" | "just" | "docker" | "python3" | "python"
+    )
 }
 
 /// Split a trailing `:start-end` line range off a read target. A path
@@ -1048,9 +1102,9 @@ fn read_tail_text(path: &Path, max: u64) -> Result<String> {
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
-struct WriteLock(PathBuf);
+pub(crate) struct WriteLock(PathBuf);
 impl WriteLock {
-    fn acquire(path: PathBuf) -> Result<Self> {
+    pub(crate) fn acquire(path: PathBuf) -> Result<Self> {
         match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(mut file) => {
                 let guard = Self(path);
