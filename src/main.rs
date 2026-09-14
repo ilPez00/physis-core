@@ -32,6 +32,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Shared workspace interface for humans, agents, and folder snapshots.
+    System(physis_core::system_cli::SystemArgs),
     /// Classify text against the semiotic grid.
     Classify { text: String },
     /// Show ontology stats.
@@ -550,8 +552,14 @@ enum ContradictionCmd {
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+    // The workspace interface chooses its own explicit/shared state location.
+    // Read-only queries must not create the default global store as a side effect.
+    if let Command::System(args) = &cli.command {
+        return args.run();
+    }
     store::ensure_data_dir()?;
     match cli.command {
+        Command::System(_) => unreachable!("handled before opening the global store"),
         Command::Classify { text } => run_classify(&text),
         Command::Ontology => run_ontology(),
         Command::Facet {
@@ -1712,8 +1720,6 @@ fn run_discover(dir: Option<&std::path::Path>, min_cluster: usize) -> anyhow::Re
     Ok(())
 }
 
-#[cfg(feature = "studio")]
-
 #[derive(Subcommand)]
 enum ModelCmd {
     /// List installed models.
@@ -2569,6 +2575,7 @@ fn cmd_run(config: &Path, model: Option<String>, ngram: Option<String>, query: O
     Ok(())
 }
 
+#[cfg(feature = "studio")]
 fn run_studio(port: u16, model: Option<String>) -> anyhow::Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(physis_core::studio::run_with_model(port, model))

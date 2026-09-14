@@ -4,6 +4,45 @@ Notable changes to `physis-core`. This file starts at 0.1.15; earlier
 releases predate it and are documented only by their git tags and commit
 history.
 
+## 0.1.26 (unreleased)
+
+### Added — workspace interface (`system`) and its terminal UI
+
+- **`physis system`** (`system.rs`, `system_cli.rs`): one `Workspace` service
+  behind a human CLI, a versioned JSON contract (`physis.system.v1`) and a
+  folder snapshot — `capabilities · inspect · list · find · pack · read ·
+  history · remember · run · export`. Lexical BM25 and the existing observation
+  log; no model, no licence, no inferred intent. Read-only queries do not create
+  a state store.
+- **`pack`**: token-budgeted context assembly. 40-line windows ranked by BM25
+  (files shortlisted first, because BM25 rewards short documents and one-line
+  files otherwise outrank real functions), greedily packed under `--budget`,
+  each chunk carrying `path:start-end`. One-window gaps inside a file are
+  bridged during selection.
+- **`read`** accepts `path:start-end` and any unambiguous file-ID prefix; an
+  ambiguous prefix is an error rather than a silent first match.
+- **`physis-system-tui`** (feature `tui`): the same service with mouse and
+  keyboard navigation, a results list, a line-numbered viewer and a command box.
+  Reader only — `remember`, `run` and `export` are not bound to any key.
+
+Measured against the shell commands an agent would otherwise run (cl100k over
+captured output, trees of 147/194/2456 documents): the packed errand costs 6051
+tokens at 5/5 answers-in-context against 14179 at 5/5 for `grep … | head` then
+`cat`, and per-operation totals moved from 7014 (a loss) to 3052 against the
+shell's 4639 after file IDs were abbreviated in displays. Harnesses and results
+live in the Pro workspace under `benchmarks/system-interface/`.
+
+### Fixed
+
+- The `studio` feature gate sat on `ModelCmd` rather than on `run_studio`, so a
+  `--no-default-features --features cli` build failed.
+
+### Added — `physis-world` and the worldstate program
+
+- See the commit history for E55-E66: log-ordered world states, entity-linked
+  retrieval reported beside the order-blind arm, and set-operation transition
+  labels against a shuffled-order null.
+
 ## 0.1.24
 
 ### Added — structural transform algebra + n-gram embedder scaffold

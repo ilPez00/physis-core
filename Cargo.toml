@@ -29,6 +29,11 @@ axum = { version = "0.7", features = ["json", "macros"], optional = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"], optional = true }
 ureq = { version = "2.2", optional = true }
 
+# Terminal UI over the workspace interface. Optional so the engine core, the
+# library and the plain CLI stay free of a rendering stack.
+ratatui = { version = "0.26", optional = true }
+crossterm = { version = "0.27", features = ["events"], optional = true }
+
 # Production semantic embeddings (optional — off by default so the package
 # builds anywhere without model files). Enable with --features embed-onnx.
 ort = { version = "2.0.0-rc.13", optional = true }
@@ -42,6 +47,9 @@ studio = ["dep:axum", "dep:tokio"]
 # tokenizer.json in the model dir at runtime; falls back to random projection.
 embed-onnx = ["dep:ort", "dep:tokenizers"]
 http = ["dep:ureq"]
+# `physis-system-tui`: mouse- and keyboard-driven navigation of the same
+# Workspace service the CLI calls.
+tui = ["cli", "dep:ratatui", "dep:crossterm"]
 
 [dev-dependencies]
 tempfile = "3"
@@ -71,3 +79,8 @@ path = "src/bin/physis.rs"
 [[bin]]
 name = "physis-world"
 path = "src/bin/world.rs"
+
+[[bin]]
+name = "physis-system-tui"
+path = "src/bin/system_tui.rs"
+required-features = ["tui"]

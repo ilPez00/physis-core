@@ -232,6 +232,10 @@ pub mod transplant;
 pub mod transform;
 pub mod vault;
 pub mod worldstate;
+pub mod system;
+
+#[cfg(feature = "cli")]
+pub mod system_cli;
 
 #[cfg(feature = "studio")]
 pub mod studio;

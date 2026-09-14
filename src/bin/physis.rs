@@ -20,6 +20,7 @@ use physis_core::edition::{Edition, CORE_CLI, PRO_CLI, PRO_SUMMARY, PRO_WEB, UPG
 /// when Pro is installed (it has the larger surface and its own error message
 /// is better than one invented here) and otherwise reported against Core.
 const CORE_COMMANDS: &[(&str, &str)] = &[
+    ("system", "Shared workspace: inspect, find, read, remember, run, export"),
     ("classify", "Score text against the semiotic grid"),
     ("ontology", "Show ontology stats"),
     ("facet", "Query ontology entries by orthogonal facets"),
