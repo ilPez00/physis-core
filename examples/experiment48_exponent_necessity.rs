@@ -285,6 +285,16 @@ fn write_file(path: &std::path::Path, content: &str) {
     std::fs::write(path, content).unwrap_or_else(|e| eprintln!("warning: could not write {}: {e}", path.display()));
 }
 
+/// Same stub as `impossible_machine_experiment`: an example whose only `main`
+/// is feature-gated is an E0601 that fails `cargo test` for the entire crate.
+#[cfg(not(feature = "embed-onnx"))]
+fn main() {
+    eprintln!(
+        "experiment48_exponent_necessity needs --features embed-onnx and model weights on disk; \
+nothing to run in this build."
+    );
+}
+
 #[cfg(feature = "embed-onnx")]
 fn main() {
     println!("EXPERIMENT 48: PRIME FIELD GEOMETRY → SPECTRAL CONSTRAINT");

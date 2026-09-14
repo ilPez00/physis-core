@@ -1052,6 +1052,18 @@ fn path_is_empty(pts: &[(f64, f64)], x: f64) -> bool {
     pts.first().map(|p| p.0 == x).unwrap_or(false)
 }
 
+/// Without `embed-onnx` this example has nothing to run, but an example with no
+/// `main` at all is a compile error (E0601) that stops `cargo test` for the
+/// whole crate — the library's 307 tests were green and unreachable behind it.
+/// The stub says why instead.
+#[cfg(not(feature = "embed-onnx"))]
+fn main() {
+    eprintln!(
+        "impossible_machine_experiment needs --features embed-onnx and model weights on disk; \
+nothing to run in this build."
+    );
+}
+
 #[cfg(feature = "embed-onnx")]
 fn main() {
     use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder};
