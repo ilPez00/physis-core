@@ -348,13 +348,46 @@ fn render(operation: &str, data: &Value) {
         }
         "history" => {
             for record in data["records"].as_array().into_iter().flatten() {
+                let subject = record["subject"].as_str().unwrap_or("");
                 println!(
-                    "obs:{}  {}  {}\n  {}",
+                    "obs:{}  {}  {subject}",
                     record["seq"],
                     record["source"].as_str().unwrap_or(""),
-                    record["subject"].as_str().unwrap_or(""),
-                    record["body"].as_str().unwrap_or("")
                 );
+                // The payload of a note repeats its subject verbatim, so
+                // printing both doubled the cost of every recall. Print the
+                // fields the subject does not carry, and only those.
+                let body: Value =
+                    serde_json::from_str(record["body"].as_str().unwrap_or("")).unwrap_or(Value::Null);
+                match &body {
+                    Value::Object(map) => {
+                        let extras: Vec<String> = map
+                            .iter()
+                            .filter(|(key, value)| {
+                                key.as_str() != "workspace"
+                                    && value.as_str() != Some(subject)
+                                    && !matches!(value, Value::Null)
+                            })
+                            .map(|(key, value)| match value.as_str() {
+                                Some(text) if text.len() > 160 => {
+                                    format!("{key}={}…", &text[..160])
+                                }
+                                Some(text) => format!("{key}={text}"),
+                                None => format!("{key}={value}"),
+                            })
+                            .collect();
+                        if !extras.is_empty() {
+                            println!("  {}", extras.join(" · "));
+                        }
+                    }
+                    // A legacy `fs` observation stores a content hash, not JSON.
+                    _ => {
+                        let raw = record["body"].as_str().unwrap_or("");
+                        if !raw.is_empty() && raw != subject {
+                            println!("  {raw}");
+                        }
+                    }
+                }
             }
             println!(
                 "{} matches in the last {} global records",

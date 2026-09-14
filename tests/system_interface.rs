@@ -421,3 +421,39 @@ fn reads_accept_a_line_range_and_an_unambiguous_id_prefix() {
     assert!(odd.status.success(), "colon path misread as a line range");
     assert_eq!(json(&odd)["data"]["text"].as_str().unwrap(), "kept\n");
 }
+
+#[test]
+fn history_display_does_not_reprint_the_note_it_just_printed() {
+    let (_temp, ws) = workspace();
+    let note = "pump calibration halted: probe disconnected";
+    let recorded = Command::new(env!("CARGO_BIN_EXE_physis-core"))
+        .env_remove("PHYSIS_CORE_DIR")
+        .args(["system", "--root"])
+        .arg(&ws.root)
+        .args(["remember", note, "--outcome", "failure", "--actor", "worker3"])
+        .output()
+        .unwrap();
+    assert!(recorded.status.success());
+
+    // Human display, not --json: the payload repeats the subject verbatim, and
+    // printing both doubled the cost of every recall (measured: 2620 → 1051
+    // tokens over 20 records).
+    let shown = Command::new(env!("CARGO_BIN_EXE_physis-core"))
+        .env_remove("PHYSIS_CORE_DIR")
+        .args(["system", "--root"])
+        .arg(&ws.root)
+        .args(["history", "pump"])
+        .output()
+        .unwrap();
+    let text = String::from_utf8(shown.stdout).unwrap();
+    assert!(text.contains(note), "the note itself must still be shown");
+    assert_eq!(
+        text.matches(note).count(),
+        1,
+        "note printed twice:\n{text}"
+    );
+    // The fields the subject does not carry are what the second line is for.
+    assert!(text.contains("actor=worker3"), "{text}");
+    assert!(text.contains("outcome=failure"), "{text}");
+    assert!(!text.contains("\"workspace\""), "raw payload leaked:\n{text}");
+}
