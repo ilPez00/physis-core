@@ -234,6 +234,21 @@ pub mod vault;
 pub mod worldstate;
 pub mod system;
 
+/// Restore the default `SIGPIPE` behaviour for a command-line program.
+///
+/// Rust sets `SIGPIPE` to ignored before `main`, so a closed downstream reader
+/// turns the next `println!` into `failed printing to stdout: Broken pipe` and
+/// a panic. Every `physis … | head` printed that panic after its output, which
+/// reads like a crash in the command the user just ran.
+pub fn unbreak_pipes() {
+    #[cfg(unix)]
+    // SAFETY: setting a signal disposition to SIG_DFL before any thread is
+    // spawned; this is the documented workaround for rust-lang/rust#46016.
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+}
+
 #[cfg(feature = "cli")]
 pub mod system_cli;
 

@@ -21,6 +21,11 @@ uuid = { version = "1", features = ["v4"] }
 anyhow = "1"
 rand = "0.8"
 sha2 = "0.10"
+# Only to restore the default SIGPIPE disposition (see `unbreak_pipes`). Rust
+# ignores SIGPIPE at startup, which turns `physis … | head` into a panic.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 
 # CLI + embedded studio GUI (axum). Kept optional so the engine core stays
 # dependency-free for embedders that reuse it. Enable with --features cli/studio.

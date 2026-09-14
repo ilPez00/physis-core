@@ -551,6 +551,7 @@ enum ContradictionCmd {
 }
 
 fn main() -> anyhow::Result<()> {
+    physis_core::unbreak_pipes();
     let cli = Cli::parse();
     // The workspace interface chooses its own explicit/shared state location.
     // Read-only queries must not create the default global store as a side effect.

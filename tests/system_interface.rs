@@ -495,3 +495,32 @@ fn build_directories_are_hidden_by_default_and_returnable_by_name() {
         .to_string()
         .contains("dist"));
 }
+
+#[test]
+#[cfg(unix)]
+fn a_closed_pipe_ends_output_instead_of_panicking() {
+    let (_temp, ws) = workspace();
+    for i in 0..200 {
+        fs::write(ws.root.join(format!("file{i}.txt")), "calibration\n").unwrap();
+    }
+    // Rust ignores SIGPIPE before main, so every `physis … | head` used to print
+    // `failed printing to stdout: Broken pipe` and a panic trace after the
+    // output the user asked for — which reads like a crash in their command.
+    let piped = Command::new("sh")
+        .arg("-c")
+        .arg(format!(
+            "{} system --root {} list --limit 500 | head -2",
+            env!("CARGO_BIN_EXE_physis-core"),
+            ws.root.display()
+        ))
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&piped.stderr);
+    assert!(!stderr.contains("panicked"), "panic on closed pipe:\n{stderr}");
+    assert!(!stderr.contains("Broken pipe"), "{stderr}");
+    assert_eq!(
+        String::from_utf8_lossy(&piped.stdout).lines().count(),
+        2,
+        "head should still receive its two lines"
+    );
+}

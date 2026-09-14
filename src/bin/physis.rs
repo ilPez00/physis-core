@@ -85,6 +85,7 @@ const PRO_COMMANDS: &[(&str, &str)] = &[
 ];
 
 fn main() {
+    physis_core::unbreak_pipes();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let edition = Edition::detect();
 
