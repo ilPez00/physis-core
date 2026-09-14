@@ -17,3 +17,4 @@ token-budgeted packing        | pack_with             | PackStrategy, chunks
 line-window ranking           | Bm25Index             | rank, score
 hypothesis fitness            | evidence, with_weight | fitness, status
 world states from log order   | mutual_knn            | components, structural_descriptor
+prediction from the record    | run, record           | predict
