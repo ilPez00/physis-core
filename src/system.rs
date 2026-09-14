@@ -795,6 +795,10 @@ online within-session adaptation did not improve on it",
             json!({"run_id":id,
             "argv":argv, "intent":intent, "actor":actor, "stdout":stdout, "stderr":stderr}),
         )?;
+        // What the record said before it ran. Kept in the result so a run and
+        // the prior it defied are one record rather than two, and so the loop
+        // that writes outcomes is the same loop that reads them.
+        let prior = self.predict(argv).ok();
         let timer = std::time::Instant::now();
         let status = Command::new(&argv[0])
             .args(&argv[1..])
@@ -813,7 +817,7 @@ online within-session adaptation did not improve on it",
             "stdout":stdout, "stderr":stderr,
             "assessment":"process exit only; task correctness is not inferred"});
         let finish = self.record("system.run.finish", intent, payload.clone())?;
-        Ok(json!({"id":id, "start_id":format!("obs:{}",start.seq),
+        Ok(json!({"id":id, "prior":prior, "start_id":format!("obs:{}",start.seq),
             "finish_id":format!("obs:{}",finish.seq), "result":payload,
             "stdout_tail":read_tail_text(&stdout, 8192)?, "stderr_tail":read_tail_text(&stderr, 8192)?}))
     }

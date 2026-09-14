@@ -440,6 +440,19 @@ workspace rate {:.2} over {} run(s))",
             );
         }
         "run" => {
+            // What the workspace's own record expected, printed beside what
+            // actually happened: the loop that writes outcomes is the loop that
+            // reads them, and a defied prior should be visible at the moment it
+            // is defied.
+            if data["prior"]["runs_of_this_kind"].as_u64().unwrap_or(0) > 0 {
+                println!(
+                    "prior: {} has failed {} of {} run(s) here (p {:.2})",
+                    data["prior"]["kind"].as_str().unwrap_or(""),
+                    data["prior"]["failures_of_this_kind"],
+                    data["prior"]["runs_of_this_kind"],
+                    data["prior"]["failure_probability"].as_f64().unwrap_or(0.0)
+                );
+            }
             println!(
                 "run {} · exit {} · {} ms\nintent {} → outcome {}",
                 data["id"].as_str().unwrap_or(""),

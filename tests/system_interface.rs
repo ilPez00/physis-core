@@ -574,3 +574,23 @@ fn predict_reads_the_workspace_record_and_says_when_there_is_none() {
         "ls"
     );
 }
+
+#[test]
+fn a_run_carries_the_prior_it_was_about_to_defy() {
+    let (_temp, ws) = workspace();
+    for _ in 0..2 {
+        cli(&ws, &["run", "--intent", "probe", "--", "false"]);
+    }
+    // The first run of a kind has no prior; the third has the record of the
+    // first two, in the same result as its own outcome.
+    let third = json(&cli(&ws, &["run", "--intent", "probe", "--", "false"]));
+    let prior = &third["data"]["prior"];
+    assert_eq!(prior["kind"].as_str().unwrap(), "false");
+    assert_eq!(prior["runs_of_this_kind"].as_u64().unwrap(), 2);
+    assert_eq!(prior["failures_of_this_kind"].as_u64().unwrap(), 2);
+    assert_eq!(third["data"]["result"]["process_success"].as_bool().unwrap(), false);
+
+    // The prior is read before the run, so it cannot include it.
+    let fourth = json(&cli(&ws, &["run", "--intent", "probe", "--", "false"]));
+    assert_eq!(fourth["data"]["prior"]["runs_of_this_kind"].as_u64().unwrap(), 3);
+}
