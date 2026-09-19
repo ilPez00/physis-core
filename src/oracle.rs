@@ -1,17 +1,21 @@
-//! Big-model oracle leg (Directive 1 §4, Directive 2 §21).
+//! Big-model oracle **types and deterministic comparison** (Directive 1 §4).
 //!
 //! A substantially larger model is used as **reference/oracle**, never as part
-//! of the deployed system. Transport is an OpenAI-compatible HTTP endpoint
-//! (OpenRouter by default) behind the `http` feature, driven by env:
+//! of the deployed system. Core keeps what a benchmark needs to report that leg
+//! honestly — the case type, the env-resolved configuration, and the two
+//! deterministic checks (token agreement, evidence citation) — and **not the
+//! transport**: the OpenAI-compatible call moved to the product repository in
+//! the 2026-09-14 Core/Product split (see `MOVED_TO_PRODUCT.md`). Offline or
+//! keyless the leg reports `not_configured`/`failed` and the benchmark carries
+//! on. Nothing is ever faked.
+//!
+//! Provider configuration this module still resolves (parsing only, no network):
 //!
 //! ```text
 //! PHYSIS_ORACLE_URL    (default https://openrouter.ai/api/v1)
 //! PHYSIS_ORACLE_KEY    (fallback: OPENROUTER_API_KEY, then GROQ_API_KEY)
 //! PHYSIS_ORACLE_MODEL  (default openai/gpt-4o)
 //! ```
-//!
-//! Offline or keyless ⇒ the leg reports `not_configured`/`failed` and the
-//! benchmark carries on measuring everything else. Nothing is ever faked.
 
 use serde::{Deserialize, Serialize};
 
@@ -73,61 +77,45 @@ pub fn token_jaccard(a: &str, b: &str) -> f32 {
 
 /// Do all `must_mention` tokens literally occur (case-insensitive)? The
 /// decisive-evidence check: did the model recover the facts that decide?
+/// Deterministic, offline — which is why it stays in Core while the call does not.
 pub fn cites_evidence(answer: &str, must_mention: &[String]) -> bool {
     let low = answer.to_lowercase();
     must_mention.iter().all(|m| low.contains(&m.to_lowercase()))
 }
 
-/// One OpenAI-compatible chat call. `max_tokens` is tight: we buy reference
-/// behaviour, not essays.
-#[cfg(feature = "http")]
-pub fn complete(
+/// The provider call as an injectable hook.
+///
+/// Core does not ship an HTTP client: the transport was moved to the product
+/// repository by the 2026-09-14 Core/Product split. A benchmark still *can*
+/// run the oracle leg, because the product (or a test) installs the transport
+/// here. With no transport installed the leg reports `not_configured` — an
+/// honest answer, never a fabricated one.
+pub type OracleTransport =
+    fn(&OracleConfig, &str, &str, &str, u32) -> anyhow::Result<(String, f64)>;
+
+static ORACLE_TRANSPORT: std::sync::OnceLock<OracleTransport> = std::sync::OnceLock::new();
+
+/// Install the transport once (product startup, or a test). Second install is
+/// ignored, so a caller cannot silently swap the instrument mid-run.
+pub fn install_transport(f: OracleTransport) {
+    let _ = ORACLE_TRANSPORT.set(f);
+}
+
+/// Run one oracle call through the installed transport, or refuse in a way the
+/// benchmark reports as `not_configured` rather than as a number.
+pub fn complete_with(
     cfg: &OracleConfig,
     key: &str,
     system: &str,
     prompt: &str,
     max_tokens: u32,
 ) -> anyhow::Result<(String, f64)> {
-    let started = std::time::Instant::now();
-    let body = serde_json::json!({
-        "model": cfg.model,
-        "temperature": 0,
-        "max_tokens": max_tokens,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": prompt},
-        ],
-    });
-    let url = format!("{}/chat/completions", cfg.url.trim_end_matches('/'));
-    let resp = ureq::post(&url)
-        .set("Authorization", &format!("Bearer {key}"))
-        .set("Content-Type", "application/json")
-        .set("HTTP-Referer", "https://github.com/ilPez00/physis-core")
-        .set("X-Title", "physis-core oracle benchmark")
-        .send_string(&serde_json::to_string(&body)?)
-        .map_err(|e| anyhow::anyhow!("oracle request: {e}"))?;
-    let text = resp
-        .into_string()
-        .map_err(|e| anyhow::anyhow!("oracle body: {e}"))?;
-    let v: serde_json::Value =
-        serde_json::from_str(&text).map_err(|e| anyhow::anyhow!("oracle json: {e}: {text}"))?;
-    let content = v
-        .pointer("/choices/0/message/content")
-        .and_then(|c| c.as_str())
-        .ok_or_else(|| anyhow::anyhow!("oracle shape: {text}"))?
-        .to_string();
-    Ok((content, started.elapsed().as_secs_f32() as f64 * 1000.0))
-}
-
-#[cfg(not(feature = "http"))]
-pub fn complete(
-    _cfg: &OracleConfig,
-    _key: &str,
-    _system: &str,
-    _prompt: &str,
-    _max_tokens: u32,
-) -> anyhow::Result<(String, f64)> {
-    anyhow::bail!("oracle needs the `http` feature — rebuild with --features http")
+    match ORACLE_TRANSPORT.get() {
+        Some(f) => f(cfg, key, system, prompt, max_tokens),
+        None => anyhow::bail!(
+            "oracle transport not installed (provider call lives in the product;              Core reports not_configured)"
+        ),
+    }
 }
 
 #[cfg(test)]

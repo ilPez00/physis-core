@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A point in time or an interval.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemporalValidity {
     /// When this becomes valid. None = valid from the beginning of time.
     pub valid_from: Option<chrono::DateTime<chrono::Utc>>,
@@ -28,6 +28,16 @@ pub struct TemporalValidity {
     /// don't delete).
     #[serde(default)]
     pub expired_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// R1 (development-cycle-2026-09-15): this window is *unplaceable* in
+    /// world time, not merely unbounded. `valid_from: None, valid_until:
+    /// None` already means "permanent" (always valid) — the two are
+    /// opposite claims and conflating them was the gap `UNKNOWN_TIME` exists
+    /// to close: undated evidence must satisfy no `valid_at` query, not
+    /// every one. `#[serde(default)]` so every pre-existing `TemporalValidity`
+    /// (all Hypothesis-level windows to date) keeps meaning "known, unbounded"
+    /// on deserialization, not "unknown".
+    #[serde(default)]
+    pub valid_unknown: bool,
 }
 
 impl TemporalValidity {
@@ -38,6 +48,7 @@ impl TemporalValidity {
             valid_until: None,
             trigger: None,
             expired_at: None,
+            valid_unknown: false,
         }
     }
 
@@ -48,6 +59,7 @@ impl TemporalValidity {
             valid_until: None,
             trigger: None,
             expired_at: None,
+            valid_unknown: false,
         }
     }
 
@@ -61,6 +73,22 @@ impl TemporalValidity {
             valid_until: Some(end),
             trigger: None,
             expired_at: None,
+            valid_unknown: false,
+        }
+    }
+
+    /// R1: no extractable world-time interval at all (E77's "dates in
+    /// prose" case, or a genuinely undated report). Distinct from
+    /// [`Self::permanent`] — that means "known to always hold"; this means
+    /// "we cannot place it in time," and must satisfy no [`Self::is_valid_at`]
+    /// query rather than every one.
+    pub fn unknown() -> Self {
+        Self {
+            valid_from: None,
+            valid_until: None,
+            trigger: None,
+            expired_at: None,
+            valid_unknown: true,
         }
     }
 
@@ -72,6 +100,9 @@ impl TemporalValidity {
     /// point-in-time query honours both — history keeps the old record, the
     /// validity surface does not.
     pub fn is_valid_at(&self, when: chrono::DateTime<chrono::Utc>) -> bool {
+        if self.valid_unknown {
+            return false;
+        }
         if let Some(from) = self.valid_from {
             if when < from {
                 return false;

@@ -1,3 +1,9 @@
+> **Retired (2026-09-15, Core/Product split).** `physis-core` is Apache-2.0
+> and sells no license; this guide predates that and is kept only as history,
+> now at `physis-pro/docs/history/STRIPE_LICENSE_GUIDE.md` with a correcting
+> header. Not compiled or packaged (already in `Cargo.toml`'s `exclude`);
+> renamed rather than deleted, per `MOVED_TO_PRODUCT.md`.
+
 # Selling physis-core Licenses via Stripe
 
 This guide outlines a minimal flow to sell commercial licenses for physis-core using Stripe.

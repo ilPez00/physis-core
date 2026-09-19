@@ -235,7 +235,7 @@ fn oracle_leg(
             "Query: {}\n\nEvidence (the only admissible sources; cite them):\n{}\n\nAnswer in <=120 words with the exact quotes that decide.",
             case.query, evidence
         );
-        let (text, ms) = crate::oracle::complete(
+        let (text, ms) = crate::oracle::complete_with(
             &ocfg,
             &key,
             "You answer industrial contract questions strictly from the given evidence. Cite exact quotes. If evidence is missing, say so.",

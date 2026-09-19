@@ -164,7 +164,27 @@ impl TokenFixedRetriever {
     }
 
     /// Retrieve the chunks whose packed token total stays within `budget`.
+    ///
+    /// Ranks by cosine to `query_emb` — the frozen baseline leg. Callers that
+    /// have a different ranking (the fused cosine+BM25 order from
+    /// [`rank_hybrid`], say) use [`Self::retrieve_with_ranking`] instead and
+    /// get the same budget guarantee.
     pub fn retrieve(&self, query_emb: &[f32], corpus: &RagCorpus) -> RetrievalResult {
+        self.retrieve_with_ranking(&rank_by_cosine(query_emb, corpus), corpus)
+    }
+
+    /// Budget-fill an arbitrary ranking. `ranked` is `(chunk id, score)`, and
+    /// the **score** is the selection criterion — list order is irrelevant, so
+    /// pass the cosine scores from [`rank_by_cosine`] or the fused scores from
+    /// [`rank_hybrid`] and the same greedy fill applies to either. Every other
+    /// guarantee of [`Self::retrieve`] holds: the packed total never exceeds
+    /// `budget`, `top_k` caps the selection, and the result is deterministic
+    /// for a deterministic ranking.
+    pub fn retrieve_with_ranking(
+        &self,
+        ranked: &[(usize, f32)],
+        corpus: &RagCorpus,
+    ) -> RetrievalResult {
         if corpus.chunks.is_empty() || self.budget == 0 {
             return RetrievalResult {
                 chunks: Vec::new(),
@@ -174,12 +194,7 @@ impl TokenFixedRetriever {
             };
         }
 
-        let mut scored: Vec<(usize, f32)> = corpus
-            .chunks
-            .iter()
-            .map(|c| (c.id, cosine_sim(query_emb, &c.embedding)))
-            .collect();
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let scored: Vec<(usize, f32)> = ranked.to_vec();
 
         // Greedy MMR: each round takes the best remaining chunk by effective
         // score, then discounts what is left against what was just taken.
@@ -199,8 +214,10 @@ impl TokenFixedRetriever {
         // already selected). The discount is updated incrementally against the
         // one new selection per round, so this is O(top_k * n) cosines rather
         // than the O(n^2) per candidate the first version paid.
-        let mut remaining: Vec<(usize, f32, f32)> =
-            scored.into_iter().map(|(id, base)| (id, base, 0.0)).collect();
+        let mut remaining: Vec<(usize, f32, f32)> = scored
+            .into_iter()
+            .map(|(id, base)| (id, base, 0.0))
+            .collect();
         let mut selected: Vec<RetrievedChunk> = Vec::new();
         let mut used = 0usize;
 
@@ -550,6 +567,38 @@ mod tests {
             "total {} must be <= budget 40",
             r.total_tokens
         );
+    }
+
+    #[test]
+    fn retrieve_with_ranking_follows_the_given_scores_under_the_same_budget() {
+        let texts: Vec<String> = (0..6)
+            .map(|i| format!("chunk {i} with enough words to cost a few tokens"))
+            .collect();
+        let e = emb();
+        let corpus = RagCorpus::build(&texts, &e);
+        let q = e.embed("chunk");
+
+        // A ranking that deliberately disagrees with cosine: the retriever must
+        // select on the scores it is handed, not re-rank by cosine behind the
+        // caller's back. This is what makes the fused `rank_hybrid` order
+        // actually reach the budget fill.
+        let ranked: Vec<(usize, f32)> =
+            vec![(3, 0.9), (1, 0.8), (0, 0.7), (2, 0.6), (4, 0.5), (5, 0.4)];
+        let r = TokenFixedRetriever::new(30, 100).retrieve_with_ranking(&ranked, &corpus);
+        assert!(r.total_tokens <= 30, "total {} must be <= budget 30", r.total_tokens);
+        assert_eq!(
+            r.chunks.first().map(|c| c.id),
+            Some(3),
+            "the first selection must be the highest-scored entry"
+        );
+
+        // And the delegation is exact: `retrieve` is `retrieve_with_ranking`
+        // over the cosine ranking.
+        let a = TokenFixedRetriever::new(30, 100).retrieve(&q, &corpus);
+        let b = TokenFixedRetriever::new(30, 100)
+            .retrieve_with_ranking(&rank_by_cosine(&q, &corpus), &corpus);
+        assert_eq!(a.chunks.len(), b.chunks.len());
+        assert_eq!(a.total_tokens, b.total_tokens);
     }
 
     #[test]

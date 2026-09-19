@@ -10,7 +10,6 @@ use physis_core::{
     epistemic::{EpistemicEvent, EpistemicEventType},
     hypothesis::{Evidence, EvidencePolarity, Hypothesis, HypothesisStatus},
     ontology::OntologyLoader,
-    quality::QualityTracker,
     rag::{RagCorpus, TokenFixedRetriever},
 };
 
@@ -181,33 +180,10 @@ fn test_epistemic_thesis_end_to_end() {
         replay_t0.unwrap(), replay_now.unwrap()
     );
 
-    println!("\n=================================================================");
-    println!("=== 5. QUALITY FEEDBACK PENALTY TUNING ===");
-    println!("=================================================================");
-    let mut quality = QualityTracker::new(Box::new(RandomProjectionEmbedder::new(64)));
-    let cell_key = format!("{}\x00{}", top_cell.domain, top_cell.mode);
-    let initial_score = top_cell.score;
+    // (Section 5, quality feedback, moved to the product repo together with the
+    //  tracker - see MOVED_TO_PRODUCT.md.)
 
-    // Report a quality penalty on this cell
-    quality.penalize_cell(&cell_key, 0.35);
-    let penalty = quality
-        .cell_penalties
-        .get(&cell_key)
-        .copied()
-        .unwrap_or(0.0);
-    assert!(penalty > 0.0, "Cell must receive quality penalty");
 
-    let adjusted_score = quality.adjust_score(&cell_key, initial_score);
-    assert!(
-        adjusted_score < initial_score,
-        "Adjusted score must be penalized"
-    );
-    println!("Quality Feedback Penalty Verified:\n  Raw Classification Score: {:.4}\n  Penalty Applied: {:.2}\n  Adjusted Score: {:.4}",
-        initial_score, penalty, adjusted_score
-    );
-
-    println!("\n=================================================================");
-    println!("=== 6. FIXED-TOKEN BUDGET RAG WITH MMR DIVERSITY ===");
     println!("=================================================================");
     let chunk_texts = vec![
         "Emergency Stop procedure: Press red button to halt spindle immediately.".to_string(),

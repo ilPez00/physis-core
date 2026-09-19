@@ -347,31 +347,15 @@ impl ModelRegistry {
         Ok(manifest)
     }
 
-    /// Install over HTTP(S). Feature-gated: without the `http` feature this
-    /// returns an explicit error rather than a fake success.
-    #[cfg(feature = "http")]
-    #[allow(unexpected_cfgs)]
-    pub fn install_http(&self, record: ModelRecord, url: &str, files: &[String]) -> anyhow::Result<ModelManifest> {
-        let dir = self.dir(&record.id);
-        std::fs::create_dir_all(&dir)?;
-        let mut verified: Vec<(String, String)> = Vec::new();
-        for rel in files {
-            let full = format!("{}/{}", url.trim_end_matches('/'), rel);
-            let resp = ureq::get(&full).call().map_err(|e| anyhow::anyhow!("download {full}: {e}"))?;
-            let mut bytes = Vec::new();
-            resp.into_reader().read_to_end(&mut bytes)?;
-            let sum = format!("{:x}", Sha256::digest(&bytes));
-            std::fs::write(dir.join(rel), &bytes)?;
-            verified.push((rel.clone(), sum));
-        }
-        let manifest = ModelManifest {
-            record,
-            revision: "downloaded".into(),
-            files: verified,
-            installed_at: chrono::Utc::now().to_rfc3339(),
-        };
-        std::fs::write(dir.join("model-manifest.json"), serde_json::to_vec_pretty(&manifest)?)?;
-        Ok(manifest)
+    /// Install over HTTP(S). The downloader is product integration (it needs
+    /// network and a registry) and moved to the product repository in the
+    /// 2026-09-14 Core/Product split. Core refuses explicitly rather than
+    /// pretending the model can be fetched.
+    pub fn install_http(&self, _record: ModelRecord, _url: &str, _files: &[String]) -> anyhow::Result<ModelManifest> {
+        anyhow::bail!(
+            "model download is not part of Core (offline by design); fetch the \
+             weights yourself and point model_dir at them, or use the product"
+        )
     }
 
     pub fn remove(&self, id: &str) -> anyhow::Result<()> {

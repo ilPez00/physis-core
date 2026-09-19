@@ -169,26 +169,19 @@
 //! - [`embed_onnx`]: Optional high-fidelity ONNX embedding runtime (MiniLM / BERT) via `ort`.
 //! - [`epistemic`]: Append-only audit stream and time-machine historical replay.
 //! - [`explanation`]: Structured explanation report generation with provenance chains and causal grounding.
-//! - [`history`]: Ingestion adapters for browser bookmarks, browser history, OPML feeds, and chat logs.
 //! - [`hypothesis`]: Hypotheses, evidence polarity, predictions, revisions, and composite fitness breakdowns.
 //! - [`ontology`]: Multi-domain ontology loaders (Praxis, Machine Process, Agent Workflow, Office Operations).
-//! - [`praxis`]: Life-log and behavioral records with asserted verdicts and feedback integration.
 //! - [`process`]: Industrial process cycles, tasks, state machines, and temporal deviations.
 //! - [`provenance`]: Cryptographic hash chains and provenance tracking for epistemological traceability.
-//! - [`quality`]: Reinforcement feedback loops with cell penalties and contextual fitness adjustments.
 //! - [`rag`]: Token-budget bounded retrieval-augmented generation with MMR diversity filtering.
-//! - [`vault`]: Markdown knowledge vault and Git commit history importers.
-//! - [`studio`]: Embedded lightweight web studio GUI and RESTful API endpoints.
 
 pub mod bench;
-pub mod act;
-pub mod act_recall;
 pub mod claim_identity;
 pub mod becoming;
 pub mod classify;
-pub mod config_run;
 pub mod coherence_dimensions;
 pub mod coherence_query;
+pub mod config_run;
 pub mod contradiction;
 pub mod core;
 pub mod coverage;
@@ -196,12 +189,10 @@ pub mod delta_engine;
 pub mod direction;
 pub mod discovery;
 pub mod dream;
-pub mod edition;
 pub mod embed;
 pub mod embed_ngram;
 pub mod epistemic;
 pub mod explanation;
-pub mod history;
 pub mod linkage;
 pub mod machines;
 pub mod map;
@@ -210,31 +201,21 @@ pub mod hypothesis;
 pub mod model_provider;
 pub mod models;
 pub mod ngram_table;
-pub mod nlq;
-pub mod oracle;
 pub mod observe;
+pub mod oracle;
 pub mod ontology;
-pub mod praxis;
 pub mod propose;
 pub mod process;
 pub mod provenance;
-pub mod experiments;
-pub mod quality;
 pub mod rag;
 pub mod relation;
 pub mod chain;
 pub mod grid_fitness;
-pub mod ground;
-pub mod notebook;
 pub mod store;
 pub mod temporal;
+pub mod worldstate;
 pub mod transplant;
 pub mod transform;
-pub mod vault;
-pub mod worldstate;
-pub mod system;
-pub mod system_delegation;
-pub mod system_mcp;
 
 /// Restore the default `SIGPIPE` behaviour for a command-line program.
 ///
@@ -250,17 +231,6 @@ pub fn unbreak_pipes() {
         libc::signal(libc::SIGPIPE, libc::SIG_DFL);
     }
 }
-
-#[cfg(feature = "cli")]
-pub mod system_cli;
-
-#[cfg(feature = "studio")]
-pub mod studio;
-#[cfg(feature = "studio")]
-pub mod studio_communities;
-
-#[cfg(feature = "studio")]
-pub mod studio_lab;
 
 #[cfg(feature = "embed-onnx")]
 pub mod embed_onnx;
@@ -285,7 +255,6 @@ pub use epistemic::{
 };
 pub use dream::{dream_over_history, ProposalKind, RetrospectiveProposal, RETIRE_AFTER_CONTRADICTIONS};
 pub use explanation::{ExplanationReport, HistoricalPrecedent};
-pub use history::importer_for as history_importer_for;
 pub use hypothesis::{
     Evidence, EvidencePolarity, FitnessBreakdown, Hypothesis, HypothesisStatus, Prediction,
     Revision, CONTRADICTION_PENALTY_CAP, CONTRADICTION_PENALTY_PER_ITEM,
@@ -296,16 +265,12 @@ pub use hypothesis::{
 };
 pub use models::*;
 pub use ontology::OntologyLoader;
-pub use praxis::{BehaviourRecord, BehaviourStatus};
 pub use process::{
     ProcessConstraint, ProcessCycle, ProcessDeviation, ProcessGoal, ProcessIntervention,
     ProcessMeasurement, ProcessOutcome, ProcessPlan, ProcessResource, ProcessState, ProcessTask,
     StateTransition, TaskState,
 };
 pub use provenance::{ProvenanceChain, ProvenanceLink};
-pub use quality::{
-    ContextualQualityTracker, FitnessContext, FitnessRecord, QualityFailure, QualityTracker,
-};
 pub use rag::{count_tokens, RagChunk, RagCorpus, RetrievalResult, TokenFixedRetriever};
 pub use relation::{RelationType, TypedEdge};
 pub use temporal::TemporalValidity;
@@ -313,10 +278,6 @@ pub use transform::{
     ACCEPT_FLOOR, Constraint, ConstraintKind, PatElem, Predicate, PropKind, Proposition,
     TraceStep, Transform, Triple, TriplePattern, WorldState, apply, find_homomorphisms,
 };
-pub use vault::{collect_labels as collect_vault_labels, scan_vault, VaultDoc};
-
-#[cfg(feature = "studio")]
-pub use studio::{run, run_with_model, StudioState};
 
 #[cfg(feature = "embed-onnx")]
 pub use embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};

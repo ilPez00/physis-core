@@ -1,5 +1,3 @@
-//! physis-core CLI.
-
 use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
@@ -8,19 +6,15 @@ use physis_core::classify::{CellClassifier, CellScore};
 use physis_core::contradiction::{Contradiction, ContradictionParty, ResolutionStatus};
 use physis_core::core::PhysisCore;
 use physis_core::embed::VectorEmbed;
-use physis_core::history::import_file as import_history_file;
 use physis_core::hypothesis::{
     Evidence, EvidencePolarity, Hypothesis, HypothesisStatus, Prediction,
 };
 use physis_core::models::{cosine_sim, Abstraction, Agency, FacetFilter, LifecyclePhase, PinEdit, Scale};
 use physis_core::ontology::OntologyLoader;
-use physis_core::praxis::parse_export as parse_praxis_export;
-use physis_core::quality::QualityTracker;
 use physis_core::rag::{
     count_tokens, Bm25Index, RagChunk, RagCorpus, TokenFixedRetriever,
 };
 use physis_core::store;
-use physis_core::vault::{collect_labels as collect_vault_labels, scan_git_log, scan_vault};
 
 /// physis-core — embed, classify, cohere, learn from feedback.
 #[derive(Parser)]
@@ -32,8 +26,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Shared workspace interface for humans, agents, and folder snapshots.
-    System(physis_core::system_cli::SystemArgs),
     /// Classify text against the semiotic grid.
     Classify { text: String },
     /// Show ontology stats.
@@ -113,24 +105,6 @@ enum Command {
         #[arg(long, default_value_t = 12)]
         max: usize,
     },
-    /// Import a knowledge vault (Obsidian/markdown notes, plain text, git log).
-    Vault {
-        /// Vault directory to scan.
-        dir: PathBuf,
-        /// Max git commits to import (0 = skip git).
-        #[arg(long, default_value_t = 50)]
-        git: usize,
-    },
-    /// Import personal history (bookmarks HTML, history JSON, OPML, chat JSONL).
-    History {
-        /// File to import.
-        file: PathBuf,
-    },
-    /// Backfill behavioral records from a Praxis life-log export.
-    Praxis {
-        /// JSON export file.
-        file: PathBuf,
-    },
     /// Show a coherence snapshot of the persisted node graph.
     Snapshot,
     /// Report an asserted verdict on a node by label.
@@ -142,11 +116,6 @@ enum Command {
     },
     /// Dream over low-coherence / failed nodes.
     Dream,
-    /// Quality feedback loop.
-    Quality {
-        #[command(subcommand)]
-        cmd: QualityCmd,
-    },
     /// Model registry: list / info / install / remove / path.
     Model {
         #[command(subcommand)]
@@ -190,78 +159,13 @@ enum Command {
         #[arg(long)]
         big_model: Option<String>,
     },
-    /// Measure `act`'s recall directly, against two construction-matched nulls.
-    ///
-    /// Conceptual problem 1 (`docs/plans/2026-09-13-four-conceptual-problems.md`):
-    /// the ledger is the differentiator and it reaches its data through the
-    /// context compiler, which is the commodity half and was measured weak.
-    /// This says how weak, on a seeded ledger with authored ground truth.
-    /// Writes `benchmarks/results/act-recall.json`.
-    #[command(name = "act-recall")]
-    ActRecall {
-        /// How many claims `act` surfaces. The `act` default is 5; the
-        /// measurement is only about the list the operator actually sees.
-        #[arg(long, default_value_t = 5)]
-        top: usize,
-        #[arg(long, default_value_t = 7)]
-        seed: u64,
-        #[arg(long)]
-        json: bool,
-    },
-    /// Watch a source and append what changed to the observation log.
-    /// Append-only: nothing here is ever rewritten. Re-running over an
-    /// unchanged tree produces nothing.
-    #[command(name = "watch")]
-    Watch {
-        /// `fs` — content-hash gated tree scan.
-        /// `git` — commits, with the interval since the previous commit.
-        /// `terminal` — shell history, with each command's real runtime.
-        /// `agent` — an agent's own session turns (model outputs and prompts).
-        /// `process` — long-lived processes, with their real age.
-        /// `browser` — visited pages (needs the `sqlite3` CLI).
-        /// `all` — every source above, in one pass.
-        #[arg(long, default_value = "fs")]
-        source: String,
-        #[arg(long, default_value = ".")]
-        path: PathBuf,
-        #[arg(long, default_value_t = 2000)]
-        max: usize,
-        /// Show what would be appended without writing.
-        #[arg(long)]
-        dry_run: bool,
-    },
-    /// Read the observation log: what this machine saw, and what else was
-    /// happening at the same time.
-    #[command(name = "observed")]
+    /// List observations from the shared log — the sequence numbers `claim
+    /// --from` cites. Reads the same append-only log any product-side
+    /// observer (watchers, workspace `remember`) writes to.
     Observed {
-        /// Only this bucket (`fs`, `git`, `terminal`, `model`, …).
+        /// Only observations from this source (e.g. `system.note`, `fs`, `git`).
         #[arg(long)]
         source: Option<String>,
-        /// What overlapped this observation in time, across every source.
-        #[arg(long)]
-        concurrent: Option<u64>,
-        #[arg(long, default_value_t = 20)]
-        limit: usize,
-        #[arg(long)]
-        json: bool,
-    },
-    /// Run a command, record it, and say what is already believed about it.
-    ///
-    /// Not a sandbox — `sh -c` already runs things. The contribution is that
-    /// the intent is recorded BEFORE the command runs (so an action that hangs
-    /// still leaves a record), the outcome is recorded with its real duration,
-    /// and claims bearing on it are surfaced first — especially ones already
-    /// Contradicted, which is the machine saying you established this does not
-    /// work.
-    #[command(name = "act")]
-    Act {
-        /// The command, as you would type it into a shell.
-        command: String,
-        /// Show what is already believed and STOP, without running anything.
-        #[arg(long)]
-        dry_run: bool,
-        #[arg(long, default_value_t = 5)]
-        top: usize,
         #[arg(long)]
         json: bool,
     },
@@ -297,14 +201,6 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
-    /// The conceptual state a human and a machine are both working on: what is
-    /// believed and on what evidence, what is still disputed, and what was
-    /// predicted and never scored. No model is involved — it reads the store.
-    #[command(name = "ground")]
-    Ground {
-        #[arg(long)]
-        json: bool,
-    },
     /// The whole engine in one pass: structure, bounded context, coverage
     /// gaps, a shortlist per gap, drift detection — and the label-permuted
     /// control that all of it is scored against.
@@ -321,32 +217,6 @@ enum Command {
         threshold: f32,
         #[arg(long)]
         json: bool,
-    },
-    /// Grounded answer over a local corpus, with citations (the "NotebookLM"
-    /// shape). Synthesises when an OpenAI-compatible endpoint is configured
-    /// (a local ollama counts); otherwise returns a labelled extract and says
-    /// why. See the `notebook` module docs for the two tiers.
-    #[command(name = "notebook")]
-    Notebook {
-        #[arg(long)]
-        corpus: PathBuf,
-        #[arg(long)]
-        query: String,
-        #[arg(long, default_value_t = 1200)]
-        budget: usize,
-        #[arg(long)]
-        json: bool,
-        /// Draft-and-fill: let the table draft what the retrieved context
-        /// supports and mark the rest as gaps, instead of asking a model for
-        /// the whole answer. Prints `table_share` — the fraction the table
-        /// supplied, which is the number that says whether this approach
-        /// applies to the question at all.
-        #[arg(long)]
-        draft: bool,
-        /// Probability floor below which the table declines to continue and
-        /// opens a gap. Higher means shorter, safer drafts.
-        #[arg(long, default_value_t = 0.0)]
-        confidence: f32,
     },
     /// Physis context compiler: fixed-budget structural context for a query
     /// against a corpus, with the measured compression over conventional
@@ -404,27 +274,6 @@ enum Command {
         #[arg(long, default_value_t = 3)]
         min_cluster: usize,
     },
-    /// Run the ontology studio web GUI.
-    #[cfg(feature = "studio")]
-    Studio {
-        /// Port to listen on.
-        #[arg(long, default_value_t = 3000)]
-        port: u16,
-        /// ONNX model directory (model.onnx + tokenizer.json). Optional — falls
-        /// back to deterministic random projection when absent or unloadable.
-        #[arg(long)]
-        model: Option<String>,
-    },
-}
-
-#[derive(Subcommand)]
-enum QualityCmd {
-    /// Show quality tracker summary.
-    Summary,
-    /// Report a failure with optional correct domain.
-    Fail { feedback: String },
-    /// Report a success for a cell (DOMAIN\x00MODE).
-    Pass { cell: String },
 }
 
 #[derive(Subcommand)]
@@ -553,14 +402,8 @@ enum ContradictionCmd {
 fn main() -> anyhow::Result<()> {
     physis_core::unbreak_pipes();
     let cli = Cli::parse();
-    // The workspace interface chooses its own explicit/shared state location.
-    // Read-only queries must not create the default global store as a side effect.
-    if let Command::System(args) = &cli.command {
-        return args.run();
-    }
     store::ensure_data_dir()?;
     match cli.command {
-        Command::System(_) => unreachable!("handled before opening the global store"),
         Command::Classify { text } => run_classify(&text),
         Command::Ontology => run_ontology(),
         Command::Facet {
@@ -595,13 +438,9 @@ fn main() -> anyhow::Result<()> {
         } => run_node_edit(&id, &label, domain, mode, clear_pin),
         Command::NodeDelete { id } => run_node_delete(&id),
         Command::NodeSearch { query, budget, max } => run_node_search(&query, budget, max),
-        Command::Vault { dir, git } => run_vault(&dir, git),
-        Command::History { file } => run_history(&file),
-        Command::Praxis { file } => run_praxis(&file),
         Command::Snapshot => run_snapshot(),
         Command::Assert { label, verdict } => run_assert(&label, &verdict),
         Command::Dream => run_dream(),
-        Command::Quality { cmd } => run_quality(cmd),
         Command::Hypothesis { cmd } => run_hypothesis(cmd),
         Command::Contradiction { cmd } => run_contradiction(cmd),
         Command::Audit => run_audit(),
@@ -610,45 +449,19 @@ fn main() -> anyhow::Result<()> {
         Command::Model { cmd } => cmd_model(cmd),
         Command::NGram { cmd } => cmd_ngram(cmd),
         Command::Demo { dir, query, order } => cmd_demo(&dir, &query, order),
-        Command::Watch { source, path, max, dry_run } => {
-            cmd_watch(&source, &path, max, dry_run)
-        }
-        Command::Observed { source, concurrent, limit, json } => {
-            cmd_observed(source.as_deref(), concurrent, limit, json)
-        }
-        Command::Act { command, dry_run, top, json } => {
-            cmd_act(&command, dry_run, top, json)
-        }
+        Command::Observed { source, json } => cmd_observed(source.as_deref(), json),
         Command::Claim { from, statement, confidence } => {
             cmd_claim(from, &statement, confidence)
         }
         Command::DirectionCmd { before, after, want, json } => {
             cmd_direction(&before, &after, &want, json)
         }
-        Command::Ground { json } => {
-            let mut core = load_core();
-            if core.project_all_revisions() > 0 {
-                store::ensure_data_dir()?;
-                core.persist()?;
-            }
-            let g = physis_core::ground::read(&core, &physis_core::observe::read(&physis_core::observe::log_path()).unwrap_or_default(), chrono::Utc::now());
-            if json {
-                println!("{}", serde_json::to_string_pretty(&g)?);
-            } else {
-                print!("{}", g.render());
-            }
-            Ok(())
-        }
         Command::Chain { corpus, query, budget, threshold, json } => {
             cmd_chain(&corpus, &query, budget, threshold, json)
         }
-        Command::Notebook { corpus, query, budget, json, draft, confidence } => cmd_notebook(&corpus, &query, budget, json, draft, confidence),
         Command::Context { corpus, query, budget, json } => cmd_context(&corpus, &query, budget, json),
         Command::Benchmark { order, budget, big_model } => cmd_benchmark(order, budget, big_model),
-        Command::ActRecall { top, seed, json } => cmd_act_recall(top, seed, json),
         Command::Run { config, model, ngram, query } => cmd_run(&config, model, ngram, query),
-        #[cfg(feature = "studio")]
-        Command::Studio { port, model } => run_studio(port, model),
     }
 }
 
@@ -671,26 +484,17 @@ or build with --features embed-onnx and real weights for semantic scores."
     e
 }
 
-fn load_quality() -> QualityTracker {
-    QualityTracker::load_or_new(&store::quality_path())
-}
-
 fn run_classify(text: &str) -> anyhow::Result<()> {
     let ontology = OntologyLoader::load_all();
     let embedder = load_embedder();
     let classifier = CellClassifier::build(&ontology, &embedder);
-    let quality = load_quality();
 
-    let results = classifier.classify_text(text, &embedder);
-    let adjusted: Vec<CellScore> = results
-        .iter()
-        .map(|r| {
-            let key = format!("{}\x00{}", r.domain, r.mode);
-            let mut r2 = r.clone();
-            r2.score = quality.adjust_score(&key, r.score);
-            r2
-        })
-        .collect();
+    // Raw scores. The quality-penalty adjustment is product behaviour: the
+    // tracker moved to the product repo (MOVED_TO_PRODUCT.md), which applies it
+    // on top of these numbers. Core reports what the mechanism itself measured.
+    // (The clone-and-map that used to sit here was the last trace of that
+    // removed step; it copied each score into itself and did nothing.)
+    let adjusted: Vec<CellScore> = classifier.classify_text(text, &embedder);
 
     println!("Query: {text}");
     println!("Cells populated: {}", classifier.cell_count());
@@ -1025,79 +829,6 @@ fn run_node_search(query: &str, budget: usize, max: usize) -> anyhow::Result<()>
     Ok(())
 }
 
-fn run_vault(dir: &std::path::Path, git: usize) -> anyhow::Result<()> {
-    let embedder = load_embedder();
-    let mut core = load_core();
-    let mut docs = scan_vault(dir);
-    if git > 0 {
-        let commits = scan_git_log(dir, git);
-        docs.extend(commits);
-    }
-    if docs.is_empty() {
-        println!("No docs found in vault: {}", dir.display());
-        return Ok(());
-    }
-    let pairs = collect_vault_labels(&docs);
-    let before = core.nodes.len();
-    for (label, text) in &pairs {
-        let emb = embedder.embed(text);
-        core.register_node_vec_labeled(emb, Some(label.clone()));
-    }
-    let added = core.nodes.len().saturating_sub(before);
-    core.persist()?;
-    println!(
-        "Vault[{}]: {} docs → {} labels registered ({} deduped)",
-        dir.display(),
-        docs.len(),
-        added,
-        pairs.len().saturating_sub(added)
-    );
-    Ok(())
-}
-
-fn run_history(file: &std::path::Path) -> anyhow::Result<()> {
-    let embedder = load_embedder();
-    let mut core = load_core();
-    let (docs, name) = import_history_file(file)?;
-    let before = core.nodes.len();
-    for doc in &docs {
-        let emb = embedder.embed(&doc.body);
-        core.register_node_vec_labeled(emb, Some(doc.title.clone()));
-    }
-    let added = core.nodes.len().saturating_sub(before);
-    core.persist()?;
-    println!(
-        "History[{}]: {} items → {} nodes registered",
-        name,
-        docs.len(),
-        added
-    );
-    Ok(())
-}
-
-fn run_praxis(file: &std::path::Path) -> anyhow::Result<()> {
-    let embedder = load_embedder();
-    let mut core = load_core();
-    let text = std::fs::read_to_string(file)?;
-    let records = parse_praxis_export(&text);
-    let before = core.nodes.len();
-    for r in &records {
-        let emb = embedder.embed(&r.body);
-        let id =
-            core.register_node_vec_labeled(emb, Some(format!("praxis:{}:{}", r.kind, r.title)));
-        core.assert_coherence(&id, r.status.as_score());
-    }
-    let added = core.nodes.len().saturating_sub(before);
-    core.persist()?;
-    println!(
-        "Praxis[{}]: {} records → {} behavioral nodes asserted",
-        file.display(),
-        records.len(),
-        added
-    );
-    Ok(())
-}
-
 fn run_snapshot() -> anyhow::Result<()> {
     let core = load_core();
     let snap = core.snapshot();
@@ -1155,51 +886,6 @@ fn run_dream() -> anyhow::Result<()> {
         );
     }
     core.persist()?;
-    Ok(())
-}
-
-fn run_quality(cmd: QualityCmd) -> anyhow::Result<()> {
-    let mut quality = load_quality();
-    match cmd {
-        QualityCmd::Summary => {
-            println!("Quality tracker: {} failures", quality.failures.len());
-            println!("  cells penalized: {}", quality.cell_penalties.len());
-            println!("  cells boosted:   {}", quality.cell_boosts.len());
-            let mut penalties: Vec<_> = quality.cell_penalties.iter().collect();
-            penalties.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-            for (cell, p) in penalties.iter().take(10) {
-                println!("  {} penalty={:.2}", cell.replace('\x00', " × "), p);
-            }
-            for f in quality.failures.iter().rev().take(5) {
-                println!(
-                    "  [{}] {} score={:.3} sev={:.1} feedback={}",
-                    &f.id[..8],
-                    f.top_cell.replace('\x00', " × "),
-                    f.top_score,
-                    f.severity,
-                    f.feedback.chars().take(50).collect::<String>(),
-                );
-            }
-        }
-        QualityCmd::Fail { feedback } => {
-            let ontology = OntologyLoader::load_all();
-            let embedder = load_embedder();
-            let classifier = CellClassifier::build(&ontology, &embedder);
-            let centroids = classifier.cell_centroids();
-            let f = quality.report_failure(&feedback, &centroids, None);
-            println!(
-                "Recorded failure → {} (score {:.3})",
-                f.top_cell.replace('\x00', " × "),
-                f.top_score
-            );
-            quality.save(&store::quality_path())?;
-        }
-        QualityCmd::Pass { cell } => {
-            quality.report_success(&cell);
-            quality.save(&store::quality_path())?;
-            println!("Boosted cell '{}'", cell.replace('\x00', " × "));
-        }
-    }
     Ok(())
 }
 
@@ -2001,215 +1687,19 @@ less context, more structure — physis.");
     Ok(())
 }
 
-fn cmd_watch(source: &str, path: &Path, max: usize, dry_run: bool) -> anyhow::Result<()> {
+fn cmd_observed(source: Option<&str>, json: bool) -> anyhow::Result<()> {
     let log = physis_core::observe::log_path();
-    // Bounded tail, not the whole log. Deduplication only needs recent history,
-    // and reading everything made a `watch` run cost 2.0 s / 372 MB at 500k
-    // observations — the cliff that killed Nepomuk, measured arriving here.
-    // 20k is far more than any watcher's window (max is capped at 500).
-    let known = physis_core::observe::read_tail(&log, 20_000)?;
-    let home = std::env::var("HOME").unwrap_or_default();
-    let shell_hist = || {
-        let z = PathBuf::from(&home).join(".zsh_history");
-        if z.exists() { z } else { PathBuf::from(&home).join(".bash_history") }
-    };
-    let agent_dir = || PathBuf::from(&home).join(".claude/projects");
-    // First browser profile that exists. Firefox and Chromium have different
-    // schemas and different epochs; `watch_browser` picks by filename.
-    let browser_db = || -> Option<PathBuf> {
-        let chromium = PathBuf::from(&home).join(".config/chromium/Default/History");
-        if chromium.exists() {
-            return Some(chromium);
-        }
-        let chrome = PathBuf::from(&home).join(".config/google-chrome/Default/History");
-        if chrome.exists() {
-            return Some(chrome);
-        }
-        std::fs::read_dir(PathBuf::from(&home).join(".mozilla/firefox"))
-            .ok()?
-            .flatten()
-            .map(|e| e.path().join("places.sqlite"))
-            .find(|p| p.exists() && !p.to_string_lossy().contains(".bak-"))
-    };
-
-    let mut fresh = match source {
-        "fs" => physis_core::observe::watch_fs(path, &known, max),
-        "git" => physis_core::observe::watch_git(path, max.min(500)),
-        "terminal" => physis_core::observe::watch_shell(&shell_hist(), &known, max.min(500)),
-        "agent" => physis_core::observe::watch_agent(&agent_dir(), &known, max.min(500)),
-        "process" => physis_core::observe::watch_proc(&known, 60, max.min(500)),
-        "browser" => browser_db()
-            .map(|db| physis_core::observe::watch_browser(&db, &known, max.min(500)))
-            .unwrap_or_default(),
-        // The point of the substrate is that these are one timeline, so running
-        // them together is the default way to use it rather than a convenience.
-        "all" => {
-            let mut v = physis_core::observe::watch_fs(path, &known, max);
-            v.extend(physis_core::observe::watch_git(path, max.min(200)));
-            v.extend(physis_core::observe::watch_shell(&shell_hist(), &known, max.min(200)));
-            v.extend(physis_core::observe::watch_agent(&agent_dir(), &known, max.min(200)));
-            v.extend(physis_core::observe::watch_proc(&known, 60, max.min(200)));
-            if let Some(db) = browser_db() {
-                v.extend(physis_core::observe::watch_browser(&db, &known, max.min(200)));
-            }
-            // One timeline: sort by when it happened, not by which watcher ran.
-            v.sort_by_key(|o| o.at);
-            v
-        }
-        other => anyhow::bail!(
-            "unknown source {other:?} — try fs | git | terminal | agent | process | browser | all"
-        ),
-    };
-    // `git` re-reads the same history every run; drop what the log already has
-    // so the append stays idempotent the way the other watchers already are.
-    fresh.retain(|o| {
-        !known.iter().any(|k| k.source == o.source && k.subject == o.subject)
-    });
-    if fresh.is_empty() {
-        println!("nothing changed — {} observation(s) already in the log", known.len());
-        return Ok(());
-    }
-    if dry_run {
-        println!("would append {} observation(s):", fresh.len());
-        for o in fresh.iter().take(20) {
-            println!("  {:<9} {}", o.source, o.subject.chars().take(80).collect::<String>());
-        }
-        return Ok(());
-    }
-    let mut by: std::collections::BTreeMap<String, usize> = Default::default();
-    for o in fresh.iter() {
-        *by.entry(o.source.clone()).or_default() += 1;
-    }
-    let (a, b) = physis_core::observe::append(&log, &mut fresh)?;
-    let breakdown: Vec<String> = by.iter().map(|(k, n)| format!("{n} {k}")).collect();
-    println!(
-        "appended {} observation(s), seq {a}..={b}  ({})",
-        fresh.len(),
-        breakdown.join(" · ")
-    );
-    println!("log: {}", log.display());
-    Ok(())
-}
-
-fn cmd_observed(
-    source: Option<&str>,
-    concurrent: Option<u64>,
-    limit: usize,
-    json: bool,
-) -> anyhow::Result<()> {
-    let all = physis_core::observe::read(&physis_core::observe::log_path())?;
-    if all.is_empty() {
-        println!("The log is empty. Nothing has been observed, so nothing can be claimed.");
-        println!("  physis-core watch --source fs --path .");
-        return Ok(());
-    }
-    let rows: Vec<physis_core::observe::Observation> = if let Some(seq) = concurrent {
-        physis_core::observe::concurrent(&all, seq)
-    } else if let Some(s) = source {
-        physis_core::observe::by_source(&all, s)
-    } else {
-        let mut v = all.clone();
-        v.sort_by_key(|o| std::cmp::Reverse(o.seq));
-        v
+    let all = physis_core::observe::read(&log)?;
+    let records = match source {
+        Some(s) => physis_core::observe::by_source(&all, s),
+        None => all,
     };
     if json {
-        println!("{}", serde_json::to_string_pretty(&rows)?);
-        return Ok(());
-    }
-    if let Some(seq) = concurrent {
-        println!("── CONCURRENT WITH #{seq} ──");
-        if rows.is_empty() {
-            println!("  nothing overlapped it in time");
+        println!("{}", serde_json::to_string_pretty(&records)?);
+    } else {
+        for o in &records {
+            println!("obs:{} [{}] {} — {}", o.seq, o.source, o.subject, o.body);
         }
-    } else {
-        println!("── OBSERVED ── {} total", all.len());
-    }
-    for o in rows.iter().take(limit) {
-        let dur = o
-            .duration_ms
-            .map(|m| format!("{:>7.1}s", m as f64 / 1000.0))
-            .unwrap_or_else(|| "       ·".into());
-        println!(
-            "  #{:<5} {} {:<9} {}",
-            o.seq,
-            dur,
-            o.source,
-            o.subject.chars().take(84).collect::<String>()
-        );
-    }
-    Ok(())
-}
-
-fn cmd_act(command: &str, dry_run: bool, top: usize, json: bool) -> anyhow::Result<()> {
-    let (embedder, embedder_kind) = physis_core::embed::select(384);
-    let core = load_core();
-    // Cosine retrieves, BM25 ranks what it retrieved. Measured by `act-recall`
-    // (`benchmarks/results/act-recall.json`) against the plain cosine order:
-    // polarity discrimination 0.250 -> 0.875, and at `--top 1` the number of
-    // commands answered with a reassurance instead of the refutation falls
-    // from 5 of 8 to 1 of 8, at a cost of 2 false alarms — 2.00 harm removed
-    // per alarm, twice the best the warning-reserve policy managed. At the
-    // default cut it is a pure reordering: same claims, better order, and
-    // every cost column identical to the cosine policy.
-    //
-    // `act::bearing_on` keeps the cosine order as the library's frozen
-    // baseline, the way `rag::rank_by_cosine` does. This is the consumer, and
-    // the consumer is where the order is read.
-    // …and a floor, on the semantic embedder only. `act-recall` measured the
-    // best-claim cosine of commands that have a refutation (min 0.717) against
-    // commands that have nothing to say (max 0.643): disjoint, 0.074 apart.
-    // A floor at 0.66 sits in that gap and takes false alarms from 4 of 8 to
-    // 0 of 8 while keeping every real warning — strictly better than no floor
-    // on every column measured, at top 1 and top 5.
-    //
-    // Not applied to the random-projection fallback, where the same two
-    // distributions overlap completely (0.705–0.902 against 0.609–0.824) and
-    // no floor exists. Guessing one there would silence real warnings to buy
-    // nothing.
-    const SEMANTIC_FLOOR: f32 = 0.66;
-    let selection = if embedder_kind == "random-projection" {
-        physis_core::act::Selection::CascadeRerank { pool: top.max(5) }
-    } else {
-        physis_core::act::Selection::CascadeFloor { pool: top.max(5), floor: SEMANTIC_FLOOR }
-    };
-    let bearing = physis_core::act::bearing_on_with(&core, command, embedder.as_ref(), top, selection);
-
-    // Silence here means two different things and they were indistinguishable.
-    // `act-recall` measured this leg at recall 0.875 on a semantic embedder and
-    // **0.000** on the random-projection fallback for a command phrased
-    // differently from the claim — so on the fallback, "nothing bears on this"
-    // is very often the matcher, not the ledger. Which one ran is now printed.
-    let floor = if embedder_kind == "random-projection" {
-        "\n  (random-projection: a lexical hash, not meaning. `act-recall` measures\n   this leg at recall 0.000 for a paraphrased command. Set PHYSIS_MODEL_DIR.)"
-    } else {
-        ""
-    };
-
-    if dry_run {
-        let warnings: Vec<_> = bearing.iter().filter(|b| b.is_warning()).collect();
-        if warnings.is_empty() {
-            println!("nothing already established bears on this. {} claim(s) checked.{floor}", core.hypotheses.len());
-        } else {
-            println!("── ALREADY ESTABLISHED ──");
-            for b in warnings {
-                println!("  [{}] {:<13} rel {:.3}\n      {}", b.id, b.status, b.relevance, b.statement);
-            }
-        }
-        println!("\n(not run — drop --dry-run to execute)");
-        return Ok(());
-    }
-
-    store::ensure_data_dir()?;
-    let a = physis_core::act::run(command, bearing, &physis_core::observe::log_path())?;
-    if json {
-        println!("{}", serde_json::to_string_pretty(&a)?);
-    } else {
-        print!("{}", a.render());
-    }
-    // The command's own exit code is the caller's result; a substrate that
-    // swallowed it would break every script that wraps this.
-    if a.exit_code != Some(0) {
-        std::process::exit(a.exit_code.unwrap_or(1));
     }
     Ok(())
 }
@@ -2297,55 +1787,6 @@ fn cmd_chain(
     Ok(())
 }
 
-fn cmd_notebook(
-    corpus: &Path,
-    query: &str,
-    budget: usize,
-    json: bool,
-    draft: bool,
-    confidence: f32,
-) -> anyhow::Result<()> {
-    let docs = physis_core::map::load_corpus(corpus)?;
-    anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", corpus.display());
-    let embedder = load_embedder();
-
-    if draft {
-        let texts: Vec<String> = docs.iter().map(|(_, b)| b.clone()).collect();
-        let top_k = docs.len().clamp(3, 8);
-        let (result, _) = physis_core::rag::retrieve_from_texts(
-            &texts, query, embedder.as_ref(), budget.max(64), top_k,
-        );
-        let d = physis_core::notebook::draft(&result, query, 40, confidence)?;
-        if json {
-            println!("{}", serde_json::to_string_pretty(&d)?);
-            return Ok(());
-        }
-        println!("── DRAFT (table over the retrieved context) ──\n");
-        println!("{}\n", d.render_with_gaps().trim());
-        println!("table supplied {} token(s), {} gap(s) left for a model",
-                 d.drafted_tokens, d.gaps);
-        println!("table_share    {:.2}   (table entries: {})", d.table_share(), d.table_entries);
-        // The number decides whether the architecture applies; say so rather
-        // than leaving the reader to infer it from a bare float.
-        if d.table_share() >= 0.5 {
-            println!("\nThe corpus carries most of this answer: a small model only has");
-            println!("to close {} gap(s).", d.gaps);
-        } else {
-            println!("\nThe corpus carries little of this answer. Draft-and-fill adds");
-            println!("latency here for no saving — ask a model directly.");
-        }
-        return Ok(());
-    }
-
-    let a = physis_core::notebook::answer(&docs, query, embedder.as_ref(), budget)?;
-    if json {
-        println!("{}", serde_json::to_string_pretty(&a)?);
-    } else {
-        print!("{}", a.render());
-    }
-    Ok(())
-}
-
 fn cmd_ngram_cells(
     input: &Path,
     order: u8,
@@ -2429,22 +1870,6 @@ fn cmd_context(corpus: &Path, query: &str, budget: usize, json: bool) -> anyhow:
 /// Measure `act`'s recall. The embedder is reported, never assumed: the same
 /// ledger scores differently under a lexical hash and a real model, and a
 /// recall claim made on the hash is not a recall claim.
-fn cmd_act_recall(top: usize, seed: u64, json: bool) -> anyhow::Result<()> {
-    let (embedder, embedder_kind) = physis_core::embed::select(384);
-    let run = physis_core::act_recall::run(top, embedder.as_ref(), embedder_kind, seed);
-    let dir = PathBuf::from("benchmarks/results");
-    std::fs::create_dir_all(&dir)?;
-    let path = dir.join("act-recall.json");
-    std::fs::write(&path, serde_json::to_vec_pretty(&run)?)?;
-    if json {
-        println!("{}", serde_json::to_string_pretty(&run)?);
-    } else {
-        print!("{}", run.render());
-        println!("\nartifact -> {}", path.display());
-    }
-    Ok(())
-}
-
 fn cmd_benchmark(order: u8, budget: usize, big_model: Option<String>) -> anyhow::Result<()> {
     use physis_core::bench::BenchConfig;
     // A benchmark that does not record WHICH embedder produced it is not
@@ -2574,12 +1999,6 @@ fn cmd_run(config: &Path, model: Option<String>, ngram: Option<String>, query: O
     println!("continuation: {} ...", cont.trim().chars().take(60).collect::<String>());
     println!("less context, more structure — physis.");
     Ok(())
-}
-
-#[cfg(feature = "studio")]
-fn run_studio(port: u16, model: Option<String>) -> anyhow::Result<()> {
-    let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(physis_core::studio::run_with_model(port, model))
 }
 
 /// Load the persisted core (or a fresh one).

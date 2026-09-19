@@ -1,1 +1,6 @@
 /target
+
+# Local runtime state. .physis/ is the observation store (append-only log);
+# .claude/ is agent scratch. Neither is source.
+.physis/
+.claude/

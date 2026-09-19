@@ -11,7 +11,7 @@ documentation = "https://docs.rs/physis-core"
 keywords = ["knowledge-graph", "epistemic-engine", "truth-maintenance", "coherence", "embeddings"]
 categories = ["data-structures", "algorithms", "science", "text-processing"]
 # Keep stray backups and non-library files out of the published .crate.
-exclude = ["**/*.bak", "sw_add_domains.py", "STRIPE_LICENSE_GUIDE.md"]
+exclude = ["**/*.bak", "sw_add_domains.py", "STRIPE_LICENSE_GUIDE.md.retired"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -30,14 +30,9 @@ libc = "0.2"
 # CLI + embedded studio GUI (axum). Kept optional so the engine core stays
 # dependency-free for embedders that reuse it. Enable with --features cli/studio.
 clap = { version = "4", features = ["derive"], optional = true }
-axum = { version = "0.7", features = ["json", "macros"], optional = true }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"], optional = true }
-ureq = { version = "2.2", optional = true }
 
 # Terminal UI over the workspace interface. Optional so the engine core, the
 # library and the plain CLI stay free of a rendering stack.
-ratatui = { version = "0.26", optional = true }
-crossterm = { version = "0.27", features = ["events"], optional = true }
 
 # Production semantic embeddings (optional — off by default so the package
 # builds anywhere without model files). Enable with --features embed-onnx.
@@ -45,16 +40,11 @@ ort = { version = "2.0.0-rc.13", optional = true }
 tokenizers = { version = "0.21", optional = true }
 
 [features]
-default = ["cli", "studio"]
+default = ["cli"]
 cli = ["dep:clap"]
-studio = ["dep:axum", "dep:tokio"]
 # ONNX MiniLM embedder via the `ort` runtime. Requires model.onnx +
 # tokenizer.json in the model dir at runtime; falls back to random projection.
 embed-onnx = ["dep:ort", "dep:tokenizers"]
-http = ["dep:ureq"]
-# `physis-system-tui`: mouse- and keyboard-driven navigation of the same
-# Workspace service the CLI calls.
-tui = ["cli", "dep:ratatui", "dep:crossterm"]
 
 [dev-dependencies]
 tempfile = "3"
@@ -74,18 +64,4 @@ name = "physis-core"
 path = "src/main.rs"
 required-features = ["cli"]
 
-# The front door. Deliberately dependency-light and feature-free: it parses no
-# subcommands of its own, it only decides which installed executable should
-# receive them, so it must build and run even where `cli` is off.
-[[bin]]
-name = "physis"
-path = "src/bin/physis.rs"
 
-[[bin]]
-name = "physis-world"
-path = "src/bin/world.rs"
-
-[[bin]]
-name = "physis-system-tui"
-path = "src/bin/system_tui.rs"
-required-features = ["tui"]
