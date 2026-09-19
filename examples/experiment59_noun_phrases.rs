@@ -80,13 +80,13 @@ fn main() {
     // extractor can be asked for exactly the sentences the rules missed.
     if let Ok(dump) = std::env::var("PHYSIS_E59_DUMP") {
         let rows: Vec<serde_json::Value> = (0..n)
-            .map(|i| {
-                serde_json::json!({"pos": i, "text": texts[i], "rule_links": np_code[i]})
-            })
+            .map(|i| serde_json::json!({"pos": i, "text": texts[i], "rule_links": np_code[i]}))
             .collect();
         std::fs::write(&dump, serde_json::to_vec_pretty(&rows).unwrap()).unwrap();
-        println!("rule links -> {dump} ({} of {n} sentences have none)",
-            np_code.iter().filter(|e| e.is_empty()).count());
+        println!(
+            "rule links -> {dump} ({} of {n} sentences have none)",
+            np_code.iter().filter(|e| e.is_empty()).count()
+        );
     }
 
     // PHYSIS_E59_EXTRA merges an external extractor's links (E61: a local
@@ -113,7 +113,11 @@ fn main() {
         out
     });
 
-    println!("{rel}\ncorpus {} ({} sentences), max_len = {max_len}\n", &sha[..12], n);
+    println!(
+        "{rel}\ncorpus {} ({} sentences), max_len = {max_len}\n",
+        &sha[..12],
+        n
+    );
     println!("extractor        P       R       F1");
     let mut rows = Vec::new();
     for (label, got) in [
@@ -128,7 +132,10 @@ fn main() {
     .chain(extra.iter().flat_map(|e| {
         vec![
             ("interpreter", e as &Vec<Vec<String>>),
-            ("rules + interp", Box::leak(Box::new(ws::merge_entities(&np_code, e)))),
+            (
+                "rules + interp",
+                Box::leak(Box::new(ws::merge_entities(&np_code, e))),
+            ),
         ]
     })) {
         let (p, r, f) = ws::extraction_prf(got, &gold_ents);
@@ -269,10 +276,20 @@ fn main() {
     let merged = extra.as_ref().map(|e| ws::merge_entities(&np_code, e));
     let mut arms = arms;
     if let Some(e) = &extra {
-        arms.push(ws::score_antecedents("interpreter", &gold_link, arm(e), 20260914));
+        arms.push(ws::score_antecedents(
+            "interpreter",
+            &gold_link,
+            arm(e),
+            20260914,
+        ));
     }
     if let Some(m) = &merged {
-        arms.push(ws::score_antecedents("rules + interp", &gold_link, arm(m), 20260914));
+        arms.push(ws::score_antecedents(
+            "rules + interp",
+            &gold_link,
+            arm(m),
+            20260914,
+        ));
     }
     println!(
         "\ndownstream: antecedent at gap >= {gap}, {} queries",

@@ -62,9 +62,13 @@ fn wordnet_anchors(wn: &WordNet, words: &[String]) -> Vec<(String, String)> {
     let mut seen_parents = std::collections::HashSet::new();
     let mut out = Vec::new();
     for w in words {
-        if !wn.lemma_exists(Pos::Noun, w) { continue; }
+        if !wn.lemma_exists(Pos::Noun, w) {
+            continue;
+        }
         let offsets = wn.synsets_for_lemma(Pos::Noun, w);
-        let Some(&first) = offsets.first() else { continue };
+        let Some(&first) = offsets.first() else {
+            continue;
+        };
         if let Some(parent) = hypernym_parent(wn, first) {
             if seen_parents.insert(parent.clone()) {
                 out.push((w.clone(), parent));
@@ -77,39 +81,71 @@ fn wordnet_anchors(wn: &WordNet, words: &[String]) -> Vec<(String, String)> {
 fn main() {
     println!("Experiment 22: word discovery vs. WordNet, binding to the embedder only afterward\n");
 
-    let wn_dir = ["models/wordnet", "../models/wordnet"].iter().find(|d| std::path::Path::new(d).join("data.noun").exists());
+    let wn_dir = ["models/wordnet", "../models/wordnet"]
+        .iter()
+        .find(|d| std::path::Path::new(d).join("data.noun").exists());
     let wn_dir = match wn_dir {
         Some(d) => *d,
-        None => { println!("WARNING: WordNet data not found — aborting."); return; }
+        None => {
+            println!("WARNING: WordNet data not found — aborting.");
+            return;
+        }
     };
     let wn = match WordNet::load(wn_dir) {
         Ok(wn) => wn,
-        Err(e) => { println!("WARNING: failed to load WordNet: {e} — aborting."); return; }
+        Err(e) => {
+            println!("WARNING: failed to load WordNet: {e} — aborting.");
+            return;
+        }
     };
-    println!("Loaded WordNet: {} noun index entries, {} synsets total.\n", wn.index_count(), wn.synset_count());
+    println!(
+        "Loaded WordNet: {} noun index entries, {} synsets total.\n",
+        wn.index_count(),
+        wn.synset_count()
+    );
 
     #[cfg(feature = "embed-onnx")]
     {
         use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
-        let minilm_dir = ["models", "../models"].iter().find(|d| std::path::Path::new(d).join("model.onnx").exists());
-        let minilm = match minilm_dir.map(|dir| OnnxEmbedder::with_config(&OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), pooling: PoolingStrategy::Mean, ..OnnxConfig::default() })) {
+        let minilm_dir = ["models", "../models"]
+            .iter()
+            .find(|d| std::path::Path::new(d).join("model.onnx").exists());
+        let minilm = match minilm_dir.map(|dir| {
+            OnnxEmbedder::with_config(&OnnxConfig {
+                dim: 384,
+                model_dir: Some(dir.to_string()),
+                pooling: PoolingStrategy::Mean,
+                ..OnnxConfig::default()
+            })
+        }) {
             Some(e) if e.is_available() => e,
-            _ => { println!("WARNING: MiniLM not available — aborting."); return; }
+            _ => {
+                println!("WARNING: MiniLM not available — aborting.");
+                return;
+            }
         };
 
         let ontology = OntologyLoader::load_all();
         let mut texts = Vec::new();
         for def in ontology.classification_domains() {
-            if def.domain.is_none() || def.mode.is_none() { continue; }
+            if def.domain.is_none() || def.mode.is_none() {
+                continue;
+            }
             let mut text = def.name.clone();
-            for hint in &def.hints { text.push(' '); text.push_str(hint); }
+            for hint in &def.hints {
+                text.push(' ');
+                text.push_str(hint);
+            }
             texts.push(text);
         }
         let n = texts.len();
         println!("Loaded {n} real ontology entries.\n");
 
         // ── Step 1-2: word discovery against WordNet, per entry ──
-        let anchors: Vec<Vec<(String, String)>> = texts.iter().map(|t| wordnet_anchors(&wn, &tokenize(t))).collect();
+        let anchors: Vec<Vec<(String, String)>> = texts
+            .iter()
+            .map(|t| wordnet_anchors(&wn, &tokenize(t)))
+            .collect();
         let with_anchor: Vec<usize> = (0..n).filter(|&i| !anchors[i].is_empty()).collect();
         let without_anchor: Vec<usize> = (0..n).filter(|&i| anchors[i].is_empty()).collect();
         println!("=== Word discovery coverage ===");
@@ -117,28 +153,51 @@ fn main() {
         println!("{}/{} entries ({:.1}%) are pure jargon by this lexicon — zero WordNet nouns matched.\n", without_anchor.len(), n, 100.0 * without_anchor.len() as f32 / n as f32);
 
         let mut parent_counts: HashMap<String, usize> = HashMap::new();
-        for a in &anchors { for (_, p) in a { *parent_counts.entry(p.clone()).or_default() += 1; } }
+        for a in &anchors {
+            for (_, p) in a {
+                *parent_counts.entry(p.clone()).or_default() += 1;
+            }
+        }
         let mut top_parents: Vec<(&String, &usize)> = parent_counts.iter().collect();
         top_parents.sort_by(|a, b| b.1.cmp(a.1));
         println!("Top 15 hypernym parent categories discovered (fixed, symbolic — never change on rerun):");
-        for (p, c) in top_parents.iter().take(15) { println!("  {p:<20} {c} entries touch this category"); }
+        for (p, c) in top_parents.iter().take(15) {
+            println!("  {p:<20} {c} entries touch this category");
+        }
 
         println!("\nExample entries WITH a WordNet anchor:");
         for &i in with_anchor.iter().take(6) {
-            println!("  '{}'  anchors={:?}", texts[i].chars().take(60).collect::<String>(), anchors[i]);
+            println!(
+                "  '{}'  anchors={:?}",
+                texts[i].chars().take(60).collect::<String>(),
+                anchors[i]
+            );
         }
         println!("\nMulti-category entries (matched words map to 2+ DIFFERENT hypernym parents — a symbolically-grounded analog to multi-membership):");
-        let multi: Vec<usize> = with_anchor.iter().filter(|&&i| anchors[i].len() >= 2).copied().collect();
-        println!("{}/{} anchored entries touch 2+ distinct parent categories.", multi.len(), with_anchor.len());
+        let multi: Vec<usize> = with_anchor
+            .iter()
+            .filter(|&&i| anchors[i].len() >= 2)
+            .copied()
+            .collect();
+        println!(
+            "{}/{} anchored entries touch 2+ distinct parent categories.",
+            multi.len(),
+            with_anchor.len()
+        );
         for &i in multi.iter().take(6) {
-            println!("  '{}'  anchors={:?}", texts[i].chars().take(60).collect::<String>(), anchors[i]);
+            println!(
+                "  '{}'  anchors={:?}",
+                texts[i].chars().take(60).collect::<String>(),
+                anchors[i]
+            );
         }
 
         // ── Step 3: bind pure-jargon entries to the embedder, extending symbolic coverage ──
         println!("\n=== Binding to the embedder: pure-jargon entries linked to their nearest WordNet-anchored entry ===");
         let embeddings: Vec<Vec<f32>> = texts.iter().map(|t| minilm.embed(t)).collect();
         for &i in without_anchor.iter().take(10) {
-            let (best_j, best_sim) = with_anchor.iter()
+            let (best_j, best_sim) = with_anchor
+                .iter()
                 .map(|&j| (j, cosine_sim(&embeddings[i], &embeddings[j])))
                 .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
                 .unwrap();

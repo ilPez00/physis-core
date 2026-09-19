@@ -30,7 +30,6 @@
 //! Run:
 //!   cargo run -p physis-core --features embed-onnx --release --example experiment39_becoming -- <corpus.json>
 
-
 // NOTE: the no-embed-onnx build is a stub; the imports, struct and helpers
 // above main are intentionally dead there (they serve the embed-onnx path).
 #![cfg_attr(not(feature = "embed-onnx"), allow(dead_code, unused_imports))]
@@ -60,7 +59,9 @@ fn main() {
         use physis_core::embed::VectorEmbed;
         use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
 
-        let path = std::env::args().nth(1).unwrap_or_else(|| "operational_corpus.json".into());
+        let path = std::env::args()
+            .nth(1)
+            .unwrap_or_else(|| "operational_corpus.json".into());
         let Ok(raw) = std::fs::read_to_string(&path) else {
             println!("WARNING: cannot read {path} — run populate_operational first.");
             return;
@@ -76,9 +77,15 @@ fn main() {
             .iter()
             .map(|e| format!("{} {}", e.subject, e.evidence.join(" ")).to_lowercase())
             .collect();
-        println!("corpus: {} events, {} .. {}", events.len(),
-                 events.first().map(|e| e.observed_at.as_str()).unwrap_or("?"),
-                 events.last().map(|e| e.observed_at.as_str()).unwrap_or("?"));
+        println!(
+            "corpus: {} events, {} .. {}",
+            events.len(),
+            events
+                .first()
+                .map(|e| e.observed_at.as_str())
+                .unwrap_or("?"),
+            events.last().map(|e| e.observed_at.as_str()).unwrap_or("?")
+        );
 
         let Some(dir) = ["models", "../models"]
             .iter()
@@ -164,7 +171,9 @@ fn main() {
                 let ok = v.trajectory == expected;
                 if v.trajectory != Trajectory::TooFew {
                     scored += 1;
-                    if ok { correct += 1; }
+                    if ok {
+                        correct += 1;
+                    }
                 }
                 println!(
                     "  {:<11} {:>4}   {:<11?} {:>9.3}   {:>+6.2}   {:>7}   {}",
@@ -173,20 +182,39 @@ fn main() {
                     v.trajectory,
                     v.separation,
                     v.runs_z,
-                    v.change_at.map(|c| c.to_string()).unwrap_or_else(|| "-".into()),
-                    if v.trajectory == Trajectory::TooFew { "(not enough occurrences)" }
-                    else if ok { "as expected" } else { "MISMATCH" }
+                    v.change_at
+                        .map(|c| c.to_string())
+                        .unwrap_or_else(|| "-".into()),
+                    if v.trajectory == Trajectory::TooFew {
+                        "(not enough occurrences)"
+                    } else if ok {
+                        "as expected"
+                    } else {
+                        "MISMATCH"
+                    }
                 );
                 // For a becoming, name the moment: what was the corpus doing
                 // at the change point?
                 if let Some(c) = v.change_at {
                     if let Some(o) = occs.get(c) {
                         let e = &events[o.at as usize];
-                        println!("        change at {} — {}", e.observed_at, e.subject.chars().take(70).collect::<String>());
+                        println!(
+                            "        change at {} — {}",
+                            e.observed_at,
+                            e.subject.chars().take(70).collect::<String>()
+                        );
                     }
                 }
-                let mis = v.deviations.iter().filter(|d| **d == Some(Deviation::Mistake)).count();
-                let var = v.deviations.iter().filter(|d| **d == Some(Deviation::Variation)).count();
+                let mis = v
+                    .deviations
+                    .iter()
+                    .filter(|d| **d == Some(Deviation::Mistake))
+                    .count();
+                let var = v
+                    .deviations
+                    .iter()
+                    .filter(|d| **d == Some(Deviation::Variation))
+                    .count();
                 if mis + var > 0 {
                     println!("        deviations: {mis} mistake(s), {var} variation(s)");
                 }
@@ -196,7 +224,9 @@ fn main() {
         println!("\n=== Verdict ===\n");
         println!("  {correct}/{scored} terms classified as their git history says they should be.");
         if scored > 0 && correct * 2 > scored {
-            println!("  Order carries the distinction on real text, not only on synthetic sequences.");
+            println!(
+                "  Order carries the distinction on real text, not only on synthetic sequences."
+            );
         } else {
             println!("  Order does NOT carry the distinction here. The statistic behaves on");
             println!("  synthetic sequences (unit tests) but does not survive real contexts.");

@@ -82,7 +82,10 @@ fn citations_resolve_to_intake_ids() {
     assert_eq!(cited.len(), 1, "both links share one intake episode");
     for id in &cited {
         assert!(
-            trail.events.iter().any(|e| e.intake_id == Option::Some(id.clone())),
+            trail
+                .events
+                .iter()
+                .any(|e| e.intake_id == Option::Some(id.clone())),
             "citation {id:?} must resolve to a trail event carrying that intake id"
         );
     }
@@ -90,7 +93,8 @@ fn citations_resolve_to_intake_ids() {
     // Provenance links carry the per-link intake id on their own.
     let mut chain = ProvenanceChain::new();
     chain.add_link(
-        ProvenanceLink::new("bearing is degrading", "maintenance_log.txt").with_intake_id(intake.clone()),
+        ProvenanceLink::new("bearing is degrading", "maintenance_log.txt")
+            .with_intake_id(intake.clone()),
     );
     assert_eq!(chain.cited_intake_ids(), vec![intake.clone()]);
 }
@@ -111,9 +115,13 @@ fn point_in_time_matches_audit_trail() {
             .with_asserted_at(at(100)),
     );
     trail.record(
-        EpistemicEvent::new(EpistemicEventType::StatusTransition, subj, "to contradicted")
-            .with_transition("supported", "contradicted")
-            .with_asserted_at(at(200)),
+        EpistemicEvent::new(
+            EpistemicEventType::StatusTransition,
+            subj,
+            "to contradicted",
+        )
+        .with_transition("supported", "contradicted")
+        .with_asserted_at(at(200)),
     );
     trail.record(
         EpistemicEvent::new(EpistemicEventType::StatusTransition, subj, "to supported")
@@ -180,21 +188,25 @@ fn point_in_time_matches_audit_trail() {
 fn evidence_retraction_replays_to_state_without_it() {
     // Level 1 — the hypothesis re-derives, evidence by evidence.
     let mut h = Hypothesis::new("machine degradation", vec![0.5; 4]);
-    h.add_supporting_evidence(
-        Evidence::supports("s1", "vibration harmonics").with_weight(0.9),
-    );
-    h.add_supporting_evidence(
-        Evidence::supports("s2", "temperature rise").with_weight(0.7),
-    );
+    h.add_supporting_evidence(Evidence::supports("s1", "vibration harmonics").with_weight(0.9));
+    h.add_supporting_evidence(Evidence::supports("s2", "temperature rise").with_weight(0.7));
     h.add_contradicting_evidence(
         Evidence::contradicts("s3", "sensor wiring fault explains the signal").with_weight(0.8),
     );
     assert_eq!(h.status, HypothesisStatus::Contradicted);
 
     assert_eq!(h.retract_evidence("s3"), 1);
-    assert_eq!(h.status, HypothesisStatus::Supported, "retracting the contradiction re-derives Supported");
+    assert_eq!(
+        h.status,
+        HypothesisStatus::Supported,
+        "retracting the contradiction re-derives Supported"
+    );
     assert_eq!(h.retract_evidence("s1"), 1);
-    assert_eq!(h.status, HypothesisStatus::Supported, "one supporting source still stands");
+    assert_eq!(
+        h.status,
+        HypothesisStatus::Supported,
+        "one supporting source still stands"
+    );
     assert_eq!(h.retract_evidence("s2"), 1);
     assert_eq!(h.status, HypothesisStatus::Candidate, "no evidence left");
     assert!(h.supporting_evidence.is_empty());
@@ -203,7 +215,9 @@ fn evidence_retraction_replays_to_state_without_it() {
 
     // Retraction is a revision: it shows in the history, it is not a delete.
     assert!(
-        h.revision_history.iter().any(|r| r.description.contains("Retracted")),
+        h.revision_history
+            .iter()
+            .any(|r| r.description.contains("Retracted")),
         "the retraction must be audited"
     );
 
@@ -235,9 +249,7 @@ fn evidence_retraction_replays_to_state_without_it() {
     h_b.id = "hB".into();
     h_b.ontology_refs = vec!["nB".into()];
     h_b.status = HypothesisStatus::Supported;
-    h_b.add_supporting_evidence(
-        Evidence::supports("src-x", "direct observation").with_weight(0.9),
-    );
+    h_b.add_supporting_evidence(Evidence::supports("src-x", "direct observation").with_weight(0.9));
 
     let hyps = vec![h_a, h_b];
     let edges = vec![TypedEdge::new(RelationType::DependsOn, "nA", "nB")];
@@ -255,12 +267,18 @@ fn evidence_retraction_replays_to_state_without_it() {
     // status was re-derived; hA was shadowed and re-evaluated.
     let hb_shadow = ctx.shadow_hypotheses.get("hB").expect("hB is shadowed");
     assert!(
-        hb_shadow.supporting_evidence.iter().all(|e| e.source != "src-x"),
+        hb_shadow
+            .supporting_evidence
+            .iter()
+            .all(|e| e.source != "src-x"),
         "the retracted evidence is gone from the shadow"
     );
     assert_eq!(hb_shadow.supporting_evidence.len(), 0);
     assert_eq!(hb_shadow.status, HypothesisStatus::Candidate);
-    assert!(ctx.shadow_hypotheses.contains_key("hA"), "hA must be re-evaluated in shadow");
+    assert!(
+        ctx.shadow_hypotheses.contains_key("hA"),
+        "hA must be re-evaluated in shadow"
+    );
 
     // Base state is untouched — the retraction is a proposal until committed.
     assert_eq!(hyps[1].supporting_evidence.len(), 1);
@@ -278,8 +296,11 @@ fn nixon_diamond_retains_both_sides() {
     let mut h_p = Hypothesis::new("Nixon is a pacifist", vec![1.0, 0.0, 0.0, 0.0]);
     h_p.id = "h_p".into();
     h_p.add_supporting_evidence(
-        Evidence::supports("quaker_census.txt", "Nixon is a Quaker; Quakers are pacifists")
-            .with_weight(0.8),
+        Evidence::supports(
+            "quaker_census.txt",
+            "Nixon is a Quaker; Quakers are pacifists",
+        )
+        .with_weight(0.8),
     );
     h_p.add_assumption("Quakers are pacifists");
 
@@ -338,7 +359,9 @@ fn nixon_diamond_retains_both_sides() {
     assert_eq!(h_np.status, HypothesisStatus::Candidate);
     assert_eq!(h_p.status, HypothesisStatus::Supported);
     assert!(
-        h_np.revision_history.iter().any(|r| r.description.contains("Retracted")),
+        h_np.revision_history
+            .iter()
+            .any(|r| r.description.contains("Retracted")),
         "the retraction is an audited revision, not a silent deletion"
     );
     assert_eq!(contradiction.claim_a.claim, "Nixon is a pacifist");

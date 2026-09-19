@@ -83,12 +83,16 @@ fn words(s: &str) -> Vec<String> {
 /// lemma -> gloss, from a WordNet `data.<pos>` file. First gloss per lemma
 /// wins, deterministically (file order is fixed).
 fn wordnet_glosses(path: &std::path::Path, out: &mut HashMap<String, String>) {
-    let Ok(text) = std::fs::read_to_string(path) else { return };
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return;
+    };
     for line in text.lines() {
         if line.starts_with("  ") || line.trim().is_empty() {
             continue;
         }
-        let Some((head, gloss)) = line.split_once(" | ") else { continue };
+        let Some((head, gloss)) = line.split_once(" | ") else {
+            continue;
+        };
         let f: Vec<&str> = head.split_whitespace().collect();
         if f.len() < 5 {
             continue;
@@ -143,7 +147,9 @@ fn main() {
         let mut cells = Vec::new();
         let mut own: Vec<HashSet<String>> = Vec::new(); // tokens the embedder DID see
         for def in ontology.classification_domains() {
-            let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut t = def.name.clone();
             for h in &def.hints {
                 t.push(' ');
@@ -155,7 +161,10 @@ fn main() {
         }
         let n = texts.len();
         println!("{n} entries, embedding...");
-        let emb: Vec<Vec<f32>> = texts.iter().map(|t| normalize(&embedder.embed(t))).collect();
+        let emb: Vec<Vec<f32>> = texts
+            .iter()
+            .map(|t| normalize(&embedder.embed(t)))
+            .collect();
 
         // Second-grade elements: content tokens of the WordNet glosses of the
         // entry's own NAME words. Every token the embedder already saw for this
@@ -255,32 +264,55 @@ fn main() {
             ("SAME DOMAIN (coarse, 5 domains)", false),
         ] {
             println!("=== {label} ===\n");
-            let (mut wth, mut wnh, mut wtl, mut wnl, mut wk) = (0usize, 0usize, 0usize, 0usize, 0usize);
+            let (mut wth, mut wnh, mut wtl, mut wnl, mut wk) =
+                (0usize, 0usize, 0usize, 0usize, 0usize);
             let (mut th, mut nh, mut tl, mut nl) = (0usize, 0usize, 0usize, 0usize);
             for s in 0..STRATA {
                 let lo = s * per;
-                let hi = if s == STRATA - 1 { order.len() } else { (s + 1) * per };
+                let hi = if s == STRATA - 1 {
+                    order.len()
+                } else {
+                    (s + 1) * per
+                };
                 let mut idx: Vec<usize> = order[lo..hi].to_vec();
                 if idx.len() < 20 {
                     continue;
                 }
                 idx.sort_by(|&a, &b| pairs[a].overlap.partial_cmp(&pairs[b].overlap).unwrap());
                 let mid = idx.len() / 2;
-                let hit = |k: &usize| if fine { pairs[*k].same_cell } else { pairs[*k].same_domain };
+                let hit = |k: &usize| {
+                    if fine {
+                        pairs[*k].same_cell
+                    } else {
+                        pairs[*k].same_domain
+                    }
+                };
                 let (lo_i, hi_i) = idx.split_at(mid);
                 let (hc, lc) = (
                     hi_i.iter().filter(|k| hit(k)).count(),
                     lo_i.iter().filter(|k| hit(k)).count(),
                 );
-                let mc = |v: &[usize]| v.iter().map(|&k| pairs[k].cos as f64).sum::<f64>() / v.len() as f64;
+                let mc = |v: &[usize]| {
+                    v.iter().map(|&k| pairs[k].cos as f64).sum::<f64>() / v.len() as f64
+                };
                 let (mch, mcl) = (mc(hi_i), mc(lo_i));
-                th += hc; nh += hi_i.len(); tl += lc; nl += lo_i.len();
+                th += hc;
+                nh += hi_i.len();
+                tl += lc;
+                nl += lo_i.len();
                 if (mch - mcl).abs() < MAX_IMB {
-                    wth += hc; wnh += hi_i.len(); wtl += lc; wnl += lo_i.len(); wk += 1;
+                    wth += hc;
+                    wnh += hi_i.len();
+                    wtl += lc;
+                    wnl += lo_i.len();
+                    wk += 1;
                 }
             }
             let (phr, plr) = (th as f64 / nh as f64, tl as f64 / nl as f64);
-            let (wphr, wplr) = (wth as f64 / wnh.max(1) as f64, wtl as f64 / wnl.max(1) as f64);
+            let (wphr, wplr) = (
+                wth as f64 / wnh.max(1) as f64,
+                wtl as f64 / wnl.max(1) as f64,
+            );
             let pz = z_prop(phr, nh as f64, plr, nl as f64);
             let wz = z_prop(wphr, wnh as f64, wplr, wnl as f64);
             println!("  all strata          hi {phr:.4}  lo {plr:.4}   z = {pz:+.2}");

@@ -87,8 +87,16 @@ impl Predictor {
     fn init(dim: usize, seed: u64) -> Self {
         let mut rng = StdRng::seed_from_u64(seed);
         let scale = 1.0 / (dim as f32).sqrt();
-        let mut rnd = |n: usize| (0..n).map(|_| (rng.gen::<f32>() - 0.5) * 2.0 * scale).collect();
-        Predictor { dim, u: rnd(dim * RANK), v: rnd(dim * RANK) }
+        let mut rnd = |n: usize| {
+            (0..n)
+                .map(|_| (rng.gen::<f32>() - 0.5) * 2.0 * scale)
+                .collect()
+        };
+        Predictor {
+            dim,
+            u: rnd(dim * RANK),
+            v: rnd(dim * RANK),
+        }
     }
 
     /// z = Uᵀ r  (RANK,)
@@ -124,11 +132,7 @@ impl Predictor {
 /// the held-out item), using `field_of` restricted to indices within that
 /// subset. Every item in the subset is used as a query reference in turn;
 /// its positives are the other subset items sharing its label.
-fn train_predictor(
-    train_embeddings: &[Vec<f32>],
-    labels: &[&'static str],
-    seed: u64,
-) -> Predictor {
+fn train_predictor(train_embeddings: &[Vec<f32>], labels: &[&'static str], seed: u64) -> Predictor {
     let dim = train_embeddings[0].len();
     let n = train_embeddings.len();
     let mut pred = Predictor::init(dim, seed);
@@ -139,7 +143,9 @@ fn train_predictor(
         let mut grad_v = vec![0.0f32; dim * RANK];
 
         for qi in 0..n {
-            let positives: Vec<usize> = (0..n).filter(|&i| i != qi && labels[i] == labels[qi]).collect();
+            let positives: Vec<usize> = (0..n)
+                .filter(|&i| i != qi && labels[i] == labels[qi])
+                .collect();
             if positives.is_empty() {
                 continue;
             }
@@ -222,15 +228,24 @@ fn mean_loss(pred: &Predictor, train_embeddings: &[Vec<f32>], labels: &[&'static
     let mut total = 0.0;
     let mut count = 0;
     for qi in 0..n {
-        let positives: Vec<usize> = (0..n).filter(|&i| i != qi && labels[i] == labels[qi]).collect();
+        let positives: Vec<usize> = (0..n)
+            .filter(|&i| i != qi && labels[i] == labels[qi])
+            .collect();
         if positives.is_empty() {
             continue;
         }
         let p = pred.predict(&train_embeddings[qi]);
         let candidates: Vec<usize> = (0..n).filter(|&i| i != qi).collect();
-        let scores: Vec<f32> = candidates.iter().map(|&i| dot(&p, &train_embeddings[i]) / TAU).collect();
+        let scores: Vec<f32> = candidates
+            .iter()
+            .map(|&i| dot(&p, &train_embeddings[i]) / TAU)
+            .collect();
         let max_s = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let sum_exp: f32 = scores.iter().map(|&s| (s - max_s).exp()).sum::<f32>().max(1e-8);
+        let sum_exp: f32 = scores
+            .iter()
+            .map(|&s| (s - max_s).exp())
+            .sum::<f32>()
+            .max(1e-8);
         for &pos in &positives {
             let ci = candidates.iter().position(|&c| c == pos).unwrap();
             let logp = (scores[ci] - max_s) - sum_exp.ln();
@@ -254,11 +269,15 @@ fn loo_eval(
     seed: u64,
 ) -> Option<(f32, f32)> {
     let train_idx: Vec<usize> = (0..embeddings.len()).filter(|&i| i != held_idx).collect();
-    let train_embeddings: Vec<Vec<f32>> = train_idx.iter().map(|&i| embeddings[i].clone()).collect();
+    let train_embeddings: Vec<Vec<f32>> =
+        train_idx.iter().map(|&i| embeddings[i].clone()).collect();
     let train_labels: Vec<&'static str> = train_idx.iter().map(|&i| label_of(i)).collect();
 
     let true_label = label_of(held_idx);
-    let field_size = train_idx.iter().filter(|&&i| label_of(i) == true_label).count();
+    let field_size = train_idx
+        .iter()
+        .filter(|&&i| label_of(i) == true_label)
+        .count();
     if field_size == 0 {
         return None;
     }
@@ -272,7 +291,11 @@ fn loo_eval(
         .map(|&i| (i, cosine_sim(&p_held, &embeddings[i])))
         .collect();
     scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-    let hits = scored.iter().take(field_size).filter(|(i, _)| label_of(*i) == true_label).count();
+    let hits = scored
+        .iter()
+        .take(field_size)
+        .filter(|(i, _)| label_of(*i) == true_label)
+        .count();
     Some((hits as f32 / field_size as f32, final_loss))
 }
 
@@ -294,7 +317,10 @@ struct Result3 {
 
 fn main() {
     println!("Experiment 3: JEPA-style predictive latent (rank-{RANK} predictor) vs. static cosine baselines");
-    println!("Leave-one-out cross-validation over all {} items\n", CORPUS.len());
+    println!(
+        "Leave-one-out cross-validation over all {} items\n",
+        CORPUS.len()
+    );
 
     #[cfg(feature = "embed-onnx")]
     {
@@ -305,10 +331,16 @@ fn main() {
             if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) {
                 continue;
             }
-            let cfg = OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), ..OnnxConfig::default() };
+            let cfg = OnnxConfig {
+                dim: 384,
+                model_dir: Some(dir.to_string()),
+                ..OnnxConfig::default()
+            };
             let e = OnnxEmbedder::with_config(&cfg);
             if e.is_available() {
-                println!("Using real semantic embedder: {dir}/model.onnx (all-MiniLM-L6-v2, 384d)\n");
+                println!(
+                    "Using real semantic embedder: {dir}/model.onnx (all-MiniLM-L6-v2, 384d)\n"
+                );
                 embeddings = Some(CORPUS.iter().map(|(t, ..)| e.embed(t)).collect::<Vec<_>>());
                 break;
             }
@@ -333,8 +365,14 @@ fn main() {
             let seed = 1000 + i as u64; // deterministic, distinct per fold
             let (fc, lc) = loo_eval(&embeddings, coarse, i, seed).unwrap_or((f32::NAN, f32::NAN));
             let (ff, lf) = loo_eval(&embeddings, fine, i, seed).unwrap_or((f32::NAN, f32::NAN));
-            if fc.is_finite() { c_sum += fc; c_n += 1; }
-            if ff.is_finite() { f_sum += ff; f_n += 1; }
+            if fc.is_finite() {
+                c_sum += fc;
+                c_n += 1;
+            }
+            if ff.is_finite() {
+                f_sum += ff;
+                f_n += 1;
+            }
             println!(
                 "{:<20} {:>10.3} {:>10.3} {:>12.4} {:>12.4}",
                 item.0, fc, ff, lc, lf
@@ -349,8 +387,14 @@ fn main() {
         }
 
         println!("\n=== AGGREGATE (leave-one-out, n={}) ===", CORPUS.len());
-        println!("mean F1 JEPA/coarse: {:.3}   (naive baseline: 0.587, delta-direction: 0.469)", c_sum / c_n as f32);
-        println!("mean F1 JEPA/fine:   {:.3}   (naive baseline: 0.468, delta-direction: 0.226)", f_sum / f_n as f32);
+        println!(
+            "mean F1 JEPA/coarse: {:.3}   (naive baseline: 0.587, delta-direction: 0.469)",
+            c_sum / c_n as f32
+        );
+        println!(
+            "mean F1 JEPA/fine:   {:.3}   (naive baseline: 0.468, delta-direction: 0.226)",
+            f_sum / f_n as f32
+        );
 
         // Control: does the exact same architecture also "learn" to predict
         // SHUFFLED (meaningless) coarse labels well? If yes, the coarse

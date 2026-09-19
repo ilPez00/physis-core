@@ -59,8 +59,16 @@ impl Predictor {
     fn init(dim: usize, seed: u64) -> Self {
         let mut rng = StdRng::seed_from_u64(seed);
         let scale = 1.0 / (dim as f32).sqrt();
-        let mut rnd = |n: usize| (0..n).map(|_| (rng.gen::<f32>() - 0.5) * 2.0 * scale).collect();
-        Predictor { dim, u: rnd(dim * RANK), v: rnd(dim * RANK) }
+        let mut rnd = |n: usize| {
+            (0..n)
+                .map(|_| (rng.gen::<f32>() - 0.5) * 2.0 * scale)
+                .collect()
+        };
+        Predictor {
+            dim,
+            u: rnd(dim * RANK),
+            v: rnd(dim * RANK),
+        }
     }
     fn project(&self, r: &[f32]) -> Vec<f32> {
         let mut z = vec![0.0f32; RANK];
@@ -110,7 +118,11 @@ fn train_predictor(train_embeddings: &[Vec<f32>], labels: &[usize], seed: u64) -
         let mut grad_v = vec![0.0f32; dim * RANK];
 
         for qi in 0..n {
-            let positives: Vec<usize> = by_label[&labels[qi]].iter().copied().filter(|&i| i != qi).collect();
+            let positives: Vec<usize> = by_label[&labels[qi]]
+                .iter()
+                .copied()
+                .filter(|&i| i != qi)
+                .collect();
             if positives.is_empty() {
                 continue;
             }
@@ -118,7 +130,10 @@ fn train_predictor(train_embeddings: &[Vec<f32>], labels: &[usize], seed: u64) -
             let p = pred.predict_from_z(&z);
 
             let candidates: Vec<usize> = (0..n).filter(|&i| i != qi).collect();
-            let scores: Vec<f32> = candidates.iter().map(|&i| dot(&p, &train_embeddings[i]) / TAU).collect();
+            let scores: Vec<f32> = candidates
+                .iter()
+                .map(|&i| dot(&p, &train_embeddings[i]) / TAU)
+                .collect();
             let max_s = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
             let exp_scores: Vec<f32> = scores.iter().map(|&s| (s - max_s).exp()).collect();
             let sum_exp: f32 = exp_scores.iter().sum::<f32>().max(1e-8);
@@ -191,15 +206,26 @@ fn mean_loss(pred: &Predictor, train_embeddings: &[Vec<f32>], labels: &[usize]) 
     let mut total = 0.0;
     let mut count = 0;
     for qi in 0..n {
-        let positives: Vec<usize> = by_label[&labels[qi]].iter().copied().filter(|&i| i != qi).collect();
+        let positives: Vec<usize> = by_label[&labels[qi]]
+            .iter()
+            .copied()
+            .filter(|&i| i != qi)
+            .collect();
         if positives.is_empty() {
             continue;
         }
         let p = pred.predict(&train_embeddings[qi]);
         let candidates: Vec<usize> = (0..n).filter(|&i| i != qi).collect();
-        let scores: Vec<f32> = candidates.iter().map(|&i| dot(&p, &train_embeddings[i]) / TAU).collect();
+        let scores: Vec<f32> = candidates
+            .iter()
+            .map(|&i| dot(&p, &train_embeddings[i]) / TAU)
+            .collect();
         let max_s = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let sum_exp: f32 = scores.iter().map(|&s| (s - max_s).exp()).sum::<f32>().max(1e-8);
+        let sum_exp: f32 = scores
+            .iter()
+            .map(|&s| (s - max_s).exp())
+            .sum::<f32>()
+            .max(1e-8);
         for &pos in &positives {
             let ci = candidates.iter().position(|&c| c == pos).unwrap();
             let logp = (scores[ci] - max_s) - sum_exp.ln();
@@ -253,7 +279,8 @@ fn run_task(
         if train_idx.is_empty() || test_idx.is_empty() {
             continue;
         }
-        let train_embeddings: Vec<Vec<f32>> = train_idx.iter().map(|&i| embeddings[i].clone()).collect();
+        let train_embeddings: Vec<Vec<f32>> =
+            train_idx.iter().map(|&i| embeddings[i].clone()).collect();
         let train_labels: Vec<usize> = train_idx.iter().map(|&i| labels[i]).collect();
 
         let seed = 4000 + fold as u64;
@@ -264,8 +291,15 @@ fn run_task(
             // predictor collapse to near-identical outputs regardless of
             // input (the classic contrastive-learning failure mode)?
             let loss = mean_loss(&pred, &train_embeddings, &train_labels);
-            let sample: Vec<Vec<f32>> = train_embeddings.iter().take(20).map(|e| pred.predict(e)).collect();
-            let norms: Vec<f32> = sample.iter().map(|p| p.iter().map(|x| x * x).sum::<f32>().sqrt()).collect();
+            let sample: Vec<Vec<f32>> = train_embeddings
+                .iter()
+                .take(20)
+                .map(|e| pred.predict(e))
+                .collect();
+            let norms: Vec<f32> = sample
+                .iter()
+                .map(|p| p.iter().map(|x| x * x).sum::<f32>().sqrt())
+                .collect();
             let mean_norm = norms.iter().sum::<f32>() / norms.len() as f32;
             let mut pairwise = Vec::new();
             for i in 0..sample.len() {
@@ -282,7 +316,8 @@ fn run_task(
                     raw_pairwise.push(cosine_sim(raw_sample[i], raw_sample[j]));
                 }
             }
-            let mean_raw_pairwise_cos = raw_pairwise.iter().sum::<f32>() / raw_pairwise.len() as f32;
+            let mean_raw_pairwise_cos =
+                raw_pairwise.iter().sum::<f32>() / raw_pairwise.len() as f32;
             println!(
                 "  [diag fold0] final_train_loss={loss:.4}  pred_mean_norm={mean_norm:.4}  pred_mean_pairwise_cos={mean_pairwise_cos:.4} (raw_mean_pairwise_cos={mean_raw_pairwise_cos:.4}) [near 1.0 pairwise = collapse]"
             );
@@ -349,10 +384,16 @@ fn main() {
             if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) {
                 continue;
             }
-            let cfg = OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), ..OnnxConfig::default() };
+            let cfg = OnnxConfig {
+                dim: 384,
+                model_dir: Some(dir.to_string()),
+                ..OnnxConfig::default()
+            };
             let e = OnnxEmbedder::with_config(&cfg);
             if e.is_available() {
-                println!("Using real semantic embedder: {dir}/model.onnx (all-MiniLM-L6-v2, 384d)\n");
+                println!(
+                    "Using real semantic embedder: {dir}/model.onnx (all-MiniLM-L6-v2, 384d)\n"
+                );
                 embedder = Some(e);
                 break;
             }
@@ -370,7 +411,9 @@ fn main() {
         let mut domains = Vec::new();
         let mut cells = Vec::new();
         for def in ontology.classification_domains() {
-            let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut text = def.name.clone();
             for hint in &def.hints {
                 text.push(' ');
@@ -393,15 +436,26 @@ fn main() {
                 *domain_ids.entry(d.clone()).or_insert(next)
             })
             .collect();
-        println!("=== Domain task: {} entries, {} classes ===", embeddings.len(), domain_ids.len());
-        let domain_result = run_task("domain (5-way, n=730)", &embeddings, &domain_labels, domain_ids.len());
+        println!(
+            "=== Domain task: {} entries, {} classes ===",
+            embeddings.len(),
+            domain_ids.len()
+        );
+        let domain_result = run_task(
+            "domain (5-way, n=730)",
+            &embeddings,
+            &domain_labels,
+            domain_ids.len(),
+        );
 
         // ── Cell task: only cells with >=5 entries ──
         let mut cell_counts: HashMap<String, usize> = HashMap::new();
         for c in &cells {
             *cell_counts.entry(c.clone()).or_default() += 1;
         }
-        let keep: Vec<usize> = (0..cells.len()).filter(|&i| cell_counts[&cells[i]] >= 5).collect();
+        let keep: Vec<usize> = (0..cells.len())
+            .filter(|&i| cell_counts[&cells[i]] >= 5)
+            .collect();
         let cell_embeddings: Vec<Vec<f32>> = keep.iter().map(|&i| embeddings[i].clone()).collect();
         let mut cell_ids: HashMap<String, usize> = HashMap::new();
         let cell_labels: Vec<usize> = keep

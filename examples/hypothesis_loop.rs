@@ -67,5 +67,8 @@ fn main() {
     for (idx, pending) in core.hypotheses[&id_a].open_predictions() {
         println!("#{idx} still open: {}", pending.statement);
     }
-    println!("open predictions remaining: {}", core.hypotheses[&id_a].pending_predictions());
+    println!(
+        "open predictions remaining: {}",
+        core.hypotheses[&id_a].pending_predictions()
+    );
 }

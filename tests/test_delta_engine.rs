@@ -20,7 +20,12 @@ fn unit_vector(axis: usize) -> Vec<f32> {
 }
 
 /// Convenience: create a labeled node with optional cell pin.
-fn make_node(id: &str, embedding: Vec<f32>, coherence: f32, cell_pin: Option<(&str, &str)>) -> CoherenceNode {
+fn make_node(
+    id: &str,
+    embedding: Vec<f32>,
+    coherence: f32,
+    cell_pin: Option<(&str, &str)>,
+) -> CoherenceNode {
     let mut n = CoherenceNode::new(embedding);
     n.id = id.to_string();
     n.coherence_score = coherence;
@@ -109,20 +114,10 @@ fn single_node_mutation_affects_radius() {
 #[test]
 fn hypothesis_cascade_embedding_shift() {
     // Node A: embedding pointing in axis 0
-    let node_a = make_node(
-        "nodeA",
-        unit_vector(0),
-        0.9,
-        Some(("HEAL", "WORK")),
-    );
+    let node_a = make_node("nodeA", unit_vector(0), 0.9, Some(("HEAL", "WORK")));
 
     // Node B: unrelated node
-    let node_b = make_node(
-        "nodeB",
-        unit_vector(1),
-        0.8,
-        Some(("HEAL", "WORK")),
-    );
+    let node_b = make_node("nodeB", unit_vector(1), 0.8, Some(("HEAL", "WORK")));
 
     let nodes = vec![node_a.clone(), node_b.clone()];
     let edges: Vec<TypedEdge> = vec![];
@@ -139,9 +134,10 @@ fn hypothesis_cascade_embedding_shift() {
     hypothesis.fitness = 0.9; // high fitness
     hypothesis.fitness_breakdown.semantic_fit = 1.0;
     hypothesis.fitness_breakdown.logical_consistency = 1.0;
-    hypothesis
-        .supporting_evidence
-        .push(Evidence::supports("sensor_log", "Reading confirms operational state"));
+    hypothesis.supporting_evidence.push(Evidence::supports(
+        "sensor_log",
+        "Reading confirms operational state",
+    ));
 
     let hypotheses = vec![hypothesis.clone()];
     let hyp_id = hypothesis.id.clone();
@@ -222,32 +218,15 @@ fn hypothesis_cascade_embedding_shift() {
 
 #[test]
 fn shadow_frame_does_not_modify_base() {
-    let node_a = make_node(
-        "nodeA",
-        unit_vector(0),
-        0.9,
-        Some(("HEAL", "WORK")),
-    );
-    let node_b = make_node(
-        "nodeB",
-        unit_vector(1),
-        0.8,
-        Some(("HEAL", "WORK")),
-    );
+    let node_a = make_node("nodeA", unit_vector(0), 0.9, Some(("HEAL", "WORK")));
+    let node_b = make_node("nodeB", unit_vector(1), 0.8, Some(("HEAL", "WORK")));
 
     let nodes = vec![node_a.clone(), node_b.clone()];
-    let hypotheses = vec![Hypothesis::new(
-        "test hypothesis",
-        unit_vector(0),
-    )];
+    let hypotheses = vec![Hypothesis::new("test hypothesis", unit_vector(0))];
     let hyp_id = hypotheses[0].id.clone();
 
     // Add an edge for adjacency
-    let edges = vec![TypedEdge::new(
-        RelationType::Influences,
-        "nodeA",
-        "nodeB",
-    )];
+    let edges = vec![TypedEdge::new(RelationType::Influences, "nodeA", "nodeB")];
 
     let base_nodes_snapshot = nodes.clone();
     let base_embeddings: Vec<Vec<f32>> = nodes.iter().map(|n| n.embedding.clone()).collect();
@@ -271,8 +250,14 @@ fn shadow_frame_does_not_modify_base() {
     assert_eq!(nodes.len(), base_nodes_snapshot.len());
     for (i, n) in nodes.iter().enumerate() {
         assert_eq!(n.id, base_nodes_snapshot[i].id, "node id must not change");
-        assert_eq!(n.embedding, base_embeddings[i], "base embedding must be unchanged");
-        assert_eq!(n.coherence_score, base_coherences[i], "base coherence must be unchanged");
+        assert_eq!(
+            n.embedding, base_embeddings[i],
+            "base embedding must be unchanged"
+        );
+        assert_eq!(
+            n.coherence_score, base_coherences[i],
+            "base coherence must be unchanged"
+        );
     }
 
     // Verify base hypotheses are unchanged
@@ -298,7 +283,8 @@ fn shadow_frame_does_not_modify_base() {
         .get("nodeA")
         .expect("nodeA must be in shadow frame");
     assert_ne!(
-        shadow_node.embedding, unit_vector(0),
+        shadow_node.embedding,
+        unit_vector(0),
         "shadow node embedding must be mutated"
     );
 
@@ -324,11 +310,7 @@ fn report_serializes_to_json() {
     let node_b = make_node("nB", unit_vector(1), 0.6, None);
     let nodes = vec![node_a.clone(), node_b.clone()];
 
-    let edges = vec![TypedEdge::new(
-        RelationType::Influences,
-        "nA",
-        "nB",
-    )];
+    let edges = vec![TypedEdge::new(RelationType::Influences, "nA", "nB")];
 
     let ctx = EvaluationContext::from_base(&nodes, &[], &edges);
 
@@ -375,7 +357,11 @@ fn report_serializes_to_json() {
     );
 
     // Verify each NodeDelta round-trips
-    for (orig, de) in report.affected_nodes.iter().zip(deserialized.affected_nodes.iter()) {
+    for (orig, de) in report
+        .affected_nodes
+        .iter()
+        .zip(deserialized.affected_nodes.iter())
+    {
         assert_eq!(orig.node_id, de.node_id);
         assert!((orig.previous_coherence - de.previous_coherence).abs() < 1e-6);
         assert!((orig.new_coherence - de.new_coherence).abs() < 1e-6);
@@ -398,11 +384,7 @@ fn property_set_mutation_propagates() {
     let node_b = make_node("nB", unit_vector(0), 0.7, Some(("HEAL", "WORK")));
     let nodes = vec![node_a.clone(), node_b.clone()];
 
-    let edges = vec![TypedEdge::new(
-        RelationType::Influences,
-        "nA",
-        "nB",
-    )];
+    let edges = vec![TypedEdge::new(RelationType::Influences, "nA", "nB")];
 
     let ctx = EvaluationContext::from_base(&nodes, &[], &edges);
 
@@ -461,7 +443,11 @@ fn cell_pin_propagates_to_shared_cell() {
     let report = evaluate_mutation(&mut ctx, mutation);
 
     // All three nodes share the cell pin, so they should all be affected
-    let affected_ids: Vec<&str> = report.affected_nodes.iter().map(|d| d.node_id.as_str()).collect();
+    let affected_ids: Vec<&str> = report
+        .affected_nodes
+        .iter()
+        .map(|d| d.node_id.as_str())
+        .collect();
     assert!(
         affected_ids.contains(&"a"),
         "node a (mutated) must be affected"

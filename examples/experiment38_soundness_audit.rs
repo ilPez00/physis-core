@@ -56,7 +56,12 @@ fn normalize(v: &[f32]) -> Vec<f32> {
 
 fn words(s: &str) -> Vec<String> {
     s.split_whitespace()
-        .map(|w| w.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect::<String>())
+        .map(|w| {
+            w.to_lowercase()
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+        })
         .filter(|w| w.len() > 2)
         .collect()
 }
@@ -65,7 +70,9 @@ fn words(s: &str) -> Vec<String> {
 fn load_wordnet(path: &std::path::Path) -> (HashMap<String, Vec<u32>>, HashMap<u32, Vec<u32>>) {
     let mut lemma: HashMap<String, Vec<u32>> = HashMap::new();
     let mut hyper: HashMap<u32, Vec<u32>> = HashMap::new();
-    let Ok(text) = std::fs::read_to_string(path) else { return (lemma, hyper) };
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return (lemma, hyper);
+    };
     for line in text.lines() {
         if line.starts_with("  ") || line.trim().is_empty() {
             continue;
@@ -75,12 +82,19 @@ fn load_wordnet(path: &std::path::Path) -> (HashMap<String, Vec<u32>>, HashMap<u
         if f.len() < 5 {
             continue;
         }
-        let Ok(off) = f[0].parse::<u32>() else { continue };
-        let Ok(wcnt) = usize::from_str_radix(f[3], 16) else { continue };
+        let Ok(off) = f[0].parse::<u32>() else {
+            continue;
+        };
+        let Ok(wcnt) = usize::from_str_radix(f[3], 16) else {
+            continue;
+        };
         // words start at index 4, each is (word, lex_id)
         for k in 0..wcnt {
             if let Some(w) = f.get(4 + k * 2) {
-                lemma.entry(w.replace('_', " ").to_lowercase()).or_default().push(off);
+                lemma
+                    .entry(w.replace('_', " ").to_lowercase())
+                    .or_default()
+                    .push(off);
             }
         }
         // pointers follow the word list: p_cnt then p_cnt * (sym, off, pos, st)
@@ -159,7 +173,10 @@ fn minimal(ca: &HashSet<u32>, hyper: &HashMap<u32, Vec<u32>>) -> usize {
 fn auc(scored: &[(f64, bool)]) -> f64 {
     let mut v: Vec<&(f64, bool)> = scored.iter().collect();
     v.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-    let (pos, neg) = (v.iter().filter(|x| x.1).count(), v.iter().filter(|x| !x.1).count());
+    let (pos, neg) = (
+        v.iter().filter(|x| x.1).count(),
+        v.iter().filter(|x| !x.1).count(),
+    );
     if pos == 0 || neg == 0 {
         return 0.5;
     }
@@ -199,15 +216,24 @@ fn main() {
             return;
         };
         let (lemma, hyper) = load_wordnet(&wn.join("data.noun"));
-        println!("WordNet noun DAG: {} lemmas, {} synsets with hypernyms", lemma.len(), hyper.len());
+        println!(
+            "WordNet noun DAG: {} lemmas, {} synsets with hypernyms",
+            lemma.len(),
+            hyper.len()
+        );
 
-        let Some(dir) = ["models", "../models"].iter().find(|d| std::path::Path::new(d).join("model.onnx").exists()) else {
+        let Some(dir) = ["models", "../models"]
+            .iter()
+            .find(|d| std::path::Path::new(d).join("model.onnx").exists())
+        else {
             println!("WARNING: MiniLM not available — aborting.");
             return;
         };
         let embedder = OnnxEmbedder::with_config(&OnnxConfig {
-            dim: 384, model_dir: Some(dir.to_string()),
-            pooling: PoolingStrategy::Mean, ..OnnxConfig::default()
+            dim: 384,
+            model_dir: Some(dir.to_string()),
+            pooling: PoolingStrategy::Mean,
+            ..OnnxConfig::default()
         });
         if !embedder.is_available() {
             println!("WARNING: embedder unavailable — aborting.");
@@ -235,19 +261,27 @@ fn main() {
                     for e in v["domains"].as_array().into_iter().flatten() {
                         let (Some(d), Some(m), Some(nm)) =
                             (e["domain"].as_str(), e["mode"].as_str(), e["name"].as_str())
-                        else { continue };
+                        else {
+                            continue;
+                        };
                         let mut toks: Vec<String> = words(nm);
                         for h in e["hints"].as_array().into_iter().flatten() {
-                            if let Some(hs) = h.as_str() { toks.extend(words(hs)); }
+                            if let Some(hs) = h.as_str() {
+                                toks.extend(words(hs));
+                            }
                         }
-                        toks.sort(); toks.dedup();
+                        toks.sort();
+                        toks.dedup();
                         anchors.insert((d.to_string(), m.to_string()), toks);
                         anchor_names.insert(nm.to_string());
                     }
                 }
             }
         }
-        println!("mode anchors: {} cells with an authored vocabulary", anchors.len());
+        println!(
+            "mode anchors: {} cells with an authored vocabulary",
+            anchors.len()
+        );
 
         // AUTHORED CELL VOCABULARY (scripts/gen_cell_vocab.py). Built from a
         // deterministic TRAIN half of each cell and scored only on the held-out
@@ -259,18 +293,34 @@ fn main() {
         let mut test_names: HashSet<String> = HashSet::new();
         let vocab_paths: Vec<String> = match std::env::var("PHYSIS_VOCAB") {
             Ok(v) => vec![v],
-            Err(_) => ["../research/perspective-discovery/cell_vocab_A.json", "cell_vocab_A.json"]
-                .iter().map(|s| s.to_string()).collect(),
+            Err(_) => [
+                "../research/perspective-discovery/cell_vocab_A.json",
+                "cell_vocab_A.json",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
         };
         for vp in vocab_paths {
-            let Ok(txt) = std::fs::read_to_string(&vp) else { continue };
-            let Ok(v) = serde_json::from_str::<serde_json::Value>(&txt) else { continue };
+            let Ok(txt) = std::fs::read_to_string(&vp) else {
+                continue;
+            };
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(&txt) else {
+                continue;
+            };
             let mut take = |key: &str, into: &mut HashMap<(String, String), Vec<String>>| {
                 for (k, arr) in v[key].as_object().into_iter().flatten() {
-                    let Some((d, m)) = k.split_once('/') else { continue };
-                    let mut t: Vec<String> = arr.as_array().into_iter().flatten()
-                        .filter_map(|x| x.as_str().map(|s| s.to_string())).collect();
-                    t.sort(); t.dedup();
+                    let Some((d, m)) = k.split_once('/') else {
+                        continue;
+                    };
+                    let mut t: Vec<String> = arr
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                        .collect();
+                    t.sort();
+                    t.dedup();
                     into.insert((d.to_string(), m.to_string()), t);
                 }
             };
@@ -278,12 +328,16 @@ fn main() {
             take("generated", &mut vocab_gen);
             for (_, arr) in v["test_entries"].as_object().into_iter().flatten() {
                 for x in arr.as_array().into_iter().flatten() {
-                    if let Some(n) = x.as_str() { test_names.insert(n.to_string()); }
+                    if let Some(n) = x.as_str() {
+                        test_names.insert(n.to_string());
+                    }
                 }
             }
             println!(
                 "cell vocabulary: {} freq cells, {} generated cells, {} held-out entries ({vp})",
-                vocab_freq.len(), vocab_gen.len(), test_names.len()
+                vocab_freq.len(),
+                vocab_gen.len(),
+                test_names.len()
             );
             break;
         }
@@ -300,14 +354,25 @@ fn main() {
         let mut entry_toks: Vec<Vec<String>> = Vec::new();
         let mut entry_names: Vec<String> = Vec::new();
         for def in ontology.classification_domains() {
-            let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut t = def.name.clone();
-            for h in &def.hints { t.push(' '); t.push_str(h); }
-            if anchor_names.contains(&def.name) { continue }
+            for h in &def.hints {
+                t.push(' ');
+                t.push_str(h);
+            }
+            if anchor_names.contains(&def.name) {
+                continue;
+            }
             entry_toks.push({
                 let mut t = words(&def.name);
-                for h in &def.hints { t.extend(words(h)); }
-                t.sort(); t.dedup(); t
+                for h in &def.hints {
+                    t.extend(words(h));
+                }
+                t.sort();
+                t.dedup();
+                t
             });
             entry_names.push(def.name.clone());
             names.push(words(&def.name));
@@ -320,7 +385,10 @@ fn main() {
         }
         let n = texts.len();
         println!("{n} entries, embedding...");
-        let emb: Vec<Vec<f32>> = texts.iter().map(|t| normalize(&embedder.embed(t))).collect();
+        let emb: Vec<Vec<f32>> = texts
+            .iter()
+            .map(|t| normalize(&embedder.embed(t)))
+            .collect();
 
         // Ancestor set per entry, from its NAME terms' synsets.
         let anc: Vec<HashSet<u32>> = (0..n)
@@ -331,7 +399,11 @@ fn main() {
                         seed.extend(offs.iter().take(2)); // first two senses
                     }
                 }
-                if seed.is_empty() { HashSet::new() } else { ancestors(&seed, &hyper, 6) }
+                if seed.is_empty() {
+                    HashSet::new()
+                } else {
+                    ancestors(&seed, &hyper, 6)
+                }
             })
             .collect();
         let anchored = anc.iter().filter(|a| !a.is_empty()).count();
@@ -353,7 +425,12 @@ fn main() {
         // env vars exist so the SAME corpus can be perturbed many different
         // ways, which is the only way to tell a real scorer margin from one
         // subsample's luck.
-        let ev = |k: &str, d: usize| std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d);
+        let ev = |k: &str, d: usize| {
+            std::env::var(k)
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(d)
+        };
         let stride = ev("PHYSIS_AUDIT_STRIDE", 7);
         let mult = ev("PHYSIS_AUDIT_MULT", 13);
         let half = std::env::var("PHYSIS_AUDIT_HALF").unwrap_or_else(|_| "test".into());
@@ -361,7 +438,9 @@ fn main() {
         let mut injected: Vec<bool> = vec![false; n];
         let mut k = 0usize;
         for i in 0..n {
-            if anc[i].is_empty() { continue }
+            if anc[i].is_empty() {
+                continue;
+            }
             k += 1;
             if stride != 0 && k % stride == 0 {
                 // move to a deterministically-chosen DIFFERENT cell
@@ -388,7 +467,9 @@ fn main() {
         let mut dump_rows: Vec<(usize, (f64, f64, f64))> = Vec::new(); // nonlattice, ancestry, cosine, injected, constraint, anchor_vocab
         let (mut stat_ca, mut stat_mca): (Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new());
         for i in 0..n {
-            if anc[i].is_empty() { continue }
+            if anc[i].is_empty() {
+                continue;
+            }
             // Only the held-out half. A cell's vocabulary was built from the
             // other half, so scoring a train entry would be self-confirming.
             let in_test = test_names.contains(&entry_names[i]);
@@ -397,8 +478,14 @@ fn main() {
                 "train" if !test_names.is_empty() && in_test => continue,
                 _ => {}
             }
-            let peers: Vec<usize> = members[&cell[i]].iter().copied().filter(|&j| j != i && !anc[j].is_empty()).collect();
-            if peers.len() < 2 { continue }
+            let peers: Vec<usize> = members[&cell[i]]
+                .iter()
+                .copied()
+                .filter(|&j| j != i && !anc[j].is_empty())
+                .collect();
+            if peers.len() < 2 {
+                continue;
+            }
 
             // NON-LATTICE, stated correctly: |MCA| > 1. The first version used
             // |MCA| != 1, which lumps "no common ancestor at all" (|CA| = 0)
@@ -413,8 +500,12 @@ fn main() {
                 let ca: HashSet<u32> = anc[i].intersection(&anc[j]).copied().collect();
                 considered += 1;
                 let m = minimal(&ca, &hyper);
-                if m > 1 { nl += 1; }
-                if ca.is_empty() { orphan += 1; }
+                if m > 1 {
+                    nl += 1;
+                }
+                if ca.is_empty() {
+                    orphan += 1;
+                }
                 stat_ca.push(ca.len());
                 stat_mca.push(m);
             }
@@ -433,7 +524,11 @@ fn main() {
             // COSINE: distance to the cell centroid, computed WITHOUT the entry
             // itself so a misfiled item cannot drag its own target toward it.
             let mut acc = vec![0.0f32; 384];
-            for &j in &peers { for d in 0..384 { acc[d] += emb[j][d]; } }
+            for &j in &peers {
+                for d in 0..384 {
+                    acc[d] += emb[j][d];
+                }
+            }
             let ctr = normalize(&acc);
             let cosine = 1.0 - cosine_sim(&emb[i], &ctr) as f64;
 
@@ -444,10 +539,18 @@ fn main() {
             let dom = &cell[i].0;
             let (mut axis_seen, mut cat_seen) = (false, false);
             for j in 0..n {
-                if j == i || &cell[j].0 != dom { continue }
-                if !fields[i].0.is_empty() && fields[j].0 == fields[i].0 { axis_seen = true; }
-                if !fields[i].1.is_empty() && fields[j].1 == fields[i].1 { cat_seen = true; }
-                if axis_seen && cat_seen { break }
+                if j == i || &cell[j].0 != dom {
+                    continue;
+                }
+                if !fields[i].0.is_empty() && fields[j].0 == fields[i].0 {
+                    axis_seen = true;
+                }
+                if !fields[i].1.is_empty() && fields[j].1 == fields[i].1 {
+                    cat_seen = true;
+                }
+                if axis_seen && cat_seen {
+                    break;
+                }
             }
             let constraint = (!axis_seen) as u8 as f64 + (!cat_seen) as u8 as f64;
 
@@ -463,7 +566,11 @@ fn main() {
                         match entry_toks[i][x].cmp(&av[y]) {
                             std::cmp::Ordering::Less => x += 1,
                             std::cmp::Ordering::Greater => y += 1,
-                            std::cmp::Ordering::Equal => { hit += 1; x += 1; y += 1; }
+                            std::cmp::Ordering::Equal => {
+                                hit += 1;
+                                x += 1;
+                                y += 1;
+                            }
                         }
                     }
                     -(hit as f64)
@@ -480,7 +587,11 @@ fn main() {
                             match entry_toks[i][x].cmp(&av[y]) {
                                 std::cmp::Ordering::Less => x += 1,
                                 std::cmp::Ordering::Greater => y += 1,
-                                std::cmp::Ordering::Equal => { hit += 1; x += 1; y += 1; }
+                                std::cmp::Ordering::Equal => {
+                                    hit += 1;
+                                    x += 1;
+                                    y += 1;
+                                }
                             }
                         }
                         -(hit as f64)
@@ -492,10 +603,23 @@ fn main() {
             let vgen = overlap(&vocab_gen);
             let _ = orphan_rate;
 
-            rows.push((nonlattice, ancestry, cosine, injected[i], constraint, anchor_vocab, vfreq, vgen));
+            rows.push((
+                nonlattice,
+                ancestry,
+                cosine,
+                injected[i],
+                constraint,
+                anchor_vocab,
+                vfreq,
+                vgen,
+            ));
             dump_rows.push((i, (cosine, constraint, ancestry)));
         }
-        println!("scored {} entries ({} injected)\n", rows.len(), rows.iter().filter(|r| r.3).count());
+        println!(
+            "scored {} entries ({} injected)\n",
+            rows.len(),
+            rows.iter().filter(|r| r.3).count()
+        );
 
         // PHYSIS_DUMP: write every scored entry with its fit to its ASSIGNED
         // cell. With PHYSIS_AUDIT_STRIDE=0 nothing is injected, so this ranks
@@ -516,9 +640,18 @@ fn main() {
         // is inapplicable rather than merely unhelpful.
         let np = stat_ca.len().max(1);
         println!("  same-cell pair diagnostics over {np} pairs:");
-        println!("    |CA| = 0 (no common ancestor): {:.1}%", 100.0 * stat_ca.iter().filter(|&&c| c == 0).count() as f64 / np as f64);
-        println!("    |MCA| = 1 (lattice, fine)    : {:.1}%", 100.0 * stat_mca.iter().filter(|&&m| m == 1).count() as f64 / np as f64);
-        println!("    |MCA| > 1 (NON-LATTICE)      : {:.1}%", 100.0 * stat_mca.iter().filter(|&&m| m > 1).count() as f64 / np as f64);
+        println!(
+            "    |CA| = 0 (no common ancestor): {:.1}%",
+            100.0 * stat_ca.iter().filter(|&&c| c == 0).count() as f64 / np as f64
+        );
+        println!(
+            "    |MCA| = 1 (lattice, fine)    : {:.1}%",
+            100.0 * stat_mca.iter().filter(|&&m| m == 1).count() as f64 / np as f64
+        );
+        println!(
+            "    |MCA| > 1 (NON-LATTICE)      : {:.1}%",
+            100.0 * stat_mca.iter().filter(|&&m| m > 1).count() as f64 / np as f64
+        );
         println!();
 
         let a_nl = auc(&rows.iter().map(|r| (r.0, r.3)).collect::<Vec<_>>());
@@ -556,7 +689,11 @@ fn main() {
             let mut within: Vec<(f64, bool)> = Vec::new();
             for s in 0..STRATA {
                 let lo = s * per;
-                let hi = if s == STRATA - 1 { order.len() } else { (s + 1) * per };
+                let hi = if s == STRATA - 1 {
+                    order.len()
+                } else {
+                    (s + 1) * per
+                };
                 // rank within stratum, so cosine level cannot carry the signal
                 let mut idx: Vec<usize> = order[lo..hi].to_vec();
                 let val = |k: usize| if pick == 0 { rows[k].0 } else { rows[k].1 };
@@ -576,7 +713,9 @@ fn main() {
         let coherence = |assign: &Vec<(String, String)>| -> (f64, f64) {
             let mut mem: HashMap<(String, String), Vec<usize>> = HashMap::new();
             for i in 0..n {
-                if !anc[i].is_empty() { mem.entry(assign[i].clone()).or_default().push(i); }
+                if !anc[i].is_empty() {
+                    mem.entry(assign[i].clone()).or_default().push(i);
+                }
             }
             let (mut lat, mut tot, mut jac, mut jn) = (0usize, 0usize, 0.0f64, 0usize);
             for peers in mem.values() {
@@ -584,10 +723,15 @@ fn main() {
                     for b in (a + 1)..peers.len().min(14) {
                         let (i, j) = (peers[a], peers[b]);
                         let ca: HashSet<u32> = anc[i].intersection(&anc[j]).copied().collect();
-                        if minimal(&ca, &hyper) == 1 { lat += 1; }
+                        if minimal(&ca, &hyper) == 1 {
+                            lat += 1;
+                        }
                         tot += 1;
                         let uni = anc[i].union(&anc[j]).count() as f64;
-                        if uni > 0.0 { jac += ca.len() as f64 / uni; jn += 1; }
+                        if uni > 0.0 {
+                            jac += ca.len() as f64 / uni;
+                            jn += 1;
+                        }
                     }
                 }
             }
@@ -596,7 +740,9 @@ fn main() {
         let (real_lat, real_jac) = coherence(&true_cell);
         // Size-matched arbitrary grouping: same cells, membership permuted.
         let mut shuffled = true_cell.clone();
-        for i in 0..n { shuffled[i] = true_cell[(i * 37 + 11) % n].clone(); }
+        for i in 0..n {
+            shuffled[i] = true_cell[(i * 37 + 11) % n].clone();
+        }
         let (rand_lat, rand_jac) = coherence(&shuffled);
         println!("                        real cells   size-matched shuffle");
         println!("  pairs with |MCA| = 1     {real_lat:.3}          {rand_lat:.3}");
@@ -611,9 +757,13 @@ fn main() {
         let best_struct = a_nl.max(a_an).max(a_cn).max(a_av).max(a_vf).max(a_vg);
         if best_struct > a_co + 0.03 {
             println!("  The structural audit BEATS the geometric baseline outright");
-            println!("  ({best_struct:.3} vs {a_co:.3}). A label-free soundness check is available.");
+            println!(
+                "  ({best_struct:.3} vs {a_co:.3}). A label-free soundness check is available."
+            );
         } else if best_struct > 0.55 {
-            println!("  The structural audit finds injected misfilings ({best_struct:.3}) but does");
+            println!(
+                "  The structural audit finds injected misfilings ({best_struct:.3}) but does"
+            );
             println!("  NOT beat plain cosine ({a_co:.3}). It is a real signal that is already");
             println!("  contained in the geometry — not the missing soundness half.");
         } else {

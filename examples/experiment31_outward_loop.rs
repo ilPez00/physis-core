@@ -84,7 +84,9 @@ fn parse_wordnet(path: &std::path::Path) -> Vec<(String, String)> {
         if line.starts_with("  ") || line.trim().is_empty() {
             continue;
         }
-        let Some((head, gloss)) = line.split_once(" | ") else { continue };
+        let Some((head, gloss)) = line.split_once(" | ") else {
+            continue;
+        };
         let f: Vec<&str> = head.split_whitespace().collect();
         // offset(0) lex(1) ss_type(2) w_cnt(3, hex) word(4)
         if f.len() < 5 {
@@ -150,7 +152,9 @@ fn main() {
         let mut texts = Vec::new();
         let mut cells = Vec::new();
         for def in ontology.classification_domains() {
-            let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut t = def.name.clone();
             for h in &def.hints {
                 t.push(' ');
@@ -160,7 +164,10 @@ fn main() {
             cells.push((d.clone(), m.clone()));
         }
         println!("physis: {} entries, embedding...", texts.len());
-        let emb: Vec<Vec<f32>> = texts.iter().map(|t| normalize(&embedder.embed(t))).collect();
+        let emb: Vec<Vec<f32>> = texts
+            .iter()
+            .map(|t| normalize(&embedder.embed(t)))
+            .collect();
 
         // Stratified hold-out, identical construction to Iteration 30.
         let mut by_cell: HashMap<(String, String), Vec<usize>> = HashMap::new();
@@ -181,7 +188,11 @@ fn main() {
         held.dedup();
         let held_set: std::collections::HashSet<usize> = held.iter().copied().collect();
         let known: Vec<usize> = (0..texts.len()).filter(|i| !held_set.contains(i)).collect();
-        println!("hold-out: {} known / {} held out\n", known.len(), held.len());
+        println!(
+            "hold-out: {} known / {} held out\n",
+            known.len(),
+            held.len()
+        );
 
         // ---------- 1. propose ----------
         const NN: usize = 5;
@@ -385,11 +396,26 @@ fn main() {
         let count = |b: Bucket| buckets.iter().filter(|x| **x == b).count();
 
         println!("\n=== 4. Triage ===\n");
-        println!("  REDUNDANT (physis already covers)  {:5}", count(Bucket::Redundant));
-        println!("  CONFIRMED GAP (WordNet + converged){:5}", count(Bucket::ConfirmedGap));
-        println!("  UNCANNY (unknown but converged)    {:5}   <- the interesting bucket", count(Bucket::Uncanny));
-        println!("  WEAK LEAD (WordNet, low converge)  {:5}", count(Bucket::WeakLead));
-        println!("  NOISE (unknown, low convergence)   {:5}", count(Bucket::Noise));
+        println!(
+            "  REDUNDANT (physis already covers)  {:5}",
+            count(Bucket::Redundant)
+        );
+        println!(
+            "  CONFIRMED GAP (WordNet + converged){:5}",
+            count(Bucket::ConfirmedGap)
+        );
+        println!(
+            "  UNCANNY (unknown but converged)    {:5}   <- the interesting bucket",
+            count(Bucket::Uncanny)
+        );
+        println!(
+            "  WEAK LEAD (WordNet, low converge)  {:5}",
+            count(Bucket::WeakLead)
+        );
+        println!(
+            "  NOISE (unknown, low convergence)   {:5}",
+            count(Bucket::Noise)
+        );
 
         // ---------- 5. validation against the hold-out ----------
         // Does a region actually contain a concept we removed? This is ground
@@ -436,7 +462,9 @@ fn main() {
                 None
             }
         };
-        let hit: Vec<bool> = (0..centroids.len()).map(|ci| reaches_held(ci).is_some()).collect();
+        let hit: Vec<bool> = (0..centroids.len())
+            .map(|ci| reaches_held(ci).is_some())
+            .collect();
         let rate = |b: Bucket| -> (usize, usize, f64) {
             let idx: Vec<usize> = (0..buckets.len()).filter(|&i| buckets[i] == b).collect();
             let h = idx.iter().filter(|&&i| hit[i]).count();
@@ -542,23 +570,41 @@ fn main() {
 
         println!("\n=== Verdict ===\n");
         if z_wordnet > 1.96 {
-            println!("  The WordNet check selects for genuinely-missing concepts (z = {z_wordnet:+.2}).");
+            println!(
+                "  The WordNet check selects for genuinely-missing concepts (z = {z_wordnet:+.2})."
+            );
         } else {
             println!("  The WORDNET CHECK DOES NOT WORK as designed. Holding convergence fixed,");
-            println!("  regions WordNet recognises hit at {cr:.3} against {ur:.3} for regions it does");
-            println!("  not (z = {z_wordnet:+.2}) — no better, and if anything slightly worse. Lexical");
-            println!("  agreement with a hand-built noun/verb lexicon carries no information about");
+            println!(
+                "  regions WordNet recognises hit at {cr:.3} against {ur:.3} for regions it does"
+            );
+            println!(
+                "  not (z = {z_wordnet:+.2}) — no better, and if anything slightly worse. Lexical"
+            );
+            println!(
+                "  agreement with a hand-built noun/verb lexicon carries no information about"
+            );
             println!("  whether a region contains a concept this ontology is missing.");
         }
         println!();
         if z_converge > 1.96 {
-            println!("  CONVERGENCE does carry signal (z = {z_converge:+.2}): among regions no lexicon");
+            println!(
+                "  CONVERGENCE does carry signal (z = {z_converge:+.2}): among regions no lexicon"
+            );
             println!("  recognises, the ones many distinct entry pairs agree on contain a removed");
-            println!("  concept {:.2}x as often as the ones they do not.", ur / nr.max(1e-9));
+            println!(
+                "  concept {:.2}x as often as the ones they do not.",
+                ur / nr.max(1e-9)
+            );
         } else {
             println!("  CONVERGENCE is the more promising axis but is NOT yet established:");
-            println!("  {ur:.3} vs {nr:.3} ({:.2}x) at z = {z_converge:+.2}, short of significance at", ur / nr.max(1e-9));
-            println!("  these sample sizes (n={un} vs n={nn}). Worth a larger corpus before building");
+            println!(
+                "  {ur:.3} vs {nr:.3} ({:.2}x) at z = {z_converge:+.2}, short of significance at",
+                ur / nr.max(1e-9)
+            );
+            println!(
+                "  these sample sizes (n={un} vs n={nn}). Worth a larger corpus before building"
+            );
             println!("  on it; not worth claiming yet.");
         }
         println!();
@@ -567,7 +613,10 @@ fn main() {
         println!("  30 still works; what sits on top of it here does not yet.");
 
         println!("\n  A confound to fix before trusting any of the above: REDUNDANT regions —");
-        println!("  ones physis still covers — hit at {:.3}, the second-highest rate. Held-out", rate(Bucket::Redundant).2);
+        println!(
+            "  ones physis still covers — hit at {:.3}, the second-highest rate. Held-out",
+            rate(Bucket::Redundant).2
+        );
         println!("  concepts were removed from cells whose SIBLINGS remain, so a region near a");
         println!("  dense known cluster sits near the removed member too. The hit metric is");
         println!("  therefore still partly measuring local density rather than absence.");

@@ -164,7 +164,12 @@ impl CandidateGain {
 fn live_scores(classifier: &CellClassifier, records: &[(String, Vec<f32>)]) -> Vec<f32> {
     records
         .iter()
-        .map(|(_, e)| classifier.best_entry_sim(e).map(|(s, _, _)| s).unwrap_or(f32::NEG_INFINITY))
+        .map(|(_, e)| {
+            classifier
+                .best_entry_sim(e)
+                .map(|(s, _, _)| s)
+                .unwrap_or(f32::NEG_INFINITY)
+        })
         .collect()
 }
 
@@ -266,7 +271,10 @@ fn gain_against(
             lift += cand - base;
         }
     }
-    CandidateGain { newly_covered, lift }
+    CandidateGain {
+        newly_covered,
+        lift,
+    }
 }
 
 #[cfg(test)]
@@ -301,7 +309,7 @@ mod tests {
     fn uncovered_lists_only_records_below_threshold() {
         let clf = fixture();
         let records = vec![
-            ("on_top".to_string(), basis(4, 0)),   // cosine 1.0 to a known entry
+            ("on_top".to_string(), basis(4, 0)), // cosine 1.0 to a known entry
             ("far_away".to_string(), basis(4, 3)), // orthogonal to everything
         ];
         let u = uncovered(&clf, &records, 0.5);
@@ -332,7 +340,11 @@ mod tests {
         ];
         let duplicate = cell("HEAL", "REST", vec![basis(4, 0)]);
         let g = candidate_gain(&clf, &duplicate, &records, 0.5);
-        assert_eq!(g.count(), 0, "a duplicate must not be credited with coverage");
+        assert_eq!(
+            g.count(),
+            0,
+            "a duplicate must not be credited with coverage"
+        );
         assert!(!g.is_useful());
     }
 
@@ -344,12 +356,15 @@ mod tests {
             ("b".to_string(), basis(4, 3)),
         ];
         let candidates = vec![
-            cell("X", "1", vec![basis(4, 2)]),                 // covers one
-            cell("Y", "2", vec![basis(4, 2), basis(4, 3)]),    // covers both
-            cell("Z", "3", vec![basis(4, 0)]),                 // covers none
+            cell("X", "1", vec![basis(4, 2)]),              // covers one
+            cell("Y", "2", vec![basis(4, 2), basis(4, 3)]), // covers both
+            cell("Z", "3", vec![basis(4, 0)]),              // covers none
         ];
         let ranked = rank_candidates(&clf, &candidates, &records, 0.5);
-        assert_eq!(ranked[0].0, 1, "the candidate covering both must rank first");
+        assert_eq!(
+            ranked[0].0, 1,
+            "the candidate covering both must rank first"
+        );
         assert_eq!(ranked[0].1.count(), 2);
         assert_eq!(ranked[2].1.count(), 0);
         for _ in 0..8 {
@@ -395,7 +410,10 @@ mod tests {
             ("r2".to_string(), vec![0.3, 0.0, 0.0, 0.0, 0.954]),
         ];
         let threshold = 0.2; // below every live score: nothing is uncovered
-        assert!(uncovered(&clf, &records, threshold).is_empty(), "setup: nothing is uncovered");
+        assert!(
+            uncovered(&clf, &records, threshold).is_empty(),
+            "setup: nothing is uncovered"
+        );
 
         let candidates = vec![
             cell("NONE", "AT-ALL", vec![basis(5, 1)]), // duplicates a known entry
@@ -405,15 +423,28 @@ mod tests {
         let ranked = rank_candidates(&clf, &candidates, &records, threshold);
 
         for (i, g) in &ranked {
-            assert_eq!(g.count(), 0, "candidate {i}: the threshold rule must be inert here");
+            assert_eq!(
+                g.count(),
+                0,
+                "candidate {i}: the threshold rule must be inert here"
+            );
         }
-        assert_eq!(ranked[0].0, 2, "helping two records beats helping one record more");
+        assert_eq!(
+            ranked[0].0, 2,
+            "helping two records beats helping one record more"
+        );
         assert_eq!(ranked[1].0, 1);
         assert_eq!(ranked[2].0, 0);
-        assert_eq!(ranked[2].1.lift, 0.0, "a duplicate of a known entry lifts nothing");
+        assert_eq!(
+            ranked[2].1.lift, 0.0,
+            "a duplicate of a known entry lifts nothing"
+        );
         assert!(ranked[0].1.lift > ranked[1].1.lift);
         for _ in 0..8 {
-            assert_eq!(rank_candidates(&clf, &candidates, &records, threshold), ranked);
+            assert_eq!(
+                rank_candidates(&clf, &candidates, &records, threshold),
+                ranked
+            );
         }
     }
 
@@ -425,8 +456,14 @@ mod tests {
         let records = vec![("r".to_string(), basis(4, 0))];
         let candidate = cell("NEW", "CELL", vec![basis(4, 0)]);
         let g = candidate_gain(&clf, &candidate, &records, 0.5);
-        assert!(g.lift.is_finite(), "lift must not be infinite against an empty ontology");
-        assert!((g.lift - 2.0).abs() < 1e-6, "cosine 1.0 above the -1.0 floor");
+        assert!(
+            g.lift.is_finite(),
+            "lift must not be infinite against an empty ontology"
+        );
+        assert!(
+            (g.lift - 2.0).abs() < 1e-6,
+            "cosine 1.0 above the -1.0 floor"
+        );
     }
 
     #[test]

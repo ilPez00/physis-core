@@ -98,7 +98,9 @@ fn main() {
         let mut cells = Vec::new();
         let mut toks: Vec<Vec<String>> = Vec::new();
         for def in ontology.classification_domains() {
-            let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut t = def.name.clone();
             let mut tv: Vec<String> = Vec::new();
             for h in &def.hints {
@@ -123,7 +125,10 @@ fn main() {
         }
         let n = texts.len();
         println!("{n} entries, embedding...");
-        let emb: Vec<Vec<f32>> = texts.iter().map(|t| normalize(&embedder.embed(t))).collect();
+        let emb: Vec<Vec<f32>> = texts
+            .iter()
+            .map(|t| normalize(&embedder.embed(t)))
+            .collect();
 
         // IDF over the second-grade tokens. Without it the "shared element" is
         // dominated by `the`/`and`/`for`, which corroborate nothing.
@@ -205,10 +210,15 @@ fn main() {
             // result that survives only in its worst-controlled bin is not a
             // result.
             const MAX_IMB: f64 = 0.01;
-            let (mut wth, mut wnh, mut wtl, mut wnl, mut wk) = (0usize, 0usize, 0usize, 0usize, 0usize);
+            let (mut wth, mut wnh, mut wtl, mut wnl, mut wk) =
+                (0usize, 0usize, 0usize, 0usize, 0usize);
             for s in 0..STRATA {
                 let lo = s * per;
-                let hi = if s == STRATA - 1 { order.len() } else { (s + 1) * per };
+                let hi = if s == STRATA - 1 {
+                    order.len()
+                } else {
+                    (s + 1) * per
+                };
                 let mut idx: Vec<usize> = order[lo..hi].to_vec();
                 if idx.len() < 20 {
                     continue;
@@ -216,21 +226,26 @@ fn main() {
                 // Split the stratum at its own median overlap.
                 idx.sort_by(|&a, &b| pairs[a].overlap.partial_cmp(&pairs[b].overlap).unwrap());
                 let mid = idx.len() / 2;
-                let hit = |k: &usize| if target { pairs[*k].same_cell } else { pairs[*k].same_domain };
+                let hit = |k: &usize| {
+                    if target {
+                        pairs[*k].same_cell
+                    } else {
+                        pairs[*k].same_domain
+                    }
+                };
                 let (lo_i, hi_i) = idx.split_at(mid);
                 let (hc, lc) = (
                     hi_i.iter().filter(|k| hit(k)).count(),
                     lo_i.iter().filter(|k| hit(k)).count(),
                 );
-                let (hr, lr) = (
-                    hc as f64 / hi_i.len() as f64,
-                    lc as f64 / lo_i.len() as f64,
-                );
+                let (hr, lr) = (hc as f64 / hi_i.len() as f64, lc as f64 / lo_i.len() as f64);
                 let z = z_prop(hr, hi_i.len() as f64, lr, lo_i.len() as f64);
                 // Residual-confound check: if the hi-overlap half also has a
                 // higher mean cosine inside the stratum, the difference may
                 // still be geometry rather than substructure.
-                let mc = |v: &[usize]| v.iter().map(|&k| pairs[k].cos as f64).sum::<f64>() / v.len() as f64;
+                let mc = |v: &[usize]| {
+                    v.iter().map(|&k| pairs[k].cos as f64).sum::<f64>() / v.len() as f64
+                };
                 let (mch, mcl) = (mc(hi_i), mc(lo_i));
                 if s % 4 == 0 || s == STRATA - 1 {
                     println!(
@@ -265,7 +280,10 @@ fn main() {
                 "  mean residual cosine imbalance (hi minus lo, weighted): {:+.5}",
                 imb_sum / imb_n.max(1.0)
             );
-            let (wphr, wplr) = (wth as f64 / wnh.max(1) as f64, wtl as f64 / wnl.max(1) as f64);
+            let (wphr, wplr) = (
+                wth as f64 / wnh.max(1) as f64,
+                wtl as f64 / wnl.max(1) as f64,
+            );
             let wz = z_prop(wphr, wnh as f64, wplr, wnl as f64);
             println!(
                 "  WELL-CONTROLLED strata only (|imbalance| < {MAX_IMB}, {wk}/{STRATA} strata):"
@@ -283,9 +301,7 @@ fn main() {
             );
         }
 
-        println!(
-            "\n=== Why this is a WEAK test of the underlying idea ===\n"
-        );
+        println!("\n=== Why this is a WEAK test of the underlying idea ===\n");
         println!("  The second-grade elements used here are the authored `hints`, and hints are");
         println!("  part of the text that was EMBEDDED (`name + hints`). So the embedder already");
         println!("  read every token this experiment scores. Asking whether token overlap adds");
@@ -297,7 +313,9 @@ fn main() {
         println!("  embedder did NOT see: \"if i then encounter a description of the dog\" — a");
         println!("  SEPARATE encounter, not a curated keyword list written by the same hand that");
         println!("  assigned the cell. In physis that source exists, but it is the operational");
-        println!("  corpus (`operational.rs` events, telemetry, workflow steps), not the ontology.");
+        println!(
+            "  corpus (`operational.rs` events, telemetry, workflow steps), not the ontology."
+        );
         println!();
         println!("  So: NOT SUPPORTED on hint-derived substructure, and the architecture is");
         println!("  untested rather than refuted. Re-run against independent encounters before");

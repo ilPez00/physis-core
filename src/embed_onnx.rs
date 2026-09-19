@@ -69,7 +69,10 @@ pub struct OnnxEmbedder {
 
 /// Load an ONNX session, logging the actual `ort` error on failure instead of
 /// swallowing it.
-fn load_onnx_session(model_path: &Path, intra_threads: Option<usize>) -> Option<ort::session::Session> {
+fn load_onnx_session(
+    model_path: &Path,
+    intra_threads: Option<usize>,
+) -> Option<ort::session::Session> {
     use ort::session::builder::GraphOptimizationLevel;
     let threads = intra_threads.unwrap_or_else(|| {
         std::thread::available_parallelism()

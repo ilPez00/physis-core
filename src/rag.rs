@@ -351,13 +351,11 @@ impl Default for Bm25Index {
 impl Bm25Index {
     pub fn build(texts: &[String]) -> Self {
         let mut doc_len: Vec<usize> = Vec::new();
-        let mut freq: std::collections::HashMap<String, usize> =
-            std::collections::HashMap::new();
+        let mut freq: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
         let mut terms: Vec<Vec<String>> = Vec::new();
         for t in texts {
             let ts = bm25_terms(t);
-            let mut seen: std::collections::HashSet<String> =
-                std::collections::HashSet::new();
+            let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
             for term in &ts {
                 if seen.insert(term.clone()) {
                     freq.insert(term.clone(), freq.get(term).copied().unwrap_or(0usize) + 1);
@@ -400,8 +398,7 @@ impl Bm25Index {
         let n = self.terms.len() as f32;
         let dl = self.doc_len[doc_idx] as f32;
         let mut total = 0.0_f32;
-        let mut counted: std::collections::HashSet<String> =
-            std::collections::HashSet::new();
+        let mut counted: std::collections::HashSet<String> = std::collections::HashSet::new();
         for q in query_terms {
             if !counted.insert(q.clone()) {
                 continue;
@@ -472,11 +469,7 @@ pub fn fuse_rrf(rankings: &[&[usize]], k: f32) -> Vec<(usize, f32)> {
 /// G5: the combined ranking — cosine and BM25 legs fused by RRF. The
 /// cosine leg is the frozen baseline; BM25 adds lexical recall that the
 /// embedding cannot see.
-pub fn rank_hybrid(
-    corpus: &RagCorpus,
-    query_emb: &[f32],
-    query_text: &str,
-) -> Vec<(usize, f32)> {
+pub fn rank_hybrid(corpus: &RagCorpus, query_emb: &[f32], query_text: &str) -> Vec<(usize, f32)> {
     let cos_rank: Vec<usize> = rank_by_cosine(query_emb, corpus)
         .iter()
         .map(|(i, _)| *i)
@@ -520,14 +513,13 @@ pub fn measure_hybrid_vs_cosine(
     let hyb = rank_hybrid(corpus, query_emb, query_text);
     let cosine_top1: Option<usize> = cos.first().map(|(id, _)| *id);
     let hybrid_top1: Option<usize> = hyb.first().map(|(id, _)| *id);
-    let improvement =
-        if hybrid_top1 == Some(target_doc) && cosine_top1 != Some(target_doc) {
-            1.0_f32
-        } else if cosine_top1 == Some(target_doc) && hybrid_top1 != Some(target_doc) {
-            -1.0_f32
-        } else {
-            0.0_f32
-        };
+    let improvement = if hybrid_top1 == Some(target_doc) && cosine_top1 != Some(target_doc) {
+        1.0_f32
+    } else if cosine_top1 == Some(target_doc) && hybrid_top1 != Some(target_doc) {
+        -1.0_f32
+    } else {
+        0.0_f32
+    };
     HybridVerdict {
         target_doc,
         cosine_top1,
@@ -585,7 +577,11 @@ mod tests {
         let ranked: Vec<(usize, f32)> =
             vec![(3, 0.9), (1, 0.8), (0, 0.7), (2, 0.6), (4, 0.5), (5, 0.4)];
         let r = TokenFixedRetriever::new(30, 100).retrieve_with_ranking(&ranked, &corpus);
-        assert!(r.total_tokens <= 30, "total {} must be <= budget 30", r.total_tokens);
+        assert!(
+            r.total_tokens <= 30,
+            "total {} must be <= budget 30",
+            r.total_tokens
+        );
         assert_eq!(
             r.chunks.first().map(|c| c.id),
             Some(3),
@@ -719,7 +715,11 @@ mod tests {
             "shipping manifest cargo hold".to_string(),
         ];
         let corpus = RagCorpus {
-            chunks: vec![chunk(0, &texts[0], target), chunk(1, &texts[1], distracter), chunk(2, &texts[2], far)],
+            chunks: vec![
+                chunk(0, &texts[0], target),
+                chunk(1, &texts[1], distracter),
+                chunk(2, &texts[2], far),
+            ],
             bm25: Bm25Index::build(&texts),
         };
         // Cosine points at the distracter: the query vector is the
@@ -728,14 +728,21 @@ mod tests {
         let query_emb = vec![1.0, 0.0, 0.0, 0.0];
 
         let verdict = measure_hybrid_vs_cosine(&corpus, &query_emb, query, 0);
-        assert_eq!(verdict.cosine_top1, Some(1), "the cosine baseline is fooled by design");
+        assert_eq!(
+            verdict.cosine_top1,
+            Some(1),
+            "the cosine baseline is fooled by design"
+        );
         assert_eq!(
             verdict.hybrid_top1,
             Some(0),
             "the fused path recovers the term-matched target"
         );
         assert!(verdict.improvement > 0.0);
-        assert!(verdict.ships_fusion, "a positive measurement must ship the fused path");
+        assert!(
+            verdict.ships_fusion,
+            "a positive measurement must ship the fused path"
+        );
 
         // Negative control: when lexical overlap is uninformative and cosine
         // already places the target first, fusion must not regress it — and
@@ -760,7 +767,10 @@ mod tests {
             "shipping is derived from the measurement, never assumed"
         );
         if v2.improvement <= 0.0 {
-            assert!(!v2.ships_fusion, "a non-positive measurement ships disabled");
+            assert!(
+                !v2.ships_fusion,
+                "a non-positive measurement ships disabled"
+            );
         }
     }
 
@@ -777,7 +787,10 @@ mod tests {
         let r2 = idx.rank(&q);
         assert_eq!(r1, r2, "the same query must rank identically every run");
         let (top_id, top_score) = r1[0];
-        assert_eq!(top_id, 1, "the doc with the rarer matching term ranks first");
+        assert_eq!(
+            top_id, 1,
+            "the doc with the rarer matching term ranks first"
+        );
         assert!(top_score > 0.0);
     }
 }

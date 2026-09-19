@@ -147,7 +147,9 @@ fn main() {
         let mut own: Vec<HashSet<String>> = Vec::new();
         let mut name_terms: Vec<Vec<String>> = Vec::new();
         for def in ontology.classification_domains() {
-            let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut t = def.name.clone();
             for h in &def.hints {
                 t.push(' ');
@@ -160,9 +162,15 @@ fn main() {
         }
         let n = texts.len();
         println!("{n} ontology entries, embedding...");
-        let emb: Vec<Vec<f32>> = texts.iter().map(|t| normalize(&embedder.embed(t))).collect();
+        let emb: Vec<Vec<f32>> = texts
+            .iter()
+            .map(|t| normalize(&embedder.embed(t)))
+            .collect();
 
-        for (mode_label, strict) in [("MATCH: >=2 name terms", false), ("MATCH: full-name substring", true)] {
+        for (mode_label, strict) in [
+            ("MATCH: >=2 name terms", false),
+            ("MATCH: full-name substring", true),
+        ] {
             println!("\n############ {mode_label} ############\n");
 
             // Episode tokens per entry, minus everything the embedding saw.
@@ -183,7 +191,11 @@ fn main() {
                         !name_lc.is_empty() && etext.contains(&name_lc)
                     } else {
                         name_terms[i].len() >= 2
-                            && name_terms[i].iter().filter(|w| etoks.binary_search(w).is_ok()).count() >= 2
+                            && name_terms[i]
+                                .iter()
+                                .filter(|w| etoks.binary_search(w).is_ok())
+                                .count()
+                                >= 2
                     };
                     if !hit {
                         continue;
@@ -282,14 +294,24 @@ fn main() {
                 let (mut th, mut nh, mut tl, mut nl) = (0usize, 0usize, 0usize, 0usize);
                 for s in 0..STRATA {
                     let lo = s * per;
-                    let hi = if s == STRATA - 1 { order.len() } else { (s + 1) * per };
+                    let hi = if s == STRATA - 1 {
+                        order.len()
+                    } else {
+                        (s + 1) * per
+                    };
                     let mut idx: Vec<usize> = order[lo..hi].to_vec();
                     if idx.len() < 20 {
                         continue;
                     }
                     idx.sort_by(|&a, &b| pairs[a].overlap.partial_cmp(&pairs[b].overlap).unwrap());
                     let mid = idx.len() / 2;
-                    let hit = |k: &usize| if fine { pairs[*k].same_cell } else { pairs[*k].same_domain };
+                    let hit = |k: &usize| {
+                        if fine {
+                            pairs[*k].same_cell
+                        } else {
+                            pairs[*k].same_domain
+                        }
+                    };
                     let (lo_i, hi_i) = idx.split_at(mid);
                     let (hc, lc) = (
                         hi_i.iter().filter(|k| hit(k)).count(),
@@ -311,7 +333,10 @@ fn main() {
                     }
                 }
                 let (phr, plr) = (th as f64 / nh as f64, tl as f64 / nl as f64);
-                let (wphr, wplr) = (wth as f64 / wnh.max(1) as f64, wtl as f64 / wnl.max(1) as f64);
+                let (wphr, wplr) = (
+                    wth as f64 / wnh.max(1) as f64,
+                    wtl as f64 / wnl.max(1) as f64,
+                );
                 println!(
                     "  {label}  all-strata hi {phr:.4} lo {plr:.4} z={:+.2}   |   well-controlled hi {wphr:.4} lo {wplr:.4} z={:+.2} ({wk}/{STRATA})",
                     z_prop(phr, nh as f64, plr, nl as f64),

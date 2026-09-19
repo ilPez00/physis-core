@@ -150,7 +150,6 @@ fn depends_on_walk_records_cycles_and_terminates() {
     );
 }
 
-
 // ── A6: named weights + per-term breakdown ───────────────────────────────
 
 #[test]

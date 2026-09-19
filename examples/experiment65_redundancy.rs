@@ -28,10 +28,30 @@ fn find(rel: &str) -> Option<PathBuf> {
 fn main() {
     // (label, path, the arm that won, its top-1, the losing arm's top-1)
     let corpora = [
-        ("hand-written", "benchmarks/worldstate/corpus.jsonl", "entity link 0.357", "bm25 NOT RUN"),
-        ("documentation", "benchmarks/worldstate/corpus-docs.jsonl", "bm25+pos 0.535", "entity link 0.209"),
-        ("machine log", "benchmarks/worldstate/corpus-log.jsonl", "bm25+pos 0.447", "entity link 0.296"),
-        ("generated templates", "benchmarks/worldstate/corpus-large.jsonl", "entity link 0.700", "bm25+pos 0.013"),
+        (
+            "hand-written",
+            "benchmarks/worldstate/corpus.jsonl",
+            "entity link 0.357",
+            "bm25 NOT RUN",
+        ),
+        (
+            "documentation",
+            "benchmarks/worldstate/corpus-docs.jsonl",
+            "bm25+pos 0.535",
+            "entity link 0.209",
+        ),
+        (
+            "machine log",
+            "benchmarks/worldstate/corpus-log.jsonl",
+            "bm25+pos 0.447",
+            "entity link 0.296",
+        ),
+        (
+            "generated templates",
+            "benchmarks/worldstate/corpus-large.jsonl",
+            "entity link 0.700",
+            "bm25+pos 0.013",
+        ),
     ];
 
     println!("corpus                 n     redundancy  margin      winner (measured)");

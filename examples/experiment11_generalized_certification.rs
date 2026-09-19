@@ -51,34 +51,55 @@ use physis_core::models::cosine_sim;
 
 fn kmeans(embeddings: &[Vec<f32>], k: usize, iterations: usize) -> Vec<usize> {
     let n = embeddings.len();
-    if n < k { return (0..n).collect(); }
+    if n < k {
+        return (0..n).collect();
+    }
     let dim = embeddings[0].len();
     let mut centroid_idx = vec![0usize];
     while centroid_idx.len() < k {
         let next = (0..n)
             .max_by(|&a, &b| {
-                let da = centroid_idx.iter().map(|&c| 1.0 - cosine_sim(&embeddings[a], &embeddings[c])).fold(f32::INFINITY, f32::min);
-                let db = centroid_idx.iter().map(|&c| 1.0 - cosine_sim(&embeddings[b], &embeddings[c])).fold(f32::INFINITY, f32::min);
+                let da = centroid_idx
+                    .iter()
+                    .map(|&c| 1.0 - cosine_sim(&embeddings[a], &embeddings[c]))
+                    .fold(f32::INFINITY, f32::min);
+                let db = centroid_idx
+                    .iter()
+                    .map(|&c| 1.0 - cosine_sim(&embeddings[b], &embeddings[c]))
+                    .fold(f32::INFINITY, f32::min);
                 da.partial_cmp(&db).unwrap()
             })
             .unwrap();
         centroid_idx.push(next);
     }
-    let mut centroids: Vec<Vec<f32>> = centroid_idx.iter().map(|&i| embeddings[i].clone()).collect();
+    let mut centroids: Vec<Vec<f32>> = centroid_idx
+        .iter()
+        .map(|&i| embeddings[i].clone())
+        .collect();
     let mut assignment = vec![0usize; n];
     for _ in 0..iterations {
         for i in 0..n {
-            assignment[i] = (0..k).max_by(|&a, &b| cosine_sim(&embeddings[i], &centroids[a]).partial_cmp(&cosine_sim(&embeddings[i], &centroids[b])).unwrap()).unwrap();
+            assignment[i] = (0..k)
+                .max_by(|&a, &b| {
+                    cosine_sim(&embeddings[i], &centroids[a])
+                        .partial_cmp(&cosine_sim(&embeddings[i], &centroids[b]))
+                        .unwrap()
+                })
+                .unwrap();
         }
         let mut sums = vec![vec![0.0f32; dim]; k];
         let mut counts = vec![0usize; k];
         for i in 0..n {
             let c = assignment[i];
             counts[c] += 1;
-            for d in 0..dim { sums[c][d] += embeddings[i][d]; }
+            for d in 0..dim {
+                sums[c][d] += embeddings[i][d];
+            }
         }
         for c in 0..k {
-            if counts[c] == 0 { continue; }
+            if counts[c] == 0 {
+                continue;
+            }
             let norm: f32 = sums[c].iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
             centroids[c] = sums[c].iter().map(|x| x / norm).collect();
         }
@@ -93,12 +114,23 @@ fn cluster_centroids(embeddings: &[Vec<f32>], assignment: &[usize]) -> [Vec<f32>
     for (i, e) in embeddings.iter().enumerate() {
         let c = assignment[i];
         counts[c] += 1;
-        for d in 0..dim { centroids[c][d] += e[d]; }
+        for d in 0..dim {
+            centroids[c][d] += e[d];
+        }
     }
     for c in 0..2 {
-        if counts[c] == 0 { continue; }
-        let norm: f32 = centroids[c].iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
-        for v in &mut centroids[c] { *v /= norm; }
+        if counts[c] == 0 {
+            continue;
+        }
+        let norm: f32 = centroids[c]
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt()
+            .max(1e-8);
+        for v in &mut centroids[c] {
+            *v /= norm;
+        }
     }
     centroids
 }
@@ -107,7 +139,11 @@ fn balance_ratio(assignment: &[usize]) -> f32 {
     let c0 = assignment.iter().filter(|&&a| a == 0).count();
     let c1 = assignment.iter().filter(|&&a| a == 1).count();
     let (lo, hi) = (c0.min(c1), c0.max(c1));
-    if hi == 0 { 0.0 } else { lo as f32 / hi as f32 }
+    if hi == 0 {
+        0.0
+    } else {
+        lo as f32 / hi as f32
+    }
 }
 
 fn silhouette_like(embeddings: &[Vec<f32>], assignment: &[usize]) -> f32 {
@@ -133,7 +169,11 @@ fn knn_consistency_raw(embeddings: &[Vec<f32>], assignment: &[usize], k: usize) 
             .collect();
         sims.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         let kk = k.min(sims.len());
-        let same = sims.iter().take(kk).filter(|(j, _)| assignment[*j] == assignment[i]).count();
+        let same = sims
+            .iter()
+            .take(kk)
+            .filter(|(j, _)| assignment[*j] == assignment[i])
+            .count();
         total += same as f32 / kk as f32;
     }
     total / n as f32
@@ -155,10 +195,18 @@ fn knn_consistency_adjusted(embeddings: &[Vec<f32>], assignment: &[usize], k: us
             .collect();
         sims.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         let kk = k.min(sims.len());
-        let same = sims.iter().take(kk).filter(|(j, _)| assignment[*j] == assignment[i]).count();
+        let same = sims
+            .iter()
+            .take(kk)
+            .filter(|(j, _)| assignment[*j] == assignment[i])
+            .count();
         let observed = same as f32 / kk as f32;
         let own_size = assignment.iter().filter(|&&a| a == assignment[i]).count();
-        let expected = if n > 1 { (own_size.saturating_sub(1)) as f32 / (n - 1) as f32 } else { 0.0 };
+        let expected = if n > 1 {
+            (own_size.saturating_sub(1)) as f32 / (n - 1) as f32
+        } else {
+            0.0
+        };
         total += observed - expected;
     }
     total / n as f32
@@ -183,9 +231,17 @@ fn knn_consistency_adaptive(embeddings: &[Vec<f32>], assignment: &[usize], max_k
             .collect();
         sims.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         let kk = k.min(sims.len());
-        let same = sims.iter().take(kk).filter(|(j, _)| assignment[*j] == assignment[i]).count();
+        let same = sims
+            .iter()
+            .take(kk)
+            .filter(|(j, _)| assignment[*j] == assignment[i])
+            .count();
         let observed = same as f32 / kk as f32;
-        let expected = if n > 1 { (own_size.saturating_sub(1)) as f32 / (n - 1) as f32 } else { 0.0 };
+        let expected = if n > 1 {
+            (own_size.saturating_sub(1)) as f32 / (n - 1) as f32
+        } else {
+            0.0
+        };
         total += observed - expected;
     }
     total / n as f32
@@ -201,28 +257,90 @@ fn confident_item_fraction(embeddings: &[Vec<f32>], assignment: &[usize], epsilo
         let own = assignment[i];
         let other = 1 - own;
         let margin = cosine_sim(e, &centroids[own]) - cosine_sim(e, &centroids[other]);
-        if margin < epsilon { low += 1; }
+        if margin < epsilon {
+            low += 1;
+        }
     }
     1.0 - (low as f32 / embeddings.len() as f32)
 }
 
 // ─────────────────────────── Case 1 & 2: Dataset A (mammal/bird) ───────────────────────────
 const DATASET_A: &[(&str, &str, &str)] = &[
-    ("dog", "The dog wagged its tail and waited by the door for its owner to come home.", "mammal"),
-    ("cat", "The cat curled up on the windowsill and purred in the afternoon sun.", "mammal"),
-    ("horse", "The horse trotted around the paddock, its mane flowing in the breeze.", "mammal"),
-    ("sheep", "The sheep grazed quietly in the pasture, following the rest of the flock.", "mammal"),
-    ("lion", "The lion stalked its prey across the savanna before launching a sudden charge.", "mammal"),
-    ("wolf", "The wolf howled at dusk, calling the rest of its pack to the hunt.", "mammal"),
-    ("bear", "The bear caught a salmon in its claws as the fish leapt upstream.", "mammal"),
-    ("tiger", "The tiger prowled silently through the tall grass, stripes blending with the shadows.", "mammal"),
-    ("eagle", "The eagle soared high above the canyon, scanning the ground for movement.", "bird"),
-    ("sparrow", "The sparrow hopped along the branch before darting off between the leaves.", "bird"),
-    ("owl", "The owl turned its head silently, watching for the faintest movement in the dark.", "bird"),
-    ("swan", "The swan glided smoothly across the lake, barely rippling the water.", "bird"),
-    ("penguin", "The penguin waddled across the ice before diving into the frigid water.", "bird"),
-    ("ostrich", "The ostrich sprinted across the plain on powerful legs, kicking up dust.", "bird"),
-    ("kiwi", "The kiwi foraged in the undergrowth at night, sniffing out insects with its long beak.", "bird"),
+    (
+        "dog",
+        "The dog wagged its tail and waited by the door for its owner to come home.",
+        "mammal",
+    ),
+    (
+        "cat",
+        "The cat curled up on the windowsill and purred in the afternoon sun.",
+        "mammal",
+    ),
+    (
+        "horse",
+        "The horse trotted around the paddock, its mane flowing in the breeze.",
+        "mammal",
+    ),
+    (
+        "sheep",
+        "The sheep grazed quietly in the pasture, following the rest of the flock.",
+        "mammal",
+    ),
+    (
+        "lion",
+        "The lion stalked its prey across the savanna before launching a sudden charge.",
+        "mammal",
+    ),
+    (
+        "wolf",
+        "The wolf howled at dusk, calling the rest of its pack to the hunt.",
+        "mammal",
+    ),
+    (
+        "bear",
+        "The bear caught a salmon in its claws as the fish leapt upstream.",
+        "mammal",
+    ),
+    (
+        "tiger",
+        "The tiger prowled silently through the tall grass, stripes blending with the shadows.",
+        "mammal",
+    ),
+    (
+        "eagle",
+        "The eagle soared high above the canyon, scanning the ground for movement.",
+        "bird",
+    ),
+    (
+        "sparrow",
+        "The sparrow hopped along the branch before darting off between the leaves.",
+        "bird",
+    ),
+    (
+        "owl",
+        "The owl turned its head silently, watching for the faintest movement in the dark.",
+        "bird",
+    ),
+    (
+        "swan",
+        "The swan glided smoothly across the lake, barely rippling the water.",
+        "bird",
+    ),
+    (
+        "penguin",
+        "The penguin waddled across the ice before diving into the frigid water.",
+        "bird",
+    ),
+    (
+        "ostrich",
+        "The ostrich sprinted across the plain on powerful legs, kicking up dust.",
+        "bird",
+    ),
+    (
+        "kiwi",
+        "The kiwi foraged in the undergrowth at night, sniffing out insects with its long beak.",
+        "bird",
+    ),
 ];
 
 // ─────────────────────────── Case 3: bird branch (from Iteration 10's 19-item corpus) ───────────────────────────
@@ -261,7 +379,9 @@ fn purity(assignment: &[usize], labels: &[&str]) -> f32 {
     for c in 0..2 {
         let mut counts = std::collections::HashMap::new();
         for i in 0..n {
-            if assignment[i] == c { *counts.entry(labels[i]).or_insert(0usize) += 1; }
+            if assignment[i] == c {
+                *counts.entry(labels[i]).or_insert(0usize) += 1;
+            }
         }
         correct += counts.values().copied().max().unwrap_or(0);
     }
@@ -284,8 +404,14 @@ fn main() {
         let mut embedder = None;
         for dir in ["models", "../models"] {
             let p = std::path::Path::new(dir);
-            if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) { continue; }
-            let cfg = OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), ..OnnxConfig::default() };
+            if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) {
+                continue;
+            }
+            let cfg = OnnxConfig {
+                dim: 384,
+                model_dir: Some(dir.to_string()),
+                ..OnnxConfig::default()
+            };
             let e = OnnxEmbedder::with_config(&cfg);
             if e.is_available() {
                 println!("Using real semantic embedder: {dir}/model.onnx\n");
@@ -293,33 +419,77 @@ fn main() {
                 break;
             }
         }
-        let embedder = match embedder { Some(e) => e, None => { println!("WARNING: no ONNX model — aborting."); return; } };
+        let embedder = match embedder {
+            Some(e) => e,
+            None => {
+                println!("WARNING: no ONNX model — aborting.");
+                return;
+            }
+        };
 
         // Case 1 & 2 share the same embeddings (Dataset A).
-        let a_emb: Vec<Vec<f32>> = DATASET_A.iter().map(|(_, s, _)| embedder.embed(s)).collect();
+        let a_emb: Vec<Vec<f32>> = DATASET_A
+            .iter()
+            .map(|(_, s, _)| embedder.embed(s))
+            .collect();
         let a_labels: Vec<&str> = DATASET_A.iter().map(|(_, _, l)| *l).collect();
-        let a_true: Vec<usize> = a_labels.iter().map(|&l| if l == "mammal" { 0 } else { 1 }).collect();
+        let a_true: Vec<usize> = a_labels
+            .iter()
+            .map(|&l| if l == "mammal" { 0 } else { 1 })
+            .collect();
         let a_real = kmeans(&a_emb, 2, 30);
         println!("Case 2 sanity check — real k-means purity vs true mammal/bird: {:.3} (expect ~0.667, the known 13-vs-2 split)", purity(&a_real, &a_labels));
 
         // Case 3: bird branch, real k-means depth-2 split.
-        let bird_emb: Vec<Vec<f32>> = BIRD_BRANCH.iter().map(|(_, s, _)| embedder.embed(s)).collect();
+        let bird_emb: Vec<Vec<f32>> = BIRD_BRANCH
+            .iter()
+            .map(|(_, s, _)| embedder.embed(s))
+            .collect();
         let bird_labels: Vec<&str> = BIRD_BRANCH.iter().map(|(_, _, l)| *l).collect();
         let bird_real = kmeans(&bird_emb, 2, 30);
         println!("Case 3 sanity check — real k-means purity vs true flying/flightless: {:.3} (expect a mislabeled split, not close to 1.0)\n", purity(&bird_real, &bird_labels));
 
         // Case 4: vehicles, TRUE wheel-count partition (2-vs-10, deliberately imbalanced).
-        let veh_emb: Vec<Vec<f32>> = VEHICLES.iter().map(|(_, s, ..)| embedder.embed(s)).collect();
-        let veh_true: Vec<usize> = VEHICLES.iter().map(|v| if v.2 == "two" { 0 } else { 1 }).collect();
+        let veh_emb: Vec<Vec<f32>> = VEHICLES
+            .iter()
+            .map(|(_, s, ..)| embedder.embed(s))
+            .collect();
+        let veh_true: Vec<usize> = VEHICLES
+            .iter()
+            .map(|v| if v.2 == "two" { 0 } else { 1 })
+            .collect();
 
         let cases = vec![
-            Case { name: "1: GOOD-balanced (true mammal/bird, 8v7)", correct: true, embeddings: a_emb.clone(), assignment: a_true.clone() },
-            Case { name: "2: BAD-imbalanced (real k-means, 13v2)", correct: false, embeddings: a_emb.clone(), assignment: a_real.clone() },
-            Case { name: "3: BAD-balanced (Iter.10 bird depth-2 real, 6v4)", correct: false, embeddings: bird_emb.clone(), assignment: bird_real.clone() },
-            Case { name: "4: GOOD-imbalanced (true wheel count, 2v10)", correct: true, embeddings: veh_emb.clone(), assignment: veh_true.clone() },
+            Case {
+                name: "1: GOOD-balanced (true mammal/bird, 8v7)",
+                correct: true,
+                embeddings: a_emb.clone(),
+                assignment: a_true.clone(),
+            },
+            Case {
+                name: "2: BAD-imbalanced (real k-means, 13v2)",
+                correct: false,
+                embeddings: a_emb.clone(),
+                assignment: a_real.clone(),
+            },
+            Case {
+                name: "3: BAD-balanced (Iter.10 bird depth-2 real, 6v4)",
+                correct: false,
+                embeddings: bird_emb.clone(),
+                assignment: bird_real.clone(),
+            },
+            Case {
+                name: "4: GOOD-imbalanced (true wheel count, 2v10)",
+                correct: true,
+                embeddings: veh_emb.clone(),
+                assignment: veh_true.clone(),
+            },
         ];
 
-        println!("{:<48} {:>8} {:>8} {:>10} {:>10} {:>10}", "case", "balance", "sil-like", "knn-raw", "knn-adj", "knn-adapt");
+        println!(
+            "{:<48} {:>8} {:>8} {:>10} {:>10} {:>10}",
+            "case", "balance", "sil-like", "knn-raw", "knn-adj", "knn-adapt"
+        );
         let mut balance_scores = vec![];
         let mut sil_scores = vec![];
         let mut knn_raw_scores = vec![];
@@ -331,7 +501,10 @@ fn main() {
             let knn_raw = knn_consistency_raw(&case.embeddings, &case.assignment, 3);
             let knn_adj = knn_consistency_adjusted(&case.embeddings, &case.assignment, 3);
             let knn_adapt = knn_consistency_adaptive(&case.embeddings, &case.assignment, 3);
-            println!("{:<48} {bal:>8.3} {sil:>8.3} {knn_raw:>10.3} {knn_adj:>10.3} {knn_adapt:>10.3}", case.name);
+            println!(
+                "{:<48} {bal:>8.3} {sil:>8.3} {knn_raw:>10.3} {knn_adj:>10.3} {knn_adapt:>10.3}",
+                case.name
+            );
             balance_scores.push((case.correct, bal));
             sil_scores.push((case.correct, sil));
             knn_raw_scores.push((case.correct, knn_raw));
@@ -344,23 +517,52 @@ fn main() {
         // for every case (as 0.02 did on the first run of this experiment)
         // is not calibrated, it's uninspected.
         println!("\nconfident-item-fraction epsilon sweep (1 - fraction of items with margin < epsilon):");
-        println!("{:<10} {:>8} {:>8} {:>8} {:>8}", "epsilon", "case1", "case2", "case3", "case4");
+        println!(
+            "{:<10} {:>8} {:>8} {:>8} {:>8}",
+            "epsilon", "case1", "case2", "case3", "case4"
+        );
         let mut best_conf_eps: Option<(f32, bool)> = None;
         for i in 0..=30 {
             let eps = i as f32 * 0.01;
-            let vals: Vec<f32> = cases.iter().map(|c| confident_item_fraction(&c.embeddings, &c.assignment, eps)).collect();
-            println!("{eps:<10.2} {:>8.3} {:>8.3} {:>8.3} {:>8.3}", vals[0], vals[1], vals[2], vals[3]);
-            let scored: Vec<(bool, f32)> = cases.iter().zip(vals.iter()).map(|(c, v)| (c.correct, *v)).collect();
-            let min_good = scored.iter().filter(|(c, _)| *c).map(|(_, s)| *s).fold(f32::INFINITY, f32::min);
-            let max_bad = scored.iter().filter(|(c, _)| !*c).map(|(_, s)| *s).fold(f32::NEG_INFINITY, f32::max);
+            let vals: Vec<f32> = cases
+                .iter()
+                .map(|c| confident_item_fraction(&c.embeddings, &c.assignment, eps))
+                .collect();
+            println!(
+                "{eps:<10.2} {:>8.3} {:>8.3} {:>8.3} {:>8.3}",
+                vals[0], vals[1], vals[2], vals[3]
+            );
+            let scored: Vec<(bool, f32)> = cases
+                .iter()
+                .zip(vals.iter())
+                .map(|(c, v)| (c.correct, *v))
+                .collect();
+            let min_good = scored
+                .iter()
+                .filter(|(c, _)| *c)
+                .map(|(_, s)| *s)
+                .fold(f32::INFINITY, f32::min);
+            let max_bad = scored
+                .iter()
+                .filter(|(c, _)| !*c)
+                .map(|(_, s)| *s)
+                .fold(f32::NEG_INFINITY, f32::max);
             if best_conf_eps.is_none() && min_good > max_bad {
                 best_conf_eps = Some((eps, true));
             }
         }
 
         fn separates(scores: &[(bool, f32)]) -> bool {
-            let min_good = scores.iter().filter(|(c, _)| *c).map(|(_, s)| *s).fold(f32::INFINITY, f32::min);
-            let max_bad = scores.iter().filter(|(c, _)| !*c).map(|(_, s)| *s).fold(f32::NEG_INFINITY, f32::max);
+            let min_good = scores
+                .iter()
+                .filter(|(c, _)| *c)
+                .map(|(_, s)| *s)
+                .fold(f32::INFINITY, f32::min);
+            let max_bad = scores
+                .iter()
+                .filter(|(c, _)| !*c)
+                .map(|(_, s)| *s)
+                .fold(f32::NEG_INFINITY, f32::max);
             min_good > max_bad
         }
 
@@ -368,8 +570,14 @@ fn main() {
         println!("balance ratio:              {}", separates(&balance_scores));
         println!("silhouette-like:            {}", separates(&sil_scores));
         println!("kNN-consistency (raw):      {}", separates(&knn_raw_scores));
-        println!("kNN-consistency (adjusted, fixed k=3): {}", separates(&knn_adj_scores));
-        println!("kNN-consistency (adjusted, adaptive k): {}", separates(&knn_adapt_scores));
+        println!(
+            "kNN-consistency (adjusted, fixed k=3): {}",
+            separates(&knn_adj_scores)
+        );
+        println!(
+            "kNN-consistency (adjusted, adaptive k): {}",
+            separates(&knn_adapt_scores)
+        );
         match best_conf_eps {
             Some((eps, _)) => println!("confident-item fraction:    TRUE at epsilon={eps:.2} (smallest epsilon that separates)"),
             None => println!("confident-item fraction:    false at every epsilon in [0.00, 0.30]"),

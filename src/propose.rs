@@ -183,9 +183,7 @@ impl Proposer {
         Self {
             cells: cells
                 .into_iter()
-                .map(|(d, m, acc, n)| {
-                    (d, m, normalise(acc.iter().map(|x| x / n as f32).collect()))
-                })
+                .map(|(d, m, acc, n)| (d, m, normalise(acc.iter().map(|x| x / n as f32).collect())))
                 .collect(),
             decisions: seen,
         }
@@ -264,7 +262,11 @@ mod tests {
             ("STUDY", "LEARN", v(&[0.0, 1.0, 0.0])),
         ]);
         assert_eq!(p.propose(&[0.0, 1.0, 0.0], 1).len(), 1);
-        assert_eq!(p.propose(&[0.0, 1.0, 0.0], 5).len(), 2, "cannot exceed cells seen");
+        assert_eq!(
+            p.propose(&[0.0, 1.0, 0.0], 5).len(),
+            2,
+            "cannot exceed cells seen"
+        );
         // The right cell can be absent from top-1 and present in the shortlist.
         let near_tie = p.propose(&[0.6, 0.8, 0.0], 2);
         assert_eq!(near_tie[0].cell(), "STUDY/LEARN");
@@ -313,7 +315,10 @@ mod tests {
         let at_one = blend_hint_weight(&name, &hints, 1.0);
         assert!((at_one[1] - 1.0).abs() < 1e-6, "alpha=1 is the full text");
         let half = blend_hint_weight(&name, &hints, DEFAULT_HINT_WEIGHT);
-        assert!((half[0] - half[1]).abs() < 1e-6, "alpha=0.5 sits between them");
+        assert!(
+            (half[0] - half[1]).abs() < 1e-6,
+            "alpha=0.5 sits between them"
+        );
         let norm = half.iter().map(|x| x * x).sum::<f32>().sqrt();
         assert!((norm - 1.0).abs() < 1e-6, "result is a unit vector");
     }

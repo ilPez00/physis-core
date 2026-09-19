@@ -31,6 +31,12 @@ fn main() {
     for ((d, m), c) in pc.iter().take(10) {
         println!("  {d}/{m}: {c}");
     }
-    println!("cells with >=5 entries: {}", pc.iter().filter(|(_, c)| *c >= 5).count());
-    println!("cells with 1 entry: {}", pc.iter().filter(|(_, c)| *c == 1).count());
+    println!(
+        "cells with >=5 entries: {}",
+        pc.iter().filter(|(_, c)| *c >= 5).count()
+    );
+    println!(
+        "cells with 1 entry: {}",
+        pc.iter().filter(|(_, c)| *c == 1).count()
+    );
 }

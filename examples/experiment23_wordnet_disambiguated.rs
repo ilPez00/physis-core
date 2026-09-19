@@ -57,14 +57,27 @@ fn tokenize(text: &str) -> Vec<String> {
 /// genuine English keyword-lists will match at a high rate even without
 /// full sentence grammar.
 fn wordnet_coverage_fraction(wn: &WordNet, words: &[String]) -> f32 {
-    if words.is_empty() { return 0.0; }
-    let hits = words.iter().filter(|w| {
-        wn.lemma_exists(Pos::Noun, w) || wn.lemma_exists(Pos::Verb, w) || wn.lemma_exists(Pos::Adj, w) || wn.lemma_exists(Pos::Adv, w)
-    }).count();
+    if words.is_empty() {
+        return 0.0;
+    }
+    let hits = words
+        .iter()
+        .filter(|w| {
+            wn.lemma_exists(Pos::Noun, w)
+                || wn.lemma_exists(Pos::Verb, w)
+                || wn.lemma_exists(Pos::Adj, w)
+                || wn.lemma_exists(Pos::Adv, w)
+        })
+        .count();
     hits as f32 / words.len() as f32
 }
 
-struct Anchor { word: String, sense_count: usize, chosen_gloss: String, parent: String }
+struct Anchor {
+    word: String,
+    sense_count: usize,
+    chosen_gloss: String,
+    parent: String,
+}
 
 /// Disambiguated word discovery: for ambiguous words, the embedder picks
 /// whichever WordNet sense's gloss best matches a LOCAL context window
@@ -87,9 +100,13 @@ fn wordnet_anchors_disambiguated(
     let mut seen_parents = std::collections::HashSet::new();
     let mut out = Vec::new();
     for (idx, w) in words.iter().enumerate() {
-        if !wn.lemma_exists(Pos::Noun, w) { continue; }
+        if !wn.lemma_exists(Pos::Noun, w) {
+            continue;
+        }
         let offsets = wn.synsets_for_lemma(Pos::Noun, w);
-        if offsets.is_empty() { continue; }
+        if offsets.is_empty() {
+            continue;
+        }
 
         let chosen = if offsets.len() == 1 {
             offsets[0]
@@ -97,21 +114,45 @@ fn wordnet_anchors_disambiguated(
             let start = idx.saturating_sub(2);
             let end = (idx + 3).min(words.len());
             let window = words[start..end].join(" ");
-            let window_embedding = window_cache.entry(window.clone()).or_insert_with(|| embed(&window)).clone();
+            let window_embedding = window_cache
+                .entry(window.clone())
+                .or_insert_with(|| embed(&window))
+                .clone();
             // Disambiguate: pick the sense whose gloss is most similar to the LOCAL window.
-            offsets.iter().copied().max_by(|&a, &b| {
-                let sim_a = gloss_similarity(wn, a, &window_embedding, embed, gloss_cache, w);
-                let sim_b = gloss_similarity(wn, b, &window_embedding, embed, gloss_cache, w);
-                sim_a.partial_cmp(&sim_b).unwrap()
-            }).unwrap()
+            offsets
+                .iter()
+                .copied()
+                .max_by(|&a, &b| {
+                    let sim_a = gloss_similarity(wn, a, &window_embedding, embed, gloss_cache, w);
+                    let sim_b = gloss_similarity(wn, b, &window_embedding, embed, gloss_cache, w);
+                    sim_a.partial_cmp(&sim_b).unwrap()
+                })
+                .unwrap()
         };
 
-        let Some(synset) = wn.get_synset(chosen) else { continue };
-        let Some(ptr) = synset.pointers.iter().find(|p| p.symbol == "@") else { continue };
-        let Some(parent_synset) = wn.get_synset(ptr.target) else { continue };
-        let Some(parent) = parent_synset.words.first().map(|l| l.text.replace('_', " ")) else { continue };
+        let Some(synset) = wn.get_synset(chosen) else {
+            continue;
+        };
+        let Some(ptr) = synset.pointers.iter().find(|p| p.symbol == "@") else {
+            continue;
+        };
+        let Some(parent_synset) = wn.get_synset(ptr.target) else {
+            continue;
+        };
+        let Some(parent) = parent_synset
+            .words
+            .first()
+            .map(|l| l.text.replace('_', " "))
+        else {
+            continue;
+        };
         if seen_parents.insert(parent.clone()) {
-            out.push(Anchor { word: w.clone(), sense_count: offsets.len(), chosen_gloss: synset.gloss.definition.to_string(), parent });
+            out.push(Anchor {
+                word: w.clone(),
+                sense_count: offsets.len(),
+                chosen_gloss: synset.gloss.definition.to_string(),
+                parent,
+            });
         }
     }
     out
@@ -119,7 +160,9 @@ fn wordnet_anchors_disambiguated(
 
 #[cfg(feature = "embed-onnx")]
 fn gloss_similarity(
-    wn: &WordNet, id: SynsetId, entry_embedding: &[f32],
+    wn: &WordNet,
+    id: SynsetId,
+    entry_embedding: &[f32],
     embed: &mut impl FnMut(&str) -> Vec<f32>,
     gloss_cache: &mut HashMap<(String, u32), Vec<f32>>,
     word: &str,
@@ -128,7 +171,9 @@ fn gloss_similarity(
     if let Some(cached) = gloss_cache.get(&key) {
         return cosine_sim(entry_embedding, cached);
     }
-    let Some(synset) = wn.get_synset(id) else { return f32::NEG_INFINITY };
+    let Some(synset) = wn.get_synset(id) else {
+        return f32::NEG_INFINITY;
+    };
     let gloss_emb = embed(synset.gloss.definition);
     let sim = cosine_sim(entry_embedding, &gloss_emb);
     gloss_cache.insert(key, gloss_emb);
@@ -138,27 +183,58 @@ fn gloss_similarity(
 fn main() {
     println!("Experiment 23: WordNet discovery, fixed — language detection + gloss-based sense disambiguation\n");
 
-    let wn_dir = ["models/wordnet", "../models/wordnet"].iter().find(|d| std::path::Path::new(d).join("data.noun").exists());
-    let wn_dir = match wn_dir { Some(d) => *d, None => { println!("WARNING: WordNet data not found — aborting."); return; } };
-    let wn = match WordNet::load(wn_dir) { Ok(wn) => wn, Err(e) => { println!("WARNING: failed to load WordNet: {e} — aborting."); return; } };
+    let wn_dir = ["models/wordnet", "../models/wordnet"]
+        .iter()
+        .find(|d| std::path::Path::new(d).join("data.noun").exists());
+    let wn_dir = match wn_dir {
+        Some(d) => *d,
+        None => {
+            println!("WARNING: WordNet data not found — aborting.");
+            return;
+        }
+    };
+    let wn = match WordNet::load(wn_dir) {
+        Ok(wn) => wn,
+        Err(e) => {
+            println!("WARNING: failed to load WordNet: {e} — aborting.");
+            return;
+        }
+    };
     println!("Loaded WordNet: {} noun index entries.\n", wn.index_count());
 
     #[cfg(feature = "embed-onnx")]
     {
         use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
-        let minilm_dir = ["models", "../models"].iter().find(|d| std::path::Path::new(d).join("model.onnx").exists());
-        let minilm = match minilm_dir.map(|dir| OnnxEmbedder::with_config(&OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), pooling: PoolingStrategy::Mean, ..OnnxConfig::default() })) {
+        let minilm_dir = ["models", "../models"]
+            .iter()
+            .find(|d| std::path::Path::new(d).join("model.onnx").exists());
+        let minilm = match minilm_dir.map(|dir| {
+            OnnxEmbedder::with_config(&OnnxConfig {
+                dim: 384,
+                model_dir: Some(dir.to_string()),
+                pooling: PoolingStrategy::Mean,
+                ..OnnxConfig::default()
+            })
+        }) {
             Some(e) if e.is_available() => e,
-            _ => { println!("WARNING: MiniLM not available — aborting."); return; }
+            _ => {
+                println!("WARNING: MiniLM not available — aborting.");
+                return;
+            }
         };
         let mut embed_fn = |t: &str| minilm.embed(t);
 
         let ontology = OntologyLoader::load_all();
         let mut texts = Vec::new();
         for def in ontology.classification_domains() {
-            if def.domain.is_none() || def.mode.is_none() { continue; }
+            if def.domain.is_none() || def.mode.is_none() {
+                continue;
+            }
             let mut text = def.name.clone();
-            for hint in &def.hints { text.push(' '); text.push_str(hint); }
+            for hint in &def.hints {
+                text.push(' ');
+                text.push_str(hint);
+            }
             texts.push(text);
         }
         let n = texts.len();
@@ -166,35 +242,73 @@ fn main() {
 
         // ── Fix 1: language detection, WordNet-self-referential heuristic ──
         let tokens_per_entry: Vec<Vec<String>> = texts.iter().map(|t| tokenize(t)).collect();
-        let coverage: Vec<f32> = tokens_per_entry.iter().map(|w| wordnet_coverage_fraction(&wn, w)).collect();
+        let coverage: Vec<f32> = tokens_per_entry
+            .iter()
+            .map(|w| wordnet_coverage_fraction(&wn, w))
+            .collect();
         println!("=== Diagnostic: WordNet-coverage-fraction distribution, before picking a threshold ===");
         for t in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7] {
             let above = coverage.iter().filter(|&&c| c >= t).count();
-            println!("  threshold={t:.1}: {above}/{n} entries ({:.1}%) pass", 100.0 * above as f32 / n as f32);
+            println!(
+                "  threshold={t:.1}: {above}/{n} entries ({:.1}%) pass",
+                100.0 * above as f32 / n as f32
+            );
         }
         // Spot-check known cases from Iteration 22/23's first attempt to pick a threshold
         // that separates them correctly, rather than guessing.
         for (i, t) in texts.iter().enumerate() {
-            if t.starts_with("Cura e Terapia") || t.starts_with("Rest & Recovery") || t.starts_with("Workshop & Tools") {
-                println!("  known case '{}...': coverage={:.3}", t.chars().take(30).collect::<String>(), coverage[i]);
+            if t.starts_with("Cura e Terapia")
+                || t.starts_with("Rest & Recovery")
+                || t.starts_with("Workshop & Tools")
+            {
+                println!(
+                    "  known case '{}...': coverage={:.3}",
+                    t.chars().take(30).collect::<String>(),
+                    coverage[i]
+                );
             }
         }
         let threshold = 0.4;
         let english_flags: Vec<bool> = coverage.iter().map(|&c| c >= threshold).collect();
         let n_english = english_flags.iter().filter(|&&b| b).count();
         println!("\n=== Language detection (chosen threshold={threshold:.1}) ===");
-        println!("{n_english}/{n} entries ({:.1}%) pass the WordNet-coverage bar.", 100.0 * n_english as f32 / n as f32);
+        println!(
+            "{n_english}/{n} entries ({:.1}%) pass the WordNet-coverage bar.",
+            100.0 * n_english as f32 / n as f32
+        );
         println!("{} entries excluded from WordNet anchoring as insufficiently English-lexical (not forced through an English-only lexicon).\n", n - n_english);
-        let excluded_examples: Vec<&str> = texts.iter().zip(&english_flags).filter(|(_, &e)| !e).map(|(t, _)| t.as_str()).take(8).collect();
-        println!("Examples of excluded entries: {:?}\n", excluded_examples.iter().map(|s| s.chars().take(40).collect::<String>()).collect::<Vec<_>>());
+        let excluded_examples: Vec<&str> = texts
+            .iter()
+            .zip(&english_flags)
+            .filter(|(_, &e)| !e)
+            .map(|(t, _)| t.as_str())
+            .take(8)
+            .collect();
+        println!(
+            "Examples of excluded entries: {:?}\n",
+            excluded_examples
+                .iter()
+                .map(|s| s.chars().take(40).collect::<String>())
+                .collect::<Vec<_>>()
+        );
 
         // ── Fix 2: gloss-based disambiguation using a LOCAL context window, only for English entries ──
         let mut gloss_cache: HashMap<(String, u32), Vec<f32>> = HashMap::new();
         let mut window_cache: HashMap<String, Vec<f32>> = HashMap::new();
-        let anchors: Vec<Vec<Anchor>> = (0..n).map(|i| {
-            if !english_flags[i] { return Vec::new(); }
-            wordnet_anchors_disambiguated(&wn, &tokens_per_entry[i], &mut embed_fn, &mut gloss_cache, &mut window_cache)
-        }).collect();
+        let anchors: Vec<Vec<Anchor>> = (0..n)
+            .map(|i| {
+                if !english_flags[i] {
+                    return Vec::new();
+                }
+                wordnet_anchors_disambiguated(
+                    &wn,
+                    &tokens_per_entry[i],
+                    &mut embed_fn,
+                    &mut gloss_cache,
+                    &mut window_cache,
+                )
+            })
+            .collect();
 
         let with_anchor = (0..n).filter(|&i| !anchors[i].is_empty()).count();
         println!("=== Disambiguated word discovery coverage ===");
@@ -207,14 +321,27 @@ fn main() {
             if t.starts_with("Volunteering") || t.starts_with("Self-Tracking") {
                 println!("\n'{}':", t.chars().take(50).collect::<String>());
                 for a in &anchors[i] {
-                    let flag = if checks.contains(&a.word.as_str()) { " <-- was WRONG in Iteration 22, check now" } else { "" };
-                    println!("  {} ({} senses) -> parent='{}' gloss=\"{}\"{}", a.word, a.sense_count, a.parent, a.chosen_gloss.chars().take(60).collect::<String>(), flag);
+                    let flag = if checks.contains(&a.word.as_str()) {
+                        " <-- was WRONG in Iteration 22, check now"
+                    } else {
+                        ""
+                    };
+                    println!(
+                        "  {} ({} senses) -> parent='{}' gloss=\"{}\"{}",
+                        a.word,
+                        a.sense_count,
+                        a.parent,
+                        a.chosen_gloss.chars().take(60).collect::<String>(),
+                        flag
+                    );
                 }
             }
         }
         println!("\n=== Debug: all candidate senses for 'log' in the Self-Tracking entry, with LOCAL-WINDOW scores ===");
         for (i, t) in texts.iter().enumerate() {
-            if !t.starts_with("Self-Tracking") { continue; }
+            if !t.starts_with("Self-Tracking") {
+                continue;
+            }
             let toks = &tokens_per_entry[i];
             if let Some(idx) = toks.iter().position(|w| w == "log") {
                 let start = idx.saturating_sub(2);
@@ -225,16 +352,28 @@ fn main() {
                 let offsets = wn.synsets_for_lemma(Pos::Noun, "log");
                 for &id in offsets {
                     if let Some(synset) = wn.get_synset(id) {
-                        let sim = gloss_similarity(&wn, id, &window_embedding, &mut embed_fn, &mut gloss_cache, "log");
+                        let sim = gloss_similarity(
+                            &wn,
+                            id,
+                            &window_embedding,
+                            &mut embed_fn,
+                            &mut gloss_cache,
+                            "log",
+                        );
                         println!("  sim={sim:.3}  \"{}\"", synset.gloss.definition);
                     }
                 }
             }
         }
 
-        println!("\n=== Italian-text false positives from Iteration 22 — now correctly excluded? ===");
+        println!(
+            "\n=== Italian-text false positives from Iteration 22 — now correctly excluded? ==="
+        );
         for (i, t) in texts.iter().enumerate() {
-            if t.starts_with("Cura e Terapia") || t.starts_with("Pianificazione Strategica") || t.starts_with("Montaggio e Installazione") {
+            if t.starts_with("Cura e Terapia")
+                || t.starts_with("Pianificazione Strategica")
+                || t.starts_with("Montaggio e Installazione")
+            {
                 println!("  '{}' -> detected as English: {} (Iteration 22 wrongly matched 'con'/'piano'/'trave' as English words here)", t.chars().take(50).collect::<String>(), english_flags[i]);
             }
         }

@@ -40,7 +40,11 @@ use std::collections::HashMap;
 fn centroid(embeddings: &[&Vec<f32>]) -> Vec<f32> {
     let dim = embeddings[0].len();
     let mut sum = vec![0.0f32; dim];
-    for e in embeddings { for d in 0..dim { sum[d] += e[d]; } }
+    for e in embeddings {
+        for d in 0..dim {
+            sum[d] += e[d];
+        }
+    }
     let norm: f32 = sum.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
     sum.iter().map(|x| x / norm).collect()
 }
@@ -54,7 +58,12 @@ struct Report {
     negative_margin_frac: f32,
 }
 
-fn evaluate(name: &'static str, embeddings: &[Vec<f32>], labels: &[usize], n_classes: usize) -> Report {
+fn evaluate(
+    name: &'static str,
+    embeddings: &[Vec<f32>],
+    labels: &[usize],
+    n_classes: usize,
+) -> Report {
     let n = embeddings.len();
     let dim = embeddings[0].len();
 
@@ -63,28 +72,45 @@ fn evaluate(name: &'static str, embeddings: &[Vec<f32>], labels: &[usize], n_cla
     for i in 0..n {
         let (mut best_j, mut best_sim) = (0usize, f32::NEG_INFINITY);
         for j in 0..n {
-            if i == j { continue; }
+            if i == j {
+                continue;
+            }
             let s = cosine_sim(&embeddings[i], &embeddings[j]);
-            if s > best_sim { best_sim = s; best_j = j; }
+            if s > best_sim {
+                best_sim = s;
+                best_j = j;
+            }
         }
-        if labels[best_j] == labels[i] { loo_hits += 1; }
+        if labels[best_j] == labels[i] {
+            loo_hits += 1;
+        }
     }
     let loo_1nn_acc = loo_hits as f32 / n as f32;
 
     // Centroid-argmax + margin (Iteration 15's methodology, verbatim).
-    let centroids: Vec<Vec<f32>> = (0..n_classes).map(|c| {
-        let members: Vec<&Vec<f32>> = (0..n).filter(|&i| labels[i] == c).map(|i| &embeddings[i]).collect();
-        centroid(&members)
-    }).collect();
+    let centroids: Vec<Vec<f32>> = (0..n_classes)
+        .map(|c| {
+            let members: Vec<&Vec<f32>> = (0..n)
+                .filter(|&i| labels[i] == c)
+                .map(|i| &embeddings[i])
+                .collect();
+            centroid(&members)
+        })
+        .collect();
     let mut argmax_hits = 0usize;
     let mut total_margin = 0.0f32;
     for i in 0..n {
         let own = labels[i];
         let own_sim = cosine_sim(&embeddings[i], &centroids[own]);
-        let (best_class, best_sim) = (0..n_classes).map(|c| (c, cosine_sim(&embeddings[i], &centroids[c])))
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap();
-        if best_class == own { argmax_hits += 1; }
-        let second_best = (0..n_classes).filter(|&c| c != own)
+        let (best_class, best_sim) = (0..n_classes)
+            .map(|c| (c, cosine_sim(&embeddings[i], &centroids[c])))
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .unwrap();
+        if best_class == own {
+            argmax_hits += 1;
+        }
+        let second_best = (0..n_classes)
+            .filter(|&c| c != own)
             .map(|c| cosine_sim(&embeddings[i], &centroids[c]))
             .fold(f32::NEG_INFINITY, f32::max);
         total_margin += own_sim - second_best;
@@ -92,16 +118,23 @@ fn evaluate(name: &'static str, embeddings: &[Vec<f32>], labels: &[usize], n_cla
     }
 
     Report {
-        name, dim,
+        name,
+        dim,
         loo_1nn_acc,
         centroid_argmax_acc: argmax_hits as f32 / n as f32,
         mean_margin: total_margin / n as f32,
-        negative_margin_frac: (0..n).filter(|&i| {
-            let own = labels[i];
-            let own_sim = cosine_sim(&embeddings[i], &centroids[own]);
-            let second_best = (0..n_classes).filter(|&c| c != own).map(|c| cosine_sim(&embeddings[i], &centroids[c])).fold(f32::NEG_INFINITY, f32::max);
-            own_sim - second_best < 0.0
-        }).count() as f32 / n as f32,
+        negative_margin_frac: (0..n)
+            .filter(|&i| {
+                let own = labels[i];
+                let own_sim = cosine_sim(&embeddings[i], &centroids[own]);
+                let second_best = (0..n_classes)
+                    .filter(|&c| c != own)
+                    .map(|c| cosine_sim(&embeddings[i], &centroids[c]))
+                    .fold(f32::NEG_INFINITY, f32::max);
+                own_sim - second_best < 0.0
+            })
+            .count() as f32
+            / n as f32,
     }
 }
 
@@ -122,28 +155,74 @@ fn main() {
         let mut texts = Vec::new();
         let mut domains = Vec::new();
         for def in ontology.classification_domains() {
-            let (Some(d), Some(_m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(_m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut text = def.name.clone();
-            for hint in &def.hints { text.push(' '); text.push_str(hint); }
+            for hint in &def.hints {
+                text.push(' ');
+                text.push_str(hint);
+            }
             texts.push(text);
             domains.push(d.clone());
         }
         let mut domain_ids: HashMap<String, usize> = HashMap::new();
-        let labels: Vec<usize> = domains.iter().map(|d| { let next = domain_ids.len(); *domain_ids.entry(d.clone()).or_insert(next) }).collect();
+        let labels: Vec<usize> = domains
+            .iter()
+            .map(|d| {
+                let next = domain_ids.len();
+                *domain_ids.entry(d.clone()).or_insert(next)
+            })
+            .collect();
         let n_classes = domain_ids.len();
-        println!("Loaded {} real ontology entries, {} domain classes.\n", texts.len(), n_classes);
+        println!(
+            "Loaded {} real ontology entries, {} domain classes.\n",
+            texts.len(),
+            n_classes
+        );
 
         // ── MiniLM (384-d, mean pooling) — the baseline used throughout Iterations 1-17 ──
-        let minilm_dir = ["models", "../models"].iter().find(|d| std::path::Path::new(d).join("model.onnx").exists());
-        let minilm = minilm_dir.map(|dir| OnnxEmbedder::with_config(&OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), pooling: PoolingStrategy::Mean, ..OnnxConfig::default() }));
+        let minilm_dir = ["models", "../models"]
+            .iter()
+            .find(|d| std::path::Path::new(d).join("model.onnx").exists());
+        let minilm = minilm_dir.map(|dir| {
+            OnnxEmbedder::with_config(&OnnxConfig {
+                dim: 384,
+                model_dir: Some(dir.to_string()),
+                pooling: PoolingStrategy::Mean,
+                ..OnnxConfig::default()
+            })
+        });
 
         // ── BGE-base (768-d), tested with BOTH pooling formats ──
-        let bge_dir = ["models/bge-base-en-v1.5", "../models/bge-base-en-v1.5"].iter().find(|d| std::path::Path::new(d).join("onnx/model.onnx").exists());
-        let bge_mean = bge_dir.map(|dir| OnnxEmbedder::with_config(&OnnxConfig { dim: 768, model_dir: Some(dir.to_string()), pooling: PoolingStrategy::Mean, ..OnnxConfig::default() }));
-        let bge_cls = bge_dir.map(|dir| OnnxEmbedder::with_config(&OnnxConfig { dim: 768, model_dir: Some(dir.to_string()), pooling: PoolingStrategy::Cls, ..OnnxConfig::default() }));
+        let bge_dir = ["models/bge-base-en-v1.5", "../models/bge-base-en-v1.5"]
+            .iter()
+            .find(|d| std::path::Path::new(d).join("onnx/model.onnx").exists());
+        let bge_mean = bge_dir.map(|dir| {
+            OnnxEmbedder::with_config(&OnnxConfig {
+                dim: 768,
+                model_dir: Some(dir.to_string()),
+                pooling: PoolingStrategy::Mean,
+                ..OnnxConfig::default()
+            })
+        });
+        let bge_cls = bge_dir.map(|dir| {
+            OnnxEmbedder::with_config(&OnnxConfig {
+                dim: 768,
+                model_dir: Some(dir.to_string()),
+                pooling: PoolingStrategy::Cls,
+                ..OnnxConfig::default()
+            })
+        });
 
-        println!("MiniLM available: {}", minilm.as_ref().map(|e| e.is_available()).unwrap_or(false));
-        println!("BGE available: {}\n", bge_mean.as_ref().map(|e| e.is_available()).unwrap_or(false));
+        println!(
+            "MiniLM available: {}",
+            minilm.as_ref().map(|e| e.is_available()).unwrap_or(false)
+        );
+        println!(
+            "BGE available: {}\n",
+            bge_mean.as_ref().map(|e| e.is_available()).unwrap_or(false)
+        );
 
         let mut reports = Vec::new();
 
@@ -166,12 +245,19 @@ fn main() {
             }
         }
 
-        println!("=== Comparison (Iteration 15's exact methodology, applied to 3 embedder configs) ===");
-        for r in &reports { print_report(r); }
+        println!(
+            "=== Comparison (Iteration 15's exact methodology, applied to 3 embedder configs) ==="
+        );
+        for r in &reports {
+            print_report(r);
+        }
 
         if reports.len() >= 2 {
             let minilm_r = reports.iter().find(|r| r.name.starts_with("MiniLM"));
-            let best_bge = reports.iter().filter(|r| r.name.starts_with("BGE")).max_by(|a, b| a.loo_1nn_acc.partial_cmp(&b.loo_1nn_acc).unwrap());
+            let best_bge = reports
+                .iter()
+                .filter(|r| r.name.starts_with("BGE"))
+                .max_by(|a, b| a.loo_1nn_acc.partial_cmp(&b.loo_1nn_acc).unwrap());
             if let (Some(m), Some(b)) = (minilm_r, best_bge) {
                 println!(
                     "\nBest BGE config ({}) vs MiniLM: LOO-1NN {:.3} vs {:.3} (delta {:+.3}), centroid-argmax {:.3} vs {:.3} (delta {:+.3})",
@@ -189,8 +275,13 @@ fn main() {
                     }
                 );
             }
-            if reports.iter().any(|r| r.name == "BGE-base (mean)") && reports.iter().any(|r| r.name == "BGE-base (CLS)") {
-                let mean_r = reports.iter().find(|r| r.name == "BGE-base (mean)").unwrap();
+            if reports.iter().any(|r| r.name == "BGE-base (mean)")
+                && reports.iter().any(|r| r.name == "BGE-base (CLS)")
+            {
+                let mean_r = reports
+                    .iter()
+                    .find(|r| r.name == "BGE-base (mean)")
+                    .unwrap();
                 let cls_r = reports.iter().find(|r| r.name == "BGE-base (CLS)").unwrap();
                 println!(
                     "\nPooling format check: mean={:.3} vs CLS={:.3} LOO-1NN — {} pooling is empirically better for BGE on this task (do not assume CLS is correct just because it's BGE's conventional default).",

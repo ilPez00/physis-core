@@ -68,7 +68,10 @@ fn main() {
     let mut prf_rows = Vec::new();
     for (name, rel) in [
         ("corpus.jsonl (hand)", "benchmarks/worldstate/corpus.jsonl"),
-        ("corpus-large (generated)", "benchmarks/worldstate/corpus-large.jsonl"),
+        (
+            "corpus-large (generated)",
+            "benchmarks/worldstate/corpus-large.jsonl",
+        ),
     ] {
         let (_, recs) = load(rel);
         let texts: Vec<&str> = recs.iter().map(|r| r.text.as_str()).collect();
@@ -89,7 +92,10 @@ fn main() {
     let mut ablation = Vec::new();
     for (name, rel) in [
         ("corpus.jsonl (hand)", "benchmarks/worldstate/corpus.jsonl"),
-        ("corpus-large (generated)", "benchmarks/worldstate/corpus-large.jsonl"),
+        (
+            "corpus-large (generated)",
+            "benchmarks/worldstate/corpus-large.jsonl",
+        ),
     ] {
         let (_, recs) = load(rel);
         let texts: Vec<&str> = recs.iter().map(|r| r.text.as_str()).collect();
@@ -160,7 +166,10 @@ fn main() {
         ws::score_antecedents("extracted (id)", &gold_link, arm(&id_ents), 20260914),
         ws::score_antecedents("extracted (id+cap)", &gold_link, arm(&idcap_ents), 20260914),
     ];
-    println!("\nE57 arm (entity + position + cosine), {} queries", arms[0].queries);
+    println!(
+        "\nE57 arm (entity + position + cosine), {} queries",
+        arms[0].queries
+    );
     println!("links               top1    top3    top1 95% CI");
     for a in &arms {
         println!(
@@ -170,7 +179,11 @@ fn main() {
     }
     println!("\ncost of extraction, per link source:");
     for a in arms.iter().skip(1) {
-        println!("  {:<18} {:+.3} top-1 vs gold links", a.arm, a.top1 - arms[0].top1);
+        println!(
+            "  {:<18} {:+.3} top-1 vs gold links",
+            a.arm,
+            a.top1 - arms[0].top1
+        );
     }
 
     // Per-distance for the extracted arm, so a loss is not hidden in the mean.
@@ -186,11 +199,17 @@ fn main() {
     gaps.sort();
     println!("\nextracted (id) links by distance to gold:");
     for (gap, (hit, tot)) in &gaps {
-        println!("  gap {gap:>3}  {hit}/{tot}  = {:.3}", *hit as f64 / *tot as f64);
+        println!(
+            "  gap {gap:>3}  {hit}/{tot}  = {:.3}",
+            *hit as f64 / *tot as f64
+        );
     }
 
     report.insert("corpus_sha256".into(), serde_json::Value::String(sha));
-    report.insert("embedder".into(), serde_json::Value::String(kind.to_string()));
+    report.insert(
+        "embedder".into(),
+        serde_json::Value::String(kind.to_string()),
+    );
     report.insert("min_df".into(), serde_json::json!(min_df));
     report.insert("arms".into(), serde_json::to_value(&arms).unwrap());
     report.insert(

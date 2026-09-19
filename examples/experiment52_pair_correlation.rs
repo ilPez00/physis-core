@@ -73,10 +73,14 @@ struct E52Output {
 // ==== small deterministic RNG (LCG, same family as E48–E51) ==================
 
 fn lcg(seed: &mut u64) -> u64 {
-    *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    *seed = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     *seed
 }
-fn f01(seed: &mut u64) -> f64 { (lcg(seed) >> 11) as f64 / (1u64 << 53) as f64 }
+fn f01(seed: &mut u64) -> f64 {
+    (lcg(seed) >> 11) as f64 / (1u64 << 53) as f64
+}
 
 // ==== primes sieve ===========================================================
 
@@ -84,17 +88,28 @@ fn sieve_primes(n_max: usize) -> Vec<usize> {
     let mut spf = vec![0usize; n_max + 1];
     let mut primes = Vec::new();
     for i in 2..=n_max {
-        if spf[i] == 0 { spf[i] = i; primes.push(i); }
+        if spf[i] == 0 {
+            spf[i] = i;
+            primes.push(i);
+        }
         for &p in &primes {
-            if p > spf[i] || i * p > n_max { break; }
+            if p > spf[i] || i * p > n_max {
+                break;
+            }
             spf[i * p] = p;
         }
     }
     let mut is_prime = vec![false; n_max + 1];
-    for &p in &primes { is_prime[p] = true; }
+    for &p in &primes {
+        is_prime[p] = true;
+    }
     // second pass with a classical sieve recomputes is_prime cleanly
     let mut out = Vec::new();
-    for n in 2..=n_max { if is_prime[n] { out.push(n); } }
+    for n in 2..=n_max {
+        if is_prime[n] {
+            out.push(n);
+        }
+    }
     out
 }
 
@@ -103,9 +118,14 @@ fn von_mangoldt(n_max: usize) -> Vec<f64> {
     let mut spf = vec![0usize; n_max + 1];
     let mut primes = Vec::new();
     for i in 2..=n_max {
-        if spf[i] == 0 { spf[i] = i; primes.push(i); }
+        if spf[i] == 0 {
+            spf[i] = i;
+            primes.push(i);
+        }
         for &p in &primes {
-            if p > spf[i] || i * p > n_max { break; }
+            if p > spf[i] || i * p > n_max {
+                break;
+            }
             spf[i * p] = p;
         }
     }
@@ -114,8 +134,16 @@ fn von_mangoldt(n_max: usize) -> Vec<f64> {
         let p = spf[n];
         let mut m = n;
         let mut all_same = true;
-        while m > 1 { if spf[m] != p { all_same = false; break; } m /= p; }
-        if all_same { lam[n] = (p as f64).ln(); }
+        while m > 1 {
+            if spf[m] != p {
+                all_same = false;
+                break;
+            }
+            m /= p;
+        }
+        if all_same {
+            lam[n] = (p as f64).ln();
+        }
     }
     lam
 }
@@ -166,32 +194,62 @@ fn observed_counts(gs: &[f64], kmax: usize) -> Vec<f64> {
 fn r_profile(gs: &[f64], ds: &[f64], kmax: usize) -> Vec<f64> {
     let n = observed_counts(gs, kmax);
     let e = expected_counts(ds, kmax);
-    n.iter().zip(e.iter()).map(|(&a, &b)| if b > 1e-9 { a / b } else { 0.0 }).collect()
+    n.iter()
+        .zip(e.iter())
+        .map(|(&a, &b)| if b > 1e-9 { a / b } else { 0.0 })
+        .collect()
 }
 
 /// D = RMS of (R(k) - 1) over all even k in the profile.
 fn deviation(r: &[f64]) -> f64 {
     let (mut s, mut c) = (0.0f64, 0usize);
     for &v in r {
-        if v.is_finite() { s += (v - 1.0).powi(2); c += 1; }
+        if v.is_finite() {
+            s += (v - 1.0).powi(2);
+            c += 1;
+        }
     }
-    if c == 0 { 0.0 } else { (s / c as f64).sqrt() }
+    if c == 0 {
+        0.0
+    } else {
+        (s / c as f64).sqrt()
+    }
 }
 
 /// Twin ratio R(k=2) = N(2)/E(2) — the single most famous H-L term.
-fn twin_ratio(r: &[f64]) -> f64 { if r.is_empty() { f64::NAN } else { r[0] } }
+fn twin_ratio(r: &[f64]) -> f64 {
+    if r.is_empty() {
+        f64::NAN
+    } else {
+        r[0]
+    }
+}
 
-fn mean(v: &[f64]) -> f64 { if v.is_empty() { 0.0 } else { v.iter().sum::<f64>() / v.len() as f64 } }
+fn mean(v: &[f64]) -> f64 {
+    if v.is_empty() {
+        0.0
+    } else {
+        v.iter().sum::<f64>() / v.len() as f64
+    }
+}
 
 /// Pearson correlation of two R-profiles (the π/θ vs ψ view agreement).
 fn profile_corr(a: &[f64], b: &[f64]) -> f64 {
     let n = a.len().min(b.len());
-    if n < 3 { return f64::NAN; }
-    let ma = mean(&a[..n]); let mb = mean(&b[..n]);
-    let mut num = 0.0; let mut da = 0.0; let mut db = 0.0;
+    if n < 3 {
+        return f64::NAN;
+    }
+    let ma = mean(&a[..n]);
+    let mb = mean(&b[..n]);
+    let mut num = 0.0;
+    let mut da = 0.0;
+    let mut db = 0.0;
     for k in 0..n {
-        let x = a[k] - ma; let y = b[k] - mb;
-        num += x * y; da += x * x; db += y * y;
+        let x = a[k] - ma;
+        let y = b[k] - mb;
+        num += x * y;
+        da += x * x;
+        db += y * y;
     }
     num / (da * db).max(1e-12).sqrt()
 }
@@ -202,7 +260,9 @@ fn profile_corr(a: &[f64], b: &[f64]) -> f64 {
 fn cramer_gap_deviation(lo: usize, hi: usize, kmax: usize, seed: &mut u64) -> f64 {
     let mut jumps = Vec::new();
     for x in lo..=hi {
-        if f01(seed) < 1.0 / (x as f64).ln() { jumps.push(x); }
+        if f01(seed) < 1.0 / (x as f64).ln() {
+            jumps.push(x);
+        }
     }
     let (gs, ds) = gaps_and_density(&jumps);
     deviation(&r_profile(&gs, &ds, kmax))
@@ -215,7 +275,9 @@ fn geometric_gap_deviation(ds: &[f64], kmax: usize, seed: &mut u64) -> f64 {
         let q = 1.0 / d;
         // geometric in 1.. ; number of trials until first "success"
         let mut x = 1.0f64;
-        while f01(seed) > q { x += 1.0; }
+        while f01(seed) > q {
+            x += 1.0;
+        }
         gs.push(x);
     }
     deviation(&r_profile(&gs, ds, kmax))
@@ -236,7 +298,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hi_disc = n_max / 2;
 
     let primes = sieve_primes(n_max);
-    let disc_primes: Vec<usize> = primes.iter().cloned().filter(|&p| p > 20 && p <= hi_disc).collect();
+    let disc_primes: Vec<usize> = primes
+        .iter()
+        .cloned()
+        .filter(|&p| p > 20 && p <= hi_disc)
+        .collect();
     let hold_primes: Vec<usize> = primes.iter().cloned().filter(|&p| p > hi_disc).collect();
 
     // pi / theta view: consecutive-prime gaps (theta jumps exactly at primes)
@@ -249,40 +315,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let d_hold = deviation(&r_hold);
     let r2_disc = twin_ratio(&r_disc);
     let r2_hold = twin_ratio(&r_hold);
-    println!("pi/theta view | discovery D={:.3} twin R2={:.3} | held-out D={:.3} twin R2={:.3}",
-        d_disc, r2_disc, d_hold, r2_hold);
+    println!(
+        "pi/theta view | discovery D={:.3} twin R2={:.3} | held-out D={:.3} twin R2={:.3}",
+        d_disc, r2_disc, d_hold, r2_hold
+    );
 
     // psi / von-Mangoldt view: jumps at primes AND prime powers (strict superset)
     let lam = von_mangoldt(n_max);
-    let disc_jumps: Vec<usize> = (2..=n_max).filter(|&x| lam[x] != 0.0 && x > 20 && x <= hi_disc).collect();
+    let disc_jumps: Vec<usize> = (2..=n_max)
+        .filter(|&x| lam[x] != 0.0 && x > 20 && x <= hi_disc)
+        .collect();
     let (g_psi_d, d_psi_d) = gaps_and_density(&disc_jumps);
     let r_psi_disc = r_profile(&g_psi_d, &d_psi_d, kmax);
     let view_corr = profile_corr(&r_disc, &r_psi_disc);
-    println!("psi(jumps) view | discovery R(2)={:.3} | pi<->psi profile corr={:.3}",
-        twin_ratio(&r_psi_disc), view_corr);
+    println!(
+        "psi(jumps) view | discovery R(2)={:.3} | pi<->psi profile corr={:.3}",
+        twin_ratio(&r_psi_disc),
+        view_corr
+    );
 
     // independence nulls on the discovery block
     let d_cramer = cramer_gap_deviation(20, hi_disc, kmax, &mut seed);
     let d_geo = geometric_gap_deviation(&disc.1, kmax, &mut seed);
     let nulls = vec![d_cramer, d_geo];
     let max_null = nulls.iter().cloned().fold(f64::MIN, f64::max);
-    println!("null deviations (Cramer, geometric): ({:.3}, {:.3})", nulls[0], nulls[1]);
-// ---- pre-frozen gates ----
+    println!(
+        "null deviations (Cramer, geometric): ({:.3}, {:.3})",
+        nulls[0], nulls[1]
+    );
+    // ---- pre-frozen gates ----
     // specificity: discovery D strictly above the worst null by a 1.5x factor
     let specific = d_disc > 1.5 * max_null.max(1e-6);
     // held-out: second half reproduces the discovery deviation within 50%,
     //           and the twin excess is present (>1) in BOTH halves
-    let ho = (d_hold - d_disc).abs() <= 0.5 * d_disc
-        && r2_disc > 1.0
-        && r2_hold > 1.0;
+    let ho = (d_hold - d_disc).abs() <= 0.5 * d_disc && r2_disc > 1.0 && r2_hold > 1.0;
     let survives = specific && ho;
 
     let verdict = if survives {
         "PARTIAL-POSITIVE — the Hardy-Littlewood small-gap correction is strongly arithmetic-specific (discovery D ~12x above every independence null: Cramer 0.10, geometric 0.10) AND out-of-sample stable (the held-out half reproduces the frozen discovery deviation; twin-ratio > 1 in BOTH halves). This is the first object-level property in the E50/E51 line that is BOTH strongly prime-specific AND out-of-sample stable. Caveat, not a discovery: the pi/theta and psi views count the same primes, so 'representation-covariant' here only asserts every counting-function view recovers the identical law — the substantive win is specificity + stability, which E50/E51's framework demanded but could not find at the geometric or cumulative-distribution levels.".to_string()
     } else {
         let mut r = Vec::new();
-        if !specific { r.push("no deviation above the independence nulls (D not specific)"); }
-        if !ho { r.push("held-out does not reproduce the discovery deviation"); }
+        if !specific {
+            r.push("no deviation above the independence nulls (D not specific)");
+        }
+        if !ho {
+            r.push("held-out does not reproduce the discovery deviation");
+        }
         format!("FAILED — {}. No representation-covariant arithmetic law is supported at this resolution.", r.join("; ") + ".")
     };
 
@@ -324,7 +402,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write_file(out_path, &serde_json::to_string_pretty(&out).unwrap());
     println!("\nVERDICT: {verdict}");
     println!("relation to 1/2: {rel_half}");
-    println!("survives={survives} | specific={specific} | held-out={ho} | nulls=({:.3}, {:.3})", d_cramer, d_geo);
+    println!(
+        "survives={survives} | specific={specific} | held-out={ho} | nulls=({:.3}, {:.3})",
+        d_cramer, d_geo
+    );
     println!("results: {}", out_path.display());
     Ok(())
 }

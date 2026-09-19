@@ -11,7 +11,9 @@ fn main() {
     let ontology = physis_core::ontology::OntologyLoader::load_all();
     let mut entries: Vec<(String, Vec<f32>)> = Vec::new();
     for def in ontology.classification_domains() {
-        let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+        let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+            continue;
+        };
         let mut text = def.name.clone();
         for hint in &def.hints {
             text.push(' ');

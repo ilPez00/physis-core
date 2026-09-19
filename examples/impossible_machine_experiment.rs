@@ -28,11 +28,10 @@ use physis_core::ontology::OntologyLoader;
 // re-declared — a second copy is the PH-012 duplication trap on purpose.
 use physis_core::machines::{Observation, ProofStatus, StructuralMachine};
 use serde::Serialize;
-use std::f64::consts::PI;
 use std::collections::BTreeMap;
+use std::f64::consts::PI;
 
 // ───────────────────────── proof-status + record types ─────────────────────────
-
 
 #[derive(Serialize, Clone)]
 struct Proposition {
@@ -45,7 +44,6 @@ struct Proposition {
     /// quarantine provenance for anomalies (mission §15): never delete
     quarantined: bool,
 }
-
 
 /// Dream output — the type system enforces mission §13: a Dream can only
 /// produce CandidateHypothesis; certification requires an apodeixis verdict.
@@ -89,15 +87,39 @@ struct C {
 }
 
 impl C {
-    fn new(re: f64, im: f64) -> Self { C { re, im } }
-    fn conj(self) -> C { C { re: self.re, im: -self.im } }
-    fn add(self, o: C) -> C { C::new(self.re + o.re, self.im + o.im) }
-    fn sub(self, o: C) -> C { C::new(self.re - o.re, self.im - o.im) }
-    fn mul(self, o: C) -> C { C::new(self.re * o.re - self.im * o.im, self.re * o.im + self.im * o.re) }
-    fn scale(self, k: f64) -> C { C::new(self.re * k, self.im * k) }
-    fn norm(self) -> f64 { (self.re * self.re + self.im * self.im).sqrt() }
-    fn arg(self) -> f64 { self.im.atan2(self.re) }
-    fn expi(t: f64) -> C { C::new(t.cos(), t.sin()) }
+    fn new(re: f64, im: f64) -> Self {
+        C { re, im }
+    }
+    fn conj(self) -> C {
+        C {
+            re: self.re,
+            im: -self.im,
+        }
+    }
+    fn add(self, o: C) -> C {
+        C::new(self.re + o.re, self.im + o.im)
+    }
+    fn sub(self, o: C) -> C {
+        C::new(self.re - o.re, self.im - o.im)
+    }
+    fn mul(self, o: C) -> C {
+        C::new(
+            self.re * o.re - self.im * o.im,
+            self.re * o.im + self.im * o.re,
+        )
+    }
+    fn scale(self, k: f64) -> C {
+        C::new(self.re * k, self.im * k)
+    }
+    fn norm(self) -> f64 {
+        (self.re * self.re + self.im * self.im).sqrt()
+    }
+    fn arg(self) -> f64 {
+        self.im.atan2(self.re)
+    }
+    fn expi(t: f64) -> C {
+        C::new(t.cos(), t.sin())
+    }
     fn powc(self, e: C) -> C {
         // principal branch: self^e = exp(e · log self)
         let ln_abs = self.norm().max(1e-300).ln();
@@ -111,7 +133,9 @@ impl C {
     }
     fn inv(self) -> C {
         let d = self.re * self.re + self.im * self.im;
-        if d < 1e-300 { return C::new(0.0, 0.0); }
+        if d < 1e-300 {
+            return C::new(0.0, 0.0);
+        }
         C::new(self.re / d, -self.im / d)
     }
 }
@@ -121,9 +145,15 @@ impl C {
 fn log_gamma(z: C) -> f64 {
     const G: f64 = 7.0;
     const COEF: [f64; 9] = [
-        0.99999999999980993, 676.5203681218851, -1259.1392167224028,
-        771.32342877765313, -176.61502916214059, 12.507343278686905,
-        -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7,
+        0.99999999999980993,
+        676.5203681218851,
+        -1259.1392167224028,
+        771.32342877765313,
+        -176.61502916214059,
+        12.507343278686905,
+        -0.13857109526572012,
+        9.9843695780195716e-6,
+        1.5056327351493116e-7,
     ];
     let zr = z.re - 1.0;
     let mut x = COEF[0];
@@ -139,8 +169,14 @@ fn log_gamma(z: C) -> f64 {
 fn chi(s: C) -> C {
     let two_pow = C::new(2.0f64.ln(), 0.0).mul(s).exp();
     let pi_pow = C::new(PI.ln(), 0.0).mul(s.sub(C::new(1.0, 0.0))).exp();
-    let sin_half = C::new(0.0, PI * s.re / 2.0).add(C::new(PI * s.im / 2.0, 0.0)).exp()
-        .sub(C::new(0.0, PI * s.re / 2.0).add(C::new(PI * s.im / 2.0, 0.0)).exp())
+    let sin_half = C::new(0.0, PI * s.re / 2.0)
+        .add(C::new(PI * s.im / 2.0, 0.0))
+        .exp()
+        .sub(
+            C::new(0.0, PI * s.re / 2.0)
+                .add(C::new(PI * s.im / 2.0, 0.0))
+                .exp(),
+        )
         .scale(0.5);
     let gamma = C::new(log_gamma(C::new(1.0 - s.re, -s.im)), 0.0).exp();
     two_pow.mul(pi_pow).mul(sin_half).mul(gamma)
@@ -153,7 +189,11 @@ fn eta(s: C, n_terms: u64) -> C {
     for n in 1..=n_terms {
         let t = C::new(-(s.re) * (n as f64).ln(), -(s.im) * (n as f64).ln());
         let term = t.exp();
-        if n % 2 == 1 { sum = sum.add(term); } else { sum = sum.sub(term); }
+        if n % 2 == 1 {
+            sum = sum.add(term);
+        } else {
+            sum = sum.sub(term);
+        }
     }
     sum
 }
@@ -183,7 +223,9 @@ fn zeta(s: C, n_terms: u64) -> C {
 fn euler_product_partial(s: C, primes: &[u64], p_max: u64) -> C {
     let mut acc = C::new(1.0, 0.0);
     for &p in primes {
-        if p > p_max { break; }
+        if p > p_max {
+            break;
+        }
         let ps = C::new(-(s.re) * (p as f64).ln(), -(s.im) * (p as f64).ln()).exp();
         acc = acc.mul(C::new(1.0, 0.0).sub(ps).inv());
     }
@@ -207,12 +249,17 @@ fn sieve(n_max: u64) -> ExactWorld {
     let n = (n_max + 1) as usize;
     let mut is_prime = vec![true; n];
     is_prime[0] = false;
-    if n > 1 { is_prime[1] = false; }
+    if n > 1 {
+        is_prime[1] = false;
+    }
     let mut p = 2usize;
     while p * p < n {
         if is_prime[p] {
             let mut m = p * p;
-            while m < n { is_prime[m] = false; m += p; }
+            while m < n {
+                is_prime[m] = false;
+                m += p;
+            }
         }
         p += 1;
     }
@@ -223,37 +270,61 @@ fn sieve(n_max: u64) -> ExactWorld {
         let q = q as usize;
         let mut m = q;
         while m < n {
-            if spf[m] == 0 { spf[m] = q as u64; }
+            if spf[m] == 0 {
+                spf[m] = q as u64;
+            }
             m += q;
         }
     }
     let mut lambda = vec![0.0f64; n];
     let mut mobius = vec![0i8; n];
-    if n > 1 { mobius[1] = 1; }
+    if n > 1 {
+        mobius[1] = 1;
+    }
     for m in 2..n {
         // factorize via spf
         let (mut mm, mut parity, mut square) = (m, 0u32, false);
         let mut first_p = 0u64;
         while mm > 1 {
             let d = spf[mm];
-            if first_p == 0 { first_p = d; }
+            if first_p == 0 {
+                first_p = d;
+            }
             let mut ex = 0u32;
-            while mm % (d as usize) == 0 { mm /= d as usize; ex += 1; }
-            if ex >= 2 { square = true; }
+            while mm % (d as usize) == 0 {
+                mm /= d as usize;
+                ex += 1;
+            }
+            if ex >= 2 {
+                square = true;
+            }
             parity += 1;
         }
-        mobius[m] = if square { 0 } else if parity % 2 == 1 { -1 } else { 1 };
+        mobius[m] = if square {
+            0
+        } else if parity % 2 == 1 {
+            -1
+        } else {
+            1
+        };
         // Λ(m) = log p iff m = p^k (single prime factor), else 0
         if first_p > 0 && square == false && {
             // single-prime test: repeated spf division reached 1 without a second prime
             let mut t = m;
-            while t % first_p as usize == 0 { t /= first_p as usize; }
+            while t % first_p as usize == 0 {
+                t /= first_p as usize;
+            }
             t == 1
         } {
             lambda[m] = (first_p as f64).ln();
         }
     }
-    ExactWorld { n_max, primes, lambda, mobius }
+    ExactWorld {
+        n_max,
+        primes,
+        lambda,
+        mobius,
+    }
 }
 
 impl ExactWorld {
@@ -263,7 +334,11 @@ impl ExactWorld {
     }
     /// θ(x) = Σ_{p ≤ x} log p — EXACT.
     fn theta(&self, x: u64) -> f64 {
-        self.primes.iter().take_while(|&&p| p <= x).map(|&p| (p as f64).ln()).sum()
+        self.primes
+            .iter()
+            .take_while(|&&p| p <= x)
+            .map(|&p| (p as f64).ln())
+            .sum()
     }
     /// π(x) — EXACT.
     fn pi(&self, x: u64) -> u64 {
@@ -273,7 +348,11 @@ impl ExactWorld {
     /// |M(x)| < √x is CONTRADICTED in the literature (Odlyzko–te Riele 1985);
     /// preserved below as a quarantined anomaly, never deleted.
     fn mertens(&self, x: u64) -> i64 {
-        self.mobius.iter().take((x + 1) as usize).map(|&m| m as i64).sum()
+        self.mobius
+            .iter()
+            .take((x + 1) as usize)
+            .map(|&m| m as i64)
+            .sum()
     }
     /// Von Mangoldt identity: log n = Σ_{d | n} Λ(d). Verified EXACTLY for all
     /// n ≤ N — a finite instance of a classical theorem.
@@ -287,7 +366,9 @@ impl ExactWorld {
                 if m % d == 0 {
                     s += self.lambda[d];
                     let e = m / d;
-                    if e != d { s += self.lambda[e]; }
+                    if e != d {
+                        s += self.lambda[e];
+                    }
                 }
                 d += 1;
             }
@@ -305,12 +386,16 @@ impl ExactWorld {
                 if m % d == 0 {
                     s += self.mobius[d] as i64;
                     let e = m / d;
-                    if e != d { s += self.mobius[e] as i64; }
+                    if e != d {
+                        s += self.mobius[e] as i64;
+                    }
                 }
                 d += 1;
             }
             let eps = if m == 1 { 1 } else { 0 };
-            if s != eps { return false; }
+            if s != eps {
+                return false;
+            }
         }
         true
     }
@@ -324,12 +409,10 @@ impl ExactWorld {
 /// treats β=1/2 as an axiom: the adversarial-zero experiment (§14) injects
 /// β ≠ 1/2 into this very layer and measures what breaks.
 const ZERO_GAMMAS: [f64; 30] = [
-    14.134725, 21.022040, 25.010858, 30.424876, 32.935062,
-    37.586178, 40.918719, 43.327073, 48.005151, 49.773832,
-    52.970321, 56.446248, 59.347044, 60.831779, 65.112544,
-    67.079811, 69.546402, 72.067158, 75.704691, 77.144840,
-    79.337375, 82.910381, 84.735493, 86.809190, 88.809111,
-    92.491899, 94.651344, 95.870634, 98.831194, 101.317851,
+    14.134725, 21.022040, 25.010858, 30.424876, 32.935062, 37.586178, 40.918719, 43.327073,
+    48.005151, 49.773832, 52.970321, 56.446248, 59.347044, 60.831779, 65.112544, 67.079811,
+    69.546402, 72.067158, 75.704691, 77.144840, 79.337375, 82.910381, 84.735493, 86.809190,
+    88.809111, 92.491899, 94.651344, 95.870634, 98.831194, 101.317851,
 ];
 
 /// One candidate zero: (β, γ). The critical line is the CONJECTURE β = 1/2.
@@ -340,7 +423,9 @@ struct Zero {
 }
 
 impl Zero {
-    fn critical(gamma: f64) -> Zero { Zero { beta: 0.5, gamma } }
+    fn critical(gamma: f64) -> Zero {
+        Zero { beta: 0.5, gamma }
+    }
 }
 
 /// Explicit formula (Guinand–Weil form, truncated at the available zeros):
@@ -399,7 +484,6 @@ struct MachineObservationOut {
     observations: Vec<Observation>,
 }
 
-
 // ───────────────────────── EUCLID — exact construction ─────────────────────────
 
 /// EUCLID (original: perception without vocabulary; primitives are conclusions,
@@ -410,7 +494,9 @@ struct MachineObservationOut {
 struct Euclid;
 
 impl StructuralMachine<RiemannWorld> for Euclid {
-    fn name(&self) -> &'static str { "euclid" }
+    fn name(&self) -> &'static str {
+        "euclid"
+    }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         let ex = sieve(w.n_exact);
         let (ok, n, worst) = ex.verify_von_mangoldt();
@@ -458,7 +544,9 @@ impl StructuralMachine<RiemannWorld> for Euclid {
 struct Logos;
 
 impl StructuralMachine<RiemannWorld> for Logos {
-    fn name(&self) -> &'static str { "logos" }
+    fn name(&self) -> &'static str {
+        "logos"
+    }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         // FE symmetry residual: |ζ(ρ)| vs |ζ(1−ρ̄)| at critical-line points.
         // For true zeros the residual should be ~0 (both ~0 — the pairing is
@@ -523,7 +611,9 @@ impl StructuralMachine<RiemannWorld> for Logos {
 struct Pythagoras;
 
 impl StructuralMachine<RiemannWorld> for Pythagoras {
-    fn name(&self) -> &'static str { "pythagoras" }
+    fn name(&self) -> &'static str {
+        "pythagoras"
+    }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         // spacing ratios (Montgomery–Dyson GUE conjecture — status HEURISTIC)
         let mut gaps: Vec<f64> = Vec::new();
@@ -538,7 +628,11 @@ impl StructuralMachine<RiemannWorld> for Pythagoras {
         // amplitude conservation: |x^ρ/ρ| + |x^{1−ρ̄}/(1−ρ̄)| exponents
         // pair-sum to x exactly — DERIVED, β-independent; the SELF-symmetry
         // happens only at β = 1/2.
-        let amp = w.zeros.iter().map(|z| z.beta.max(1.0 - z.beta)).fold(0.0f64, f64::max);
+        let amp = w
+            .zeros
+            .iter()
+            .map(|z| z.beta.max(1.0 - z.beta))
+            .fold(0.0f64, f64::max);
         vec![
             Observation {
                 machine: "pythagoras".into(),
@@ -574,7 +668,9 @@ impl StructuralMachine<RiemannWorld> for Pythagoras {
 struct Nous;
 
 impl StructuralMachine<RiemannWorld> for Nous {
-    fn name(&self) -> &'static str { "nous" }
+    fn name(&self) -> &'static str {
+        "nous"
+    }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         let ex = sieve(w.n_exact);
         let xs: Vec<u64> = w.psi_exact_at.keys().copied().collect();
@@ -584,7 +680,10 @@ impl StructuralMachine<RiemannWorld> for Nous {
             let r = psi_recon(x as f64, &w.zeros);
             let e = ex.psi(x);
             let rel = (r - e).abs() / e.max(1.0);
-            if rel > worst { worst = rel; at = x; }
+            if rel > worst {
+                worst = rel;
+                at = x;
+            }
         }
         let n_primes = ex.pi(w.n_exact);
         let compression = w.zeros.len() as f64 / n_primes as f64;
@@ -592,7 +691,10 @@ impl StructuralMachine<RiemannWorld> for Nous {
             // compression loss with the adversarial zero
             let mut zs = w.zeros.clone();
             zs.push(z);
-            zs.push(Zero { beta: 1.0 - z.beta, gamma: z.gamma }); // obligatory mirror
+            zs.push(Zero {
+                beta: 1.0 - z.beta,
+                gamma: z.gamma,
+            }); // obligatory mirror
             let mut worst_adv = 0.0f64;
             for &x in &xs {
                 let r = psi_recon(x as f64, &zs);
@@ -633,7 +735,9 @@ impl StructuralMachine<RiemannWorld> for Nous {
 struct Empedocles;
 
 impl StructuralMachine<RiemannWorld> for Empedocles {
-    fn name(&self) -> &'static str { "empedocles" }
+    fn name(&self) -> &'static str {
+        "empedocles"
+    }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         let ex = sieve(w.n_exact);
         // Strife measure: total oscillation of ψ − x across scales, normalized
@@ -685,7 +789,9 @@ impl StructuralMachine<RiemannWorld> for Empedocles {
 struct Physis;
 
 impl StructuralMachine<RiemannWorld> for Physis {
-    fn name(&self) -> &'static str { "physis" }
+    fn name(&self) -> &'static str {
+        "physis"
+    }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         let ex = sieve(w.n_exact);
         let xs: Vec<u64> = w.psi_exact_at.keys().copied().collect();
@@ -731,12 +837,16 @@ impl StructuralMachine<RiemannWorld> for Physis {
 struct Kairos;
 
 impl StructuralMachine<RiemannWorld> for Kairos {
-    fn name(&self) -> &'static str { "kairos" }
+    fn name(&self) -> &'static str {
+        "kairos"
+    }
     fn inspect(&self, w: &RiemannWorld) -> Vec<Observation> {
         let ex = sieve(w.n_exact);
         let mut pts: Vec<(f64, f64)> = Vec::new(); // (log x, log D)
         for (&x, _) in w.psi_exact_at.iter() {
-            if x < 100 { continue; }
+            if x < 100 {
+                continue;
+            }
             let r = psi_recon(x as f64, &w.zeros);
             let d = ((r - ex.psi(x)).abs() / ex.psi(x).max(1.0)).max(1e-12);
             pts.push(((x as f64).ln(), d.ln()));
@@ -744,12 +854,19 @@ impl StructuralMachine<RiemannWorld> for Kairos {
         // least-squares slope over the top half of the range (truncation floor
         // at small x)
         let half = &pts[pts.len() / 2..];
-        let (n_f, sx, sy, sxx, sxy) = (half.len() as f64,
-            half.iter().map(|p| p.0).sum::<f64>(), half.iter().map(|p| p.1).sum::<f64>(),
-            half.iter().map(|p| p.0 * p.0).sum::<f64>(), half.iter().map(|p| p.0 * p.1).sum::<f64>());
+        let (n_f, sx, sy, sxx, sxy) = (
+            half.len() as f64,
+            half.iter().map(|p| p.0).sum::<f64>(),
+            half.iter().map(|p| p.1).sum::<f64>(),
+            half.iter().map(|p| p.0 * p.0).sum::<f64>(),
+            half.iter().map(|p| p.0 * p.1).sum::<f64>(),
+        );
         let slope = (n_f * sxy - sx * sy) / (n_f * sxx - sx * sx).max(1e-12);
         // adversarial exponent
-        let adv_exp: f64 = w.adversarial_zero.map(|z| off_line_signature(&z) + 0.5).unwrap_or(0.5);
+        let adv_exp: f64 = w
+            .adversarial_zero
+            .map(|z| off_line_signature(&z) + 0.5)
+            .unwrap_or(0.5);
         vec![
             Observation {
                 machine: "kairos".into(),
@@ -788,16 +905,36 @@ struct OfflineZeroReport {
 fn offline_zero_experiment(w: &RiemannWorld) -> OfflineZeroReport {
     let adv = w.adversarial_zero.unwrap();
     let ex = sieve(w.n_exact);
-    let mirror = Zero { beta: 1.0 - adv.beta, gamma: adv.gamma };
+    let mirror = Zero {
+        beta: 1.0 - adv.beta,
+        gamma: adv.gamma,
+    };
     let mut zs = w.zeros.clone();
     zs.push(adv);
     zs.push(mirror);
-    let xs: Vec<u64> = w.psi_exact_at.keys().copied().filter(|&x| x >= 100).collect();
-    let deviation_baseline: Vec<(u64, f64)> = xs.iter()
-        .map(|&x| (x, (psi_recon(x as f64, &w.zeros) - ex.psi(x)).abs() / ex.psi(x).max(1.0)))
+    let xs: Vec<u64> = w
+        .psi_exact_at
+        .keys()
+        .copied()
+        .filter(|&x| x >= 100)
         .collect();
-    let deviation_adversarial: Vec<(u64, f64)> = xs.iter()
-        .map(|&x| (x, (psi_recon(x as f64, &zs) - ex.psi(x)).abs() / ex.psi(x).max(1.0)))
+    let deviation_baseline: Vec<(u64, f64)> = xs
+        .iter()
+        .map(|&x| {
+            (
+                x,
+                (psi_recon(x as f64, &w.zeros) - ex.psi(x)).abs() / ex.psi(x).max(1.0),
+            )
+        })
+        .collect();
+    let deviation_adversarial: Vec<(u64, f64)> = xs
+        .iter()
+        .map(|&x| {
+            (
+                x,
+                (psi_recon(x as f64, &zs) - ex.psi(x)).abs() / ex.psi(x).max(1.0),
+            )
+        })
         .collect();
     let machine_verdicts: Vec<(String, String)> = vec![
         ("euclid".into(), "SURVIVES UNCHANGED: no finite construction sees the intruder. The off-line zero produces NO contradiction inside the exact arithmetic layer — recorded as EUCLID's refusal, not as innocence".into()),
@@ -858,15 +995,35 @@ fn build_primitive_registry(embedder: &dyn physis_core::embed::VectorEmbed) -> P
     let classifier = physis_core::classify::CellClassifier::build(&ontology, embedder);
     let labels: Vec<String> = CYCLE_PRIMITIVES.iter().map(|s| s.to_string()).collect();
     let embeddings: Vec<Vec<f32>> = labels.iter().map(|l| embedder.embed(l)).collect();
-    let cell_coordinates: Vec<String> = labels.iter().map(|l| {
-        let scores = classifier.classify(&embedder.embed(l));
-        scores.first().map(|c| format!("{}/{} ({:.3})", c.domain, c.mode, c.score)).unwrap_or_default()
-    }).collect();
+    let cell_coordinates: Vec<String> = labels
+        .iter()
+        .map(|l| {
+            let scores = classifier.classify(&embedder.embed(l));
+            scores
+                .first()
+                .map(|c| format!("{}/{} ({:.3})", c.domain, c.mode, c.score))
+                .unwrap_or_default()
+        })
+        .collect();
     let n = labels.len();
-    let neighbor_matrix = (0..n).map(|i| {
-        (0..n).map(|j| if i == j { 0.0 } else { cosine_sim(&embeddings[i], &embeddings[j]) as f64 }).collect()
-    }).collect();
-    PrimitiveRegistry { labels, cell_coordinates, neighbor_matrix }
+    let neighbor_matrix = (0..n)
+        .map(|i| {
+            (0..n)
+                .map(|j| {
+                    if i == j {
+                        0.0
+                    } else {
+                        cosine_sim(&embeddings[i], &embeddings[j]) as f64
+                    }
+                })
+                .collect()
+        })
+        .collect();
+    PrimitiveRegistry {
+        labels,
+        cell_coordinates,
+        neighbor_matrix,
+    }
 }
 
 // ───────────────────────── the dream function (§13) ─────────────────────────
@@ -892,9 +1049,15 @@ fn dream(world: &RiemannWorld, registry: &PrimitiveRegistry) -> Vec<CandidateHyp
     });
     // dream 2: the cycle primitives form a tight relational bundle (recall echo)
     let n = registry.labels.len();
-    let mean_sim = (0..n).flat_map(|i| (0..n).filter(|&j| j != i)
-        .map(|j| registry.neighbor_matrix[i][j]).collect::<Vec<f64>>())
-        .sum::<f64>() / (n * (n - 1)) as f64;
+    let mean_sim = (0..n)
+        .flat_map(|i| {
+            (0..n)
+                .filter(|&j| j != i)
+                .map(|j| registry.neighbor_matrix[i][j])
+                .collect::<Vec<f64>>()
+        })
+        .sum::<f64>()
+        / (n * (n - 1)) as f64;
     out.push(CandidateHypothesis {
         id: "D2-cycle-bundle-coherence".into(),
         dream_claim: "the Riemann-cycle primitives embed as a coherent neighborhood (mean pairwise cosine {mean}) — the cycle is not an artifact of the experiment's vocabulary: the shipped ontology classifies its members into nearby cells".replace("{mean}", &format!("{mean_sim:.3}")),
@@ -924,27 +1087,84 @@ struct CompositionReport {
     formalizable: usize,
 }
 
-fn compose_machines(reports: &[MachineReport], propositions: &[Proposition]) -> Vec<CompositionReport> {
-    let get = |name: &str| reports.iter().find(|r| r.name == name).map(|r| r.observations.len()).unwrap_or(0);
+fn compose_machines(
+    reports: &[MachineReport],
+    propositions: &[Proposition],
+) -> Vec<CompositionReport> {
+    let get = |name: &str| {
+        reports
+            .iter()
+            .find(|r| r.name == name)
+            .map(|r| r.observations.len())
+            .unwrap_or(0)
+    };
     let paths = [
-        ("euclid→pythagoras→logos", vec!["euclid", "pythagoras", "logos"]),
+        (
+            "euclid→pythagoras→logos",
+            vec!["euclid", "pythagoras", "logos"],
+        ),
         ("euclid→nous→physis", vec!["euclid", "nous", "physis"]),
-        ("euclid→empedocles→physis", vec!["euclid", "empedocles", "physis"]),
+        (
+            "euclid→empedocles→physis",
+            vec!["euclid", "empedocles", "physis"],
+        ),
         ("pythagoras→logos→apodeixis", vec!["pythagoras", "logos"]),
-        ("all→physis→apodeixis", vec!["euclid", "pythagoras", "logos", "nous", "empedocles", "physis", "kairos"]),
+        (
+            "all→physis→apodeixis",
+            vec![
+                "euclid",
+                "pythagoras",
+                "logos",
+                "nous",
+                "empedocles",
+                "physis",
+                "kairos",
+            ],
+        ),
     ];
-    paths.iter().map(|(name, machines)| {
-        let touched: usize = machines.iter().map(|m| get(m)).sum();
-        let surviving = propositions.iter().filter(|p|
-            matches!(p.status, ProofStatus::Established | ProofStatus::Derived | ProofStatus::EstablishedFinite)
-            && machines.iter().any(|m| p.machines.iter().any(|pm| pm == m))).count();
-        let contradictions = propositions.iter().filter(|p| p.status == ProofStatus::Contradicted
-            && machines.iter().any(|m| p.machines.iter().any(|pm| pm == m))).count();
-        let formalizable = propositions.iter().filter(|p|
-            matches!(p.status, ProofStatus::Established | ProofStatus::Derived | ProofStatus::EstablishedFinite | ProofStatus::Conjectural)
-            && machines.iter().any(|m| p.machines.iter().any(|pm| pm == m))).count();
-        CompositionReport { path: name.to_string(), propositions_touched: touched, surviving, contradictions_generated: contradictions, formalizable }
-    }).collect()
+    paths
+        .iter()
+        .map(|(name, machines)| {
+            let touched: usize = machines.iter().map(|m| get(m)).sum();
+            let surviving = propositions
+                .iter()
+                .filter(|p| {
+                    matches!(
+                        p.status,
+                        ProofStatus::Established
+                            | ProofStatus::Derived
+                            | ProofStatus::EstablishedFinite
+                    ) && machines.iter().any(|m| p.machines.iter().any(|pm| pm == m))
+                })
+                .count();
+            let contradictions = propositions
+                .iter()
+                .filter(|p| {
+                    p.status == ProofStatus::Contradicted
+                        && machines.iter().any(|m| p.machines.iter().any(|pm| pm == m))
+                })
+                .count();
+            let formalizable = propositions
+                .iter()
+                .filter(|p| {
+                    matches!(
+                        p.status,
+                        ProofStatus::Established
+                            | ProofStatus::Derived
+                            | ProofStatus::EstablishedFinite
+                            | ProofStatus::Conjectural
+                    ) && machines.iter().any(|m| p.machines.iter().any(|pm| pm == m))
+                })
+                .count();
+            CompositionReport {
+                path: name.to_string(),
+                propositions_touched: touched,
+                surviving,
+                contradictions_generated: contradictions,
+                formalizable,
+            }
+        })
+        .collect()
 }
 
 // ───────────────────────── disagreement graph (§3/§8) ─────────────────────────
@@ -1023,26 +1243,47 @@ struct ImpossibleOutput {
 }
 
 fn write_file(path: &std::path::Path, content: &str) {
-    if let Some(p) = path.parent() { let _ = std::fs::create_dir_all(p); }
-    std::fs::write(path, content).unwrap_or_else(|e| eprintln!("warning: could not write {}: {e}", path.display()));
+    if let Some(p) = path.parent() {
+        let _ = std::fs::create_dir_all(p);
+    }
+    std::fs::write(path, content)
+        .unwrap_or_else(|e| eprintln!("warning: could not write {}: {e}", path.display()));
 }
 
 fn svg_lines(series: &[(String, Vec<(f64, f64)>)], title: &str, xlab: &str, ylab: &str) -> String {
     let mut s = format!("<svg xmlns='http://www.w3.org/2000/svg' width='720' height='480'><rect width='100%' height='100%' fill='white'/><text x='16' y='24' font-size='14' font-family='sans-serif' font-weight='bold'>{title}</text><text x='16' y='42' font-size='10' font-family='sans-serif' fill='#555'>{xlab} vs {ylab}</text>");
-    let all: Vec<(f64, f64)> = series.iter().flat_map(|(_, pts)| pts.iter().copied()).collect();
+    let all: Vec<(f64, f64)> = series
+        .iter()
+        .flat_map(|(_, pts)| pts.iter().copied())
+        .collect();
     let xmin = all.iter().map(|p| p.0).fold(f64::INFINITY, f64::min);
     let xmax = all.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max);
     let ymin = all.iter().map(|p| p.1).fold(f64::INFINITY, f64::min);
     let ymax = all.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
     const COLORS: [&str; 4] = ["#4269d0", "#c0392b", "#3ca951", "#efb118"];
     for (k, (name, pts)) in series.iter().enumerate() {
-        let path: String = pts.iter().map(|(x, y)| {
-            let px = 60.0 + (x - xmin) / (xmax - xmin + 1e-12) * 620.0;
-            let py = 430.0 - (y - ymin) / (ymax - ymin + 1e-12) * 360.0;
-            format!("{}{:.1},{:.1} ", if path_is_empty(&pts, *x) { "M" } else { "L" }, px, py)
-        }).collect();
-        s.push_str(&format!("<polyline points='{path}' fill='none' stroke='{}' stroke-width='1.6'/>", COLORS[k % COLORS.len()]));
-        s.push_str(&format!("<text x='64' y='{}' font-size='10' font-family='sans-serif' fill='{}'>— {name}</text>", 460.0 - 12.0 * k as f32, COLORS[k % COLORS.len()]));
+        let path: String = pts
+            .iter()
+            .map(|(x, y)| {
+                let px = 60.0 + (x - xmin) / (xmax - xmin + 1e-12) * 620.0;
+                let py = 430.0 - (y - ymin) / (ymax - ymin + 1e-12) * 360.0;
+                format!(
+                    "{}{:.1},{:.1} ",
+                    if path_is_empty(&pts, *x) { "M" } else { "L" },
+                    px,
+                    py
+                )
+            })
+            .collect();
+        s.push_str(&format!(
+            "<polyline points='{path}' fill='none' stroke='{}' stroke-width='1.6'/>",
+            COLORS[k % COLORS.len()]
+        ));
+        s.push_str(&format!(
+            "<text x='64' y='{}' font-size='10' font-family='sans-serif' fill='{}'>— {name}</text>",
+            460.0 - 12.0 * k as f32,
+            COLORS[k % COLORS.len()]
+        ));
     }
     s.push_str("</svg>");
     s
@@ -1097,8 +1338,13 @@ fn main() {
 
     // ── machine outputs WITHOUT the adversary (§8) ──
     let machines: Vec<Box<dyn StructuralMachine<RiemannWorld>>> = vec![
-        Box::new(Euclid), Box::new(Logos), Box::new(Pythagoras),
-        Box::new(Nous), Box::new(Empedocles), Box::new(Physis), Box::new(Kairos),
+        Box::new(Euclid),
+        Box::new(Logos),
+        Box::new(Pythagoras),
+        Box::new(Nous),
+        Box::new(Empedocles),
+        Box::new(Physis),
+        Box::new(Kairos),
     ];
     let mut reports: Vec<MachineReport> = Vec::new();
     for m in &machines {
@@ -1119,15 +1365,28 @@ fn main() {
 
     // ── §14: the off-line zero (adversarial object) — quarantined, never deleted ──
     println!("injecting adversarial zero ρ = 0.6 + 14.134725i (off the critical line)…");
-    w.adversarial_zero = Some(Zero { beta: 0.6, gamma: 14.134725 });
+    w.adversarial_zero = Some(Zero {
+        beta: 0.6,
+        gamma: 14.134725,
+    });
     let offline = offline_zero_experiment(&w);
     let adv_baseline_ratio = {
         let tail = 10.min(offline.deviation_adversarial.len());
-        let da: f64 = offline.deviation_adversarial[offline.deviation_adversarial.len() - tail..].iter().map(|p| p.1).sum::<f64>() / tail as f64;
-        let db: f64 = offline.deviation_baseline[offline.deviation_baseline.len() - tail..].iter().map(|p| p.1).sum::<f64>() / tail as f64;
+        let da: f64 = offline.deviation_adversarial[offline.deviation_adversarial.len() - tail..]
+            .iter()
+            .map(|p| p.1)
+            .sum::<f64>()
+            / tail as f64;
+        let db: f64 = offline.deviation_baseline[offline.deviation_baseline.len() - tail..]
+            .iter()
+            .map(|p| p.1)
+            .sum::<f64>()
+            / tail as f64;
         da / db.max(1e-12)
     };
-    println!("adversarial ψ-deviation / baseline ψ-deviation (top of range) = {adv_baseline_ratio:.2}");
+    println!(
+        "adversarial ψ-deviation / baseline ψ-deviation (top of range) = {adv_baseline_ratio:.2}"
+    );
 
     // ── propositions ledger (every claim exactly one status) ──
     let propositions = build_propositions(&reports, &offline, adv_baseline_ratio);
@@ -1137,18 +1396,34 @@ fn main() {
 
     // ── homologies (§11) ──
     let homologies = vec![
-        ("arithmetic: Σ_{d|n} μ(d) = [n=1]".into(), "analytic: 1/ζ(s) = Σ μ(n) n^(−s)".into(),
-         "Dirichlet series of a Dirichlet inverse IS the reciprocal".into(),
-         "inverse exists both ways (μ is the convolution inverse of 1)".into(), "established"),
-        ("FE pairing ρ ↦ 1−ρ̄".into(), "amplitude conservation |x^ρ·x^{1−ρ̄}| = x".into(),
-         "the involution acts identically on zeros and on explicit-formula terms".into(),
-         "fixed locus Re(s)=1/2 (logos)".into(), "established"),
-        ("Euler product ↔ Dirichlet series".into(), "multiplicative hinge of the Riemann cycle".into(),
-         "complete multiplicativity of n ↦ p^(−s) factors".into(),
-         "reverses exactly for Re(s) > 1; strip side conditional".into(), "established"),
-        ("von Mangoldt identity log n = Σ_{d|n} Λ(d)".into(), "ψ = x − Σ_ρ x^ρ/ρ − …".into(),
-         "the SAME divisor-sum conservation appears at n-level and at ψ-level".into(),
-         "exact at n-level; strip-level through the cycle".into(), "established"),
+        (
+            "arithmetic: Σ_{d|n} μ(d) = [n=1]".into(),
+            "analytic: 1/ζ(s) = Σ μ(n) n^(−s)".into(),
+            "Dirichlet series of a Dirichlet inverse IS the reciprocal".into(),
+            "inverse exists both ways (μ is the convolution inverse of 1)".into(),
+            "established",
+        ),
+        (
+            "FE pairing ρ ↦ 1−ρ̄".into(),
+            "amplitude conservation |x^ρ·x^{1−ρ̄}| = x".into(),
+            "the involution acts identically on zeros and on explicit-formula terms".into(),
+            "fixed locus Re(s)=1/2 (logos)".into(),
+            "established",
+        ),
+        (
+            "Euler product ↔ Dirichlet series".into(),
+            "multiplicative hinge of the Riemann cycle".into(),
+            "complete multiplicativity of n ↦ p^(−s) factors".into(),
+            "reverses exactly for Re(s) > 1; strip side conditional".into(),
+            "established",
+        ),
+        (
+            "von Mangoldt identity log n = Σ_{d|n} Λ(d)".into(),
+            "ψ = x − Σ_ρ x^ρ/ρ − …".into(),
+            "the SAME divisor-sum conservation appears at n-level and at ψ-level".into(),
+            "exact at n-level; strip-level through the cycle".into(),
+            "established",
+        ),
     ];
 
     // ── composition + disagreement + dream ──
@@ -1162,10 +1437,32 @@ fn main() {
 
     // ── metrics (§19) ──
     let n_obs: usize = reports.iter().map(|r| r.observations.len()).sum();
-    let proved = propositions.iter().filter(|p| matches!(p.status, ProofStatus::Established | ProofStatus::Derived | ProofStatus::EstablishedFinite)).count();
-    let refuted = propositions.iter().filter(|p| p.status == ProofStatus::Contradicted).count();
-    let unresolved = propositions.iter().filter(|p| matches!(p.status, ProofStatus::InsufficientData | ProofStatus::Conjectural)).count();
-    let formalizable = propositions.iter().filter(|p| !matches!(p.status, ProofStatus::Heuristic | ProofStatus::Numerical)).count();
+    let proved = propositions
+        .iter()
+        .filter(|p| {
+            matches!(
+                p.status,
+                ProofStatus::Established | ProofStatus::Derived | ProofStatus::EstablishedFinite
+            )
+        })
+        .count();
+    let refuted = propositions
+        .iter()
+        .filter(|p| p.status == ProofStatus::Contradicted)
+        .count();
+    let unresolved = propositions
+        .iter()
+        .filter(|p| {
+            matches!(
+                p.status,
+                ProofStatus::InsufficientData | ProofStatus::Conjectural
+            )
+        })
+        .count();
+    let formalizable = propositions
+        .iter()
+        .filter(|p| !matches!(p.status, ProofStatus::Heuristic | ProofStatus::Numerical))
+        .count();
     let metrics = Metrics {
         machines_active: reports.len(),
         unique_observations: n_obs,
@@ -1190,11 +1487,31 @@ fn main() {
 
     let output = ImpossibleOutput {
         layer_status_ledger: vec![
-            ("EXACT".into(), "sieve, μ, Λ, ψ, θ, π, M, convolution identities".into(), "verified by finite instance (EstablishedFinite)".into()),
-            ("SYMBOLIC".into(), "functional equation, pairing, fixed locus, explicit formula".into(), "classical theorems cited with witnesses (Established)".into()),
-            ("NUMERICAL".into(), "ζ/η evaluation, Euler product, ψ-regeneration, spacing stats".into(), "error-bounded observations (Numerical)".into()),
-            ("HEURISTIC".into(), "dream compatibility scores, GUE spacing claims".into(), "never certified — type-enforced (Heuristic)".into()),
-            ("CONJECTURAL".into(), "RH itself; zero-table β=1/2 assumption".into(), "carried explicitly; adversarially probed (Conjectural)".into()),
+            (
+                "EXACT".into(),
+                "sieve, μ, Λ, ψ, θ, π, M, convolution identities".into(),
+                "verified by finite instance (EstablishedFinite)".into(),
+            ),
+            (
+                "SYMBOLIC".into(),
+                "functional equation, pairing, fixed locus, explicit formula".into(),
+                "classical theorems cited with witnesses (Established)".into(),
+            ),
+            (
+                "NUMERICAL".into(),
+                "ζ/η evaluation, Euler product, ψ-regeneration, spacing stats".into(),
+                "error-bounded observations (Numerical)".into(),
+            ),
+            (
+                "HEURISTIC".into(),
+                "dream compatibility scores, GUE spacing claims".into(),
+                "never certified — type-enforced (Heuristic)".into(),
+            ),
+            (
+                "CONJECTURAL".into(),
+                "RH itself; zero-table β=1/2 assumption".into(),
+                "carried explicitly; adversarially probed (Conjectural)".into(),
+            ),
         ],
         machine_reports: reports,
         propositions,
@@ -1212,21 +1529,62 @@ fn main() {
         next_experiment: next_experiment.into(),
         registry,
     };
-    write_file(std::path::Path::new("research/impossible_machine/experiments/results.json"),
-        &serde_json::to_string_pretty(&output).unwrap());
+    write_file(
+        std::path::Path::new("research/impossible_machine/experiments/results.json"),
+        &serde_json::to_string_pretty(&output).unwrap(),
+    );
     // SVGs: deviation growth (log-log) — the off-line signature
     let base_series = vec![
-        ("baseline (β=1/2 table)".into(), output.offline.deviation_baseline.iter().map(|(x, d)| ((*x as f64).ln(), d.ln())).collect::<Vec<(f64, f64)>>()),
-        ("adversarial (β=0.6 + mirror)".into(), output.offline.deviation_adversarial.iter().map(|(x, d)| ((*x as f64).ln(), d.ln())).collect::<Vec<(f64, f64)>>()),
+        (
+            "baseline (β=1/2 table)".into(),
+            output
+                .offline
+                .deviation_baseline
+                .iter()
+                .map(|(x, d)| ((*x as f64).ln(), d.ln()))
+                .collect::<Vec<(f64, f64)>>(),
+        ),
+        (
+            "adversarial (β=0.6 + mirror)".into(),
+            output
+                .offline
+                .deviation_adversarial
+                .iter()
+                .map(|(x, d)| ((*x as f64).ln(), d.ln()))
+                .collect::<Vec<(f64, f64)>>(),
+        ),
     ];
-    write_file(std::path::Path::new("research/impossible_machine/visualizations/offline_signature.svg"),
-        &svg_lines(&base_series, "off-line zero signature: log|ψ_recon − ψ_exact| vs log x", "log x", "log deviation"));
-    let shape_series: Vec<(String, Vec<(f64, f64)>)> = output.shape_vector.iter()
+    write_file(
+        std::path::Path::new("research/impossible_machine/visualizations/offline_signature.svg"),
+        &svg_lines(
+            &base_series,
+            "off-line zero signature: log|ψ_recon − ψ_exact| vs log x",
+            "log x",
+            "log deviation",
+        ),
+    );
+    let shape_series: Vec<(String, Vec<(f64, f64)>)> = output
+        .shape_vector
+        .iter()
         .filter(|(m, _)| *m == "nous" || *m == "pythagoras")
-        .map(|(m, pts)| (m.clone(), pts.iter().filter_map(|(b, v)| b.parse::<f64>().ok().map(|bf| (bf, *v))).collect()))
+        .map(|(m, pts)| {
+            (
+                m.clone(),
+                pts.iter()
+                    .filter_map(|(b, v)| b.parse::<f64>().ok().map(|bf| (bf, *v)))
+                    .collect(),
+            )
+        })
         .collect();
-    write_file(std::path::Path::new("research/impossible_machine/visualizations/shape_vector.svg"),
-        &svg_lines(&shape_series, "shape vector components vs hypothetical β", "β", "component value"));
+    write_file(
+        std::path::Path::new("research/impossible_machine/visualizations/shape_vector.svg"),
+        &svg_lines(
+            &shape_series,
+            "shape vector components vs hypothetical β",
+            "β",
+            "component value",
+        ),
+    );
     println!("verdict: {verdict}");
     println!("results: research/impossible_machine/experiments/results.json");
 }
@@ -1242,7 +1600,8 @@ fn input_of(name: &str) -> String {
         "empedocles" => "ψ − x oscillation + Mertens history",
         "physis" => "all layers (cycle coherence)",
         _ => "ψ deviations across scales",
-    }.to_string()
+    }
+    .to_string()
 }
 fn operation_of(name: &str) -> String {
     match name {
@@ -1253,7 +1612,8 @@ fn operation_of(name: &str) -> String {
         "empedocles" => "Love/Strife decomposition + anomaly quarantine",
         "physis" => "cycle coherence scoring",
         _ => "scale-transition exponent estimation",
-    }.to_string()
+    }
+    .to_string()
 }
 fn gained_of(name: &str) -> String {
     match name {
@@ -1264,7 +1624,8 @@ fn gained_of(name: &str) -> String {
         "empedocles" => "the Mertens precedent: verified ≠ true",
         "physis" => "cycle emergence + its circularity risk",
         _ => "the growth exponent as the scale-surviving invariant",
-    }.to_string()
+    }
+    .to_string()
 }
 fn destroyed_of(name: &str) -> String {
     match name {
@@ -1275,7 +1636,8 @@ fn destroyed_of(name: &str) -> String {
         "empedocles" => "which zero causes which oscillation",
         "physis" => "layer provenance of coherence losses",
         _ => "absolute values (exponent only)",
-    }.to_string()
+    }
+    .to_string()
 }
 fn failure_of(name: &str) -> String {
     match name {
@@ -1286,7 +1648,8 @@ fn failure_of(name: &str) -> String {
         "empedocles" => "balance is descriptive, not prescriptive",
         "physis" => "coherence cannot eliminate (F6 circularity risk)",
         _ => "exponent estimation over finite range",
-    }.to_string()
+    }
+    .to_string()
 }
 fn equivalent_of(name: &str) -> String {
     match name {
@@ -1297,15 +1660,24 @@ fn equivalent_of(name: &str) -> String {
         "empedocles" => "empedocles reducer (Stable=+1/Anomaly=−1)",
         "physis" => "PhysisCore coherence engine + quality loop",
         _ => "chronos reducer (temporal transitions)",
-    }.to_string()
+    }
+    .to_string()
 }
 
-fn build_propositions(reports: &[MachineReport], offline: &OfflineZeroReport, adv_ratio: f64) -> Vec<Proposition> {
+fn build_propositions(
+    reports: &[MachineReport],
+    offline: &OfflineZeroReport,
+    adv_ratio: f64,
+) -> Vec<Proposition> {
     let mut v: Vec<Proposition> = Vec::new();
-    let obs = |name: &str, target: &str| reports.iter()
-        .find(|r| r.name == name)
-        .and_then(|r| r.observations.iter().find(|o| o.target == target))
-        .map(|o| o.status).unwrap_or(ProofStatus::InsufficientData);
+    let obs = |name: &str, target: &str| {
+        reports
+            .iter()
+            .find(|r| r.name == name)
+            .and_then(|r| r.observations.iter().find(|o| o.target == target))
+            .map(|o| o.status)
+            .unwrap_or(ProofStatus::InsufficientData)
+    };
     v.push(Proposition {
         id: "P1-von-mangoldt-finite".into(),
         machines: vec!["euclid".into()],
@@ -1317,7 +1689,9 @@ fn build_propositions(reports: &[MachineReport], offline: &OfflineZeroReport, ad
     v.push(Proposition {
         id: "P2-mobius-inverse".into(),
         machines: vec!["euclid".into(), "logos".into()],
-        claim: "μ is the Dirichlet inverse of 1 (Σ_{d|n} μ(d) = [n=1]); hence 1/ζ(s) = Σ μ(n)n^(−s)".into(),
+        claim:
+            "μ is the Dirichlet inverse of 1 (Σ_{d|n} μ(d) = [n=1]); hence 1/ζ(s) = Σ μ(n)n^(−s)"
+                .into(),
         status: ProofStatus::Established,
         witness: "exact finite verification + classical analytic continuation".into(),
         quarantined: false,
@@ -1411,18 +1785,32 @@ fn shape_vector_scan(w: &RiemannWorld) -> Vec<(String, Vec<(String, f64)>)> {
     // Pythagoras: off-line zero signature
     let pyth_pts: Vec<(String, f64)> = [0.40f64, 0.45, 0.49, 0.499, 0.5, 0.501, 0.51, 0.55, 0.60]
         .map(|beta| {
-            let z = Zero { beta, gamma: 14.134725 };
+            let z = Zero {
+                beta,
+                gamma: 14.134725,
+            };
             (format!("{beta:.3}"), off_line_signature(&z))
-        }).to_vec();
+        })
+        .to_vec();
     shape.push(("pythagoras".into(), pyth_pts));
     // Nous: compression loss with in-world zeros + hypothetical zero
     let nous_pts: Vec<(String, f64)> = [0.40f64, 0.45, 0.49, 0.499, 0.5, 0.501, 0.51, 0.55, 0.60]
         .map(|beta| {
-            let z = Zero { beta, gamma: 14.134725 };
+            let z = Zero {
+                beta,
+                gamma: 14.134725,
+            };
             let mut zs = zeros.clone();
             zs.push(z);
-            zs.push(Zero { beta: 1.0 - beta, gamma: 14.134725 });
-            let xs: Vec<u64> = psi_exact_at.keys().copied().filter(|&x| x >= 5000).collect();
+            zs.push(Zero {
+                beta: 1.0 - beta,
+                gamma: 14.134725,
+            });
+            let xs: Vec<u64> = psi_exact_at
+                .keys()
+                .copied()
+                .filter(|&x| x >= 5000)
+                .collect();
             let mut worst = 0.0f64;
             for x in xs {
                 let r = psi_recon(x as f64, &zs);
@@ -1430,7 +1818,8 @@ fn shape_vector_scan(w: &RiemannWorld) -> Vec<(String, Vec<(String, f64)>)> {
                 worst = worst.max((r - e).abs() / e.max(1.0));
             }
             (format!("{beta:.3}"), worst)
-        }).to_vec();
+        })
+        .to_vec();
     shape.push(("nous".into(), nous_pts));
     shape
 }

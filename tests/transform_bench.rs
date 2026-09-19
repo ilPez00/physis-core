@@ -1,8 +1,8 @@
 use physis_core::{
     models::cosine_sim,
     transform::{
-        Constraint, ConstraintKind, PatElem, PropKind, Proposition, Predicate, Transform,
-        Triple, TriplePattern, WorldState, apply, find_homomorphisms,
+        apply, find_homomorphisms, Constraint, ConstraintKind, PatElem, Predicate, PropKind,
+        Proposition, Transform, Triple, TriplePattern, WorldState,
     },
 };
 use std::collections::HashMap;
@@ -23,16 +23,12 @@ fn mycorrhiza_world() -> WorldState {
         constraints: vec![
             Constraint {
                 desc: "FUNGUS-supports-ROOT Requires support".to_string(),
-                kind: ConstraintKind::Requires {
-                    triple: t_support,
-                },
+                kind: ConstraintKind::Requires { triple: t_support },
             },
             // Second Requires so removing Exchanges is counterfactually incoherent (test 3).
             Constraint {
                 desc: "Requires ROOT-exchanges-RESOURCE".to_string(),
-                kind: ConstraintKind::Requires {
-                    triple: t_exchange,
-                },
+                kind: ConstraintKind::Requires { triple: t_exchange },
             },
         ],
     }
@@ -79,7 +75,8 @@ fn transfer_beats_similarity() {
 
     let src_text = "ROOT Exchanges RESOURCE RESOURCE flows_to FUNGUS FUNGUS Supports ROOT ROOT Requires RESOURCE";
     let true_text = "TREE Exchanges NUTRIENT NUTRIENT flows_to MYCELIUM MYCELIUM Supports TREE TREE Requires NUTRIENT";
-    let decoy_text = "ROOT Causes FUNGUS FUNGUS Causes ROOT ROOT Exchanges RESOURCE RESOURCE flows_to FUNGUS";
+    let decoy_text =
+        "ROOT Causes FUNGUS FUNGUS Causes ROOT ROOT Exchanges RESOURCE RESOURCE flows_to FUNGUS";
     let sim_true = token_overlap(src_text, true_text);
     let sim_decoy = token_overlap(src_text, decoy_text);
     assert!(
@@ -154,10 +151,7 @@ fn symbolic_rule_baseline_fails_transfer() {
                 Triple::new("TREE", Predicate::Exchanges, "NUTRIENT"),
                 "bench",
             ),
-            Proposition::observed(
-                Triple::new("NUTRIENT", flows, "MYCELIUM"),
-                "bench",
-            ),
+            Proposition::observed(Triple::new("NUTRIENT", flows, "MYCELIUM"), "bench"),
             Proposition::observed(
                 Triple::new("MYCELIUM", Predicate::Supports, "TREE"),
                 "bench",

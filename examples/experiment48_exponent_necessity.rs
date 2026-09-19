@@ -23,13 +23,20 @@ use std::collections::BTreeMap;
 
 fn sieve_primes(n: usize) -> Vec<usize> {
     let mut is_prime = vec![true; n + 1];
-    if n > 0 { is_prime[0] = false; }
-    if n > 1 { is_prime[1] = false; }
+    if n > 0 {
+        is_prime[0] = false;
+    }
+    if n > 1 {
+        is_prime[1] = false;
+    }
     let mut p = 2;
     while p * p <= n {
         if is_prime[p] {
             let mut m = p * p;
-            while m <= n { is_prime[m] = false; m += p; }
+            while m <= n {
+                is_prime[m] = false;
+                m += p;
+            }
         }
         p += 1;
     }
@@ -37,7 +44,9 @@ fn sieve_primes(n: usize) -> Vec<usize> {
 }
 
 fn li(x: f64) -> f64 {
-    if x <= 1.0 { return 0.0; }
+    if x <= 1.0 {
+        return 0.0;
+    }
     let mut s = 0.0f64;
     let mut term = x.ln();
     let mut fact = 1.0f64;
@@ -76,7 +85,11 @@ fn build_field(n_max: usize) -> ArithmeticField {
     let step = (n_max / 500).max(1);
     let mut p_idx = 0;
     for x in (1..=n_max).step_by(step) {
-        while p_idx < primes.len() && primes[p_idx] <= x { pi += 1; theta += (primes[p_idx] as f64).ln(); p_idx += 1; }
+        while p_idx < primes.len() && primes[p_idx] <= x {
+            pi += 1;
+            theta += (primes[p_idx] as f64).ln();
+            p_idx += 1;
+        }
         // psi via von Mangoldt: sum Lambda(n) for n <= x
         // Lambda(p^k) = log p; for simplicity approximate with theta
         psi = theta;
@@ -88,8 +101,15 @@ fn build_field(n_max: usize) -> ArithmeticField {
         e_theta_v.push((xf, theta - xf));
         e_psi_v.push((xf, psi - xf));
     }
-    ArithmeticField { pi: pi_v, theta: theta_v, psi: psi_v,
-        e_pi: e_pi_v, e_theta: e_theta_v, e_psi: e_psi_v, n_max }
+    ArithmeticField {
+        pi: pi_v,
+        theta: theta_v,
+        psi: psi_v,
+        e_pi: e_pi_v,
+        e_theta: e_theta_v,
+        e_psi: e_psi_v,
+        n_max,
+    }
 }
 
 // ───────────────────────── scale-space analysis ─────────────────────────
@@ -106,11 +126,16 @@ fn dfa(field: &ArithmeticField, q: f64) -> Vec<(f64, f64)> {
     let series: Vec<f64> = field.e_psi.iter().map(|(_, v)| *v).collect();
     let n = series.len();
     let cumsum: Vec<f64> = std::iter::once(0.0)
-        .chain(series.iter().scan(0.0f64, |a, &x| { *a += x; Some(*a) }))
+        .chain(series.iter().scan(0.0f64, |a, &x| {
+            *a += x;
+            Some(*a)
+        }))
         .collect();
     let mut result = Vec::new();
     for &w in &[4usize, 8, 16, 32, 64, 128, 256, 512] {
-        if w >= n { break; }
+        if w >= n {
+            break;
+        }
         let n_windows = n / w;
         let mut rms = 0.0f64;
         for i in 0..n_windows {
@@ -130,7 +155,11 @@ fn dfa(field: &ArithmeticField, q: f64) -> Vec<(f64, f64)> {
 /// Box-counting dimension: count boxes containing points at scale epsilon.
 fn box_counting(field: &ArithmeticField, eps: f64) -> usize {
     let xs: Vec<f64> = field.e_psi.iter().map(|(x, _)| x.ln()).collect();
-    let ys: Vec<f64> = field.e_psi.iter().map(|(_, v)| v / (field.n_max as f64).max(1.0).sqrt()).collect();
+    let ys: Vec<f64> = field
+        .e_psi
+        .iter()
+        .map(|(_, v)| v / (field.n_max as f64).max(1.0).sqrt())
+        .collect();
     let xmin = xs.iter().cloned().fold(f64::INFINITY, f64::min);
     let xmax = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     let ymin = ys.iter().cloned().fold(f64::INFINITY, f64::min);
@@ -146,7 +175,9 @@ fn box_counting(field: &ArithmeticField, eps: f64) -> usize {
 
 /// Correlation dimension estimate.
 fn correlation_dim(field: &ArithmeticField, r: f64) -> f64 {
-    let pts: Vec<(f64, f64)> = field.e_psi.iter()
+    let pts: Vec<(f64, f64)> = field
+        .e_psi
+        .iter()
         .map(|(x, v)| (x.ln(), *v / (field.n_max as f64).max(1.0).sqrt()))
         .collect();
     let n = pts.len();
@@ -157,11 +188,15 @@ fn correlation_dim(field: &ArithmeticField, r: f64) -> f64 {
             let dx = pts[i].0 - pts[j].0;
             let dy = pts[i].1 - pts[j].1;
             let dist = (dx * dx + dy * dy).sqrt();
-            if dist < r { count += 1; }
+            if dist < r {
+                count += 1;
+            }
             total += 1;
         }
     }
-    if total == 0 { return 0.0; }
+    if total == 0 {
+        return 0.0;
+    }
     count as f64 / total as f64
 }
 
@@ -177,14 +212,22 @@ struct NullReport {
 
 fn null_uniform(n: usize) -> Vec<(f64, f64)> {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let seed = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64;
+    let seed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos() as u64;
     let mut rng = seed;
-    (0..n).map(|i| {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-        let x = ((i as u64).wrapping_mul(1103515245).wrapping_add(12345) as f64) / (u64::MAX as f64);
-        let y = (rng as f64) / (u64::MAX as f64) * 2.0 - 1.0;
-        (x.ln().max(-10.0), y)
-    }).collect()
+    (0..n)
+        .map(|i| {
+            rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            let x = ((i as u64).wrapping_mul(1103515245).wrapping_add(12345) as f64)
+                / (u64::MAX as f64);
+            let y = (rng as f64) / (u64::MAX as f64) * 2.0 - 1.0;
+            (x.ln().max(-10.0), y)
+        })
+        .collect()
 }
 
 fn null_cramer(n: usize) -> Vec<(f64, f64)> {
@@ -193,7 +236,9 @@ fn null_cramer(n: usize) -> Vec<(f64, f64)> {
     let mut pts = Vec::new();
     let mut x = 2.0f64;
     while pts.len() < n {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let u = (rng as f64) / (u64::MAX as f64);
         let gap = -x.ln() * u.ln();
         x += gap;
@@ -209,7 +254,9 @@ fn null_surrogate(field: &ArithmeticField) -> Vec<(f64, f64)> {
     let mut rng = 9999u64;
     let mut out = Vec::new();
     for i in 0..n {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let phase = (rng as f64) / (u64::MAX as f64) * 2.0 * std::f64::consts::PI;
         out.push((field.e_psi[i].0.ln(), vals[i] * phase.cos()));
     }
@@ -241,7 +288,9 @@ fn spectral_signature(sigma: f64, t: f64, field: &ArithmeticField) -> (f64, f64,
 /// Returns a score in [0,1] — NOT optimized to peak at 1/2.
 fn compatibility(sigma: f64, field: &ArithmeticField) -> f64 {
     let mut best = 0.0f64;
-    for &t in &[14.134725, 21.022040, 25.010857, 30.424876, 32.935061, 37.586178] {
+    for &t in &[
+        14.134725, 21.022040, 25.010857, 30.424876, 32.935061, 37.586178,
+    ] {
         let (amp, _, coh) = spectral_signature(sigma, t, field);
         let score = coh / (amp + 1e-12);
         best = best.max(score);
@@ -281,8 +330,11 @@ struct NecessityOutput {
 }
 
 fn write_file(path: &std::path::Path, content: &str) {
-    if let Some(p) = path.parent() { let _ = std::fs::create_dir_all(p); }
-    std::fs::write(path, content).unwrap_or_else(|e| eprintln!("warning: could not write {}: {e}", path.display()));
+    if let Some(p) = path.parent() {
+        let _ = std::fs::create_dir_all(p);
+    }
+    std::fs::write(path, content)
+        .unwrap_or_else(|e| eprintln!("warning: could not write {}: {e}", path.display()));
 }
 
 /// Same stub as `impossible_machine_experiment`: an example whose only `main`
@@ -307,8 +359,15 @@ fn main() {
     let mut field_stats = BTreeMap::new();
     let last = field.e_psi.last().unwrap();
     field_stats.insert("e_psi_final".into(), last.1);
-    field_stats.insert("e_psi_final_normalized".into(), last.1 / (n_max as f64).sqrt());
-    println!("    E_psi({n_max}) = {:.2} (normalized: {:.4})", last.1, last.1 / (n_max as f64).sqrt());
+    field_stats.insert(
+        "e_psi_final_normalized".into(),
+        last.1 / (n_max as f64).sqrt(),
+    );
+    println!(
+        "    E_psi({n_max}) = {:.2} (normalized: {:.4})",
+        last.1,
+        last.1 / (n_max as f64).sqrt()
+    );
 
     // §2: scale-space (log scale) + §4: effective dimension, two independent estimators
     println!("[2-4] scale-space + dimension estimation (box-counting + correlation)…");
@@ -323,13 +382,20 @@ fn main() {
     }
     // slope = -d_eff via least squares
     let n_f = bc_pairs.len() as f64;
-    let (sx, sy, sxx, sxy) = bc_pairs.iter().fold((0.0, 0.0, 0.0, 0.0), |(a, b, c, d), &(x, y)| (a + x, b + y, c + x * x, d + x * y));
+    let (sx, sy, sxx, sxy) = bc_pairs
+        .iter()
+        .fold((0.0, 0.0, 0.0, 0.0), |(a, b, c, d), &(x, y)| {
+            (a + x, b + y, c + x * x, d + x * y)
+        });
     let slope_bc = (n_f * sxy - sx * sy) / (n_f * sxx - sx * sx).max(1e-12);
     let d_box = -slope_bc;
     dimension_estimates.push(DimensionEstimate {
         method: "box-counting".into(),
         d_eff: d_box,
-        scale_range: (bc_pairs.first().unwrap().0.exp(), bc_pairs.last().unwrap().0.exp()),
+        scale_range: (
+            bc_pairs.first().unwrap().0.exp(),
+            bc_pairs.last().unwrap().0.exp(),
+        ),
         scale_dependent: false,
         d_by_scale: vec![],
     });
@@ -338,13 +404,26 @@ fn main() {
     // DFA: fluctuation scaling F(w) ~ w^alpha, d_eff related to 2 - alpha (1/f noise view)
     let dfa_pairs = dfa(&field, 2.0);
     let n_d = dfa_pairs.len() as f64;
-    let (sx, sy, sxx, sxy) = dfa_pairs.iter().fold((0.0, 0.0, 0.0, 0.0), |(a, b, c, d), &(x, y)| (a + x.ln(), b + y.ln(), c + x.ln() * x.ln(), d + x.ln() * y.ln()));
+    let (sx, sy, sxx, sxy) =
+        dfa_pairs
+            .iter()
+            .fold((0.0, 0.0, 0.0, 0.0), |(a, b, c, d), &(x, y)| {
+                (
+                    a + x.ln(),
+                    b + y.ln(),
+                    c + x.ln() * x.ln(),
+                    d + x.ln() * y.ln(),
+                )
+            });
     let alpha = (n_d * sxy - sx * sy) / (n_d * sxx - sx * sx).max(1e-12);
     let d_dfa = 2.0 - alpha;
     dimension_estimates.push(DimensionEstimate {
         method: "DFA (2 - alpha)".into(),
         d_eff: d_dfa,
-        scale_range: (dfa_pairs.first().map(|p| p.0).unwrap_or(0.0), dfa_pairs.last().map(|p| p.0).unwrap_or(0.0)),
+        scale_range: (
+            dfa_pairs.first().map(|p| p.0).unwrap_or(0.0),
+            dfa_pairs.last().map(|p| p.0).unwrap_or(0.0),
+        ),
         scale_dependent: false,
         d_by_scale: vec![],
     });
@@ -354,7 +433,11 @@ fn main() {
     let cd_r = 0.1;
     let c_small = correlation_dim(&field, cd_r);
     let c_big = correlation_dim(&field, cd_r * 4.0);
-    let d_corr = if c_small > 0.0 && c_big > 0.0 { ((c_small / c_big).ln() / (cd_r / (cd_r * 4.0)).ln()).abs() } else { 0.0 };
+    let d_corr = if c_small > 0.0 && c_big > 0.0 {
+        ((c_small / c_big).ln() / (cd_r / (cd_r * 4.0)).ln()).abs()
+    } else {
+        0.0
+    };
     dimension_estimates.push(DimensionEstimate {
         method: "correlation (C(r) scaling)".into(),
         d_eff: d_corr,
@@ -375,8 +458,14 @@ fn main() {
         // cheap box-count dimension on the null
         let xs: Vec<f64> = pts.iter().map(|p| p.0).collect();
         let ys: Vec<f64> = pts.iter().map(|p| p.1).collect();
-        let (xmin, xmax) = (xs.iter().cloned().fold(f64::INFINITY, f64::min), xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max));
-        let (ymin, ymax) = (ys.iter().cloned().fold(f64::INFINITY, f64::min), ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max));
+        let (xmin, xmax) = (
+            xs.iter().cloned().fold(f64::INFINITY, f64::min),
+            xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+        );
+        let (ymin, ymax) = (
+            ys.iter().cloned().fold(f64::INFINITY, f64::min),
+            ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+        );
         let mut counts = Vec::new();
         for &k in &[1u32, 2, 3, 4] {
             let eps = 1.0 / (1 << k) as f64;
@@ -389,12 +478,24 @@ fn main() {
             counts.push((eps.ln(), (set.len() as f64).ln()));
         }
         let n_n = counts.len() as f64;
-        let (sx, sy, sxx, sxy) = counts.iter().fold((0.0, 0.0, 0.0, 0.0), |(a, b, c, d), &(x, y)| (a + x, b + y, c + x * x, d + x * y));
+        let (sx, sy, sxx, sxy) = counts
+            .iter()
+            .fold((0.0, 0.0, 0.0, 0.0), |(a, b, c, d), &(x, y)| {
+                (a + x, b + y, c + x * x, d + x * y)
+            });
         let slope = (n_n * sxy - sx * sy) / (n_n * sxx - sx * sx).max(1e-12);
         let d_null = -slope;
         let survives = (d_null - d_box).abs() > 0.15; // genuinely different from the prime field
-        println!("    {name}: d_eff = {d_null:.3} ({} prime field)", if survives { "≠" } else { "≈" });
-        null_models.push(NullReport { name: name.into(), d_eff: d_null, d_eff_ci: (d_null - 0.1, d_null + 0.1), survives });
+        println!(
+            "    {name}: d_eff = {d_null:.3} ({} prime field)",
+            if survives { "≠" } else { "≈" }
+        );
+        null_models.push(NullReport {
+            name: name.into(),
+            d_eff: d_null,
+            d_eff_ci: (d_null - 0.1, d_null + 0.1),
+            survives,
+        });
     }
 
     // §8-§13: NOW introduce zeta. sigma is an unconstrained variable over (0,1).
@@ -407,8 +508,14 @@ fn main() {
         // admissibility threshold set by the NULL distribution, not by 1/2:
         let null_compat = compatibility(0.5 + 7.3 * sigma.sin(), &field); // scrambled control
         let admissible = compat > null_compat * 1.1 && compat > 0.05;
-        if admissible { admissible_set.push(sigma); }
-        spectral_constraints.push(SpectralConstraint { sigma, compatibility: compat, admissible });
+        if admissible {
+            admissible_set.push(sigma);
+        }
+        spectral_constraints.push(SpectralConstraint {
+            sigma,
+            compatibility: compat,
+            admissible,
+        });
         sigma += 0.05;
     }
 
@@ -419,7 +526,8 @@ fn main() {
         let mean = ds.iter().sum::<f64>() / ds.len() as f64;
         ds.iter().all(|d| (d - mean).abs() < 0.5)
     };
-    let constraint_exists = !admissible_set.is_empty() && admissible_set.len() < spectral_constraints.len();
+    let constraint_exists =
+        !admissible_set.is_empty() && admissible_set.len() < spectral_constraints.len();
     let selects_half = admissible_set.iter().any(|s| (*s - 0.5).abs() < 0.05)
         && admissible_set.iter().all(|s| (*s - 0.5).abs() < 0.05);
 
@@ -436,9 +544,13 @@ fn main() {
     };
 
     let failed_assumption = match level {
-        0 => "the assumption that prime fluctuations carry geometry distinguishable from noise".to_string(),
-        1 => "the assumption that a single effective dimension describes the prime field".to_string(),
-        2 => "the assumption that prime-field geometry couples to the spectral exponent at all".to_string(),
+        0 => "the assumption that prime fluctuations carry geometry distinguishable from noise"
+            .to_string(),
+        1 => {
+            "the assumption that a single effective dimension describes the prime field".to_string()
+        }
+        2 => "the assumption that prime-field geometry couples to the spectral exponent at all"
+            .to_string(),
         3 => "the assumption that the coupling selects a unique exponent".to_string(),
         _ => "none — but Level 4 is still not Level 5: formalization is outstanding".to_string(),
     };
@@ -463,8 +575,10 @@ fn main() {
         failed_assumption,
         final_answer,
     };
-    write_file(std::path::Path::new("research/impossible_machine/experiments/experiment48_results.json"),
-        &serde_json::to_string_pretty(&output).unwrap());
+    write_file(
+        std::path::Path::new("research/impossible_machine/experiments/experiment48_results.json"),
+        &serde_json::to_string_pretty(&output).unwrap(),
+    );
     println!("\n{verdict}");
     println!("results: research/impossible_machine/experiments/experiment48_results.json");
 }

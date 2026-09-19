@@ -604,7 +604,9 @@ impl PhysisCore {
     /// is audited on the hypothesis but is not a transition, because the log
     /// records transitions rather than heartbeats.
     pub fn project_revisions(&mut self, id: &str) -> usize {
-        let Some(h) = self.hypotheses.get(id) else { return 0 };
+        let Some(h) = self.hypotheses.get(id) else {
+            return 0;
+        };
         let last_seen = self
             .epistemic_audit
             .events
@@ -1083,7 +1085,10 @@ mod ph017_tests {
             .iter()
             .find(|e| e.subject_id == id)
             .expect("the transition must be projected");
-        assert_eq!(ev.timestamp, revision_time, "the event keeps the revision's clock");
+        assert_eq!(
+            ev.timestamp, revision_time,
+            "the event keeps the revision's clock"
+        );
     }
 
     /// Idempotent: the projection is a view, and calling it twice must not
@@ -1109,12 +1114,19 @@ mod ph017_tests {
         let mut h = Hypothesis::new("steady", vec![]);
         h.add_supporting_evidence(Evidence::supports("a", "one")); // Candidate -> Supported
         h.add_supporting_evidence(Evidence::supports("b", "two")); // Supported -> Supported
-        // Three revisions exist: "Created" (Candidate->Candidate, construction
-        // rather than a transition), the real Candidate->Supported move, and a
-        // second Supported->Supported that crossed nothing.
-        assert_eq!(h.revision_history.len(), 3, "all three are audited on the hypothesis");
+                                                                   // Three revisions exist: "Created" (Candidate->Candidate, construction
+                                                                   // rather than a transition), the real Candidate->Supported move, and a
+                                                                   // second Supported->Supported that crossed nothing.
         assert_eq!(
-            h.revision_history.iter().filter(|r| r.previous_status != r.new_status).count(),
+            h.revision_history.len(),
+            3,
+            "all three are audited on the hypothesis"
+        );
+        assert_eq!(
+            h.revision_history
+                .iter()
+                .filter(|r| r.previous_status != r.new_status)
+                .count(),
             1,
             "but only one of them is a transition"
         );

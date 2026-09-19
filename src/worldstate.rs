@@ -68,9 +68,9 @@
 use std::collections::HashMap;
 
 use rand::rngs::StdRng;
-use sha2::{Digest, Sha256};
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 /// Cosine between two L2-normalised-ish vectors. Defensive against zero norm.
 pub fn cosine(a: &[f32], b: &[f32]) -> f32 {
@@ -188,7 +188,11 @@ pub fn ari(a: &[usize], b: &[usize]) -> f64 {
 /// part of a neighbourhood that can be compared without already knowing the
 /// correspondence. Each descriptor is z-scored within itself so two spaces with
 /// different similarity scales stay comparable.
-pub fn structural_descriptor(sim: &[Vec<f32>], adj: &[Vec<usize>], profile: usize) -> Vec<Vec<f32>> {
+pub fn structural_descriptor(
+    sim: &[Vec<f32>],
+    adj: &[Vec<usize>],
+    profile: usize,
+) -> Vec<Vec<f32>> {
     let n = sim.len();
     (0..n)
         .map(|i| {
@@ -267,11 +271,7 @@ pub fn rank_candidates(da: &[Vec<f32>], db: &[Vec<f32>], top: usize) -> Vec<Vec<
     da.iter()
         .map(|x| {
             let mut idx: Vec<usize> = (0..db.len()).collect();
-            idx.sort_by(|&p, &q| {
-                cosine(x, &db[q])
-                    .partial_cmp(&cosine(x, &db[p]))
-                    .unwrap()
-            });
+            idx.sort_by(|&p, &q| cosine(x, &db[q]).partial_cmp(&cosine(x, &db[p])).unwrap());
             idx.truncate(top);
             idx
         })
@@ -512,14 +512,7 @@ mod tests {
 // model should.
 
 /// A derived transition between adjacent positions.
-pub const TRANSITIONS: [&str; 6] = [
-    "emerge",
-    "persist",
-    "change",
-    "recur",
-    "disappear",
-    "none",
-];
+pub const TRANSITIONS: [&str; 6] = ["emerge", "persist", "change", "recur", "disappear", "none"];
 
 /// Lexical cues for disappearance. Declared rather than learned: there are six
 /// of them, they are in the open, and a reader can see exactly how much of L1
@@ -775,9 +768,9 @@ pub struct AntecedentScore {
 pub fn gold_antecedents(entities: &[Vec<String>]) -> Vec<Option<usize>> {
     (0..entities.len())
         .map(|p| {
-            (0..p).rev().find(|&q| {
-                entities[q].iter().any(|e| entities[p].contains(e))
-            })
+            (0..p)
+                .rev()
+                .find(|&q| entities[q].iter().any(|e| entities[p].contains(e)))
         })
         .collect()
 }
@@ -837,7 +830,9 @@ impl PositionRun {
             t.z
         );
         for (label, count, recall) in &t.per_label {
-            s.push_str(&format!("    {label:<11} n={count:<3} recall {recall:.3}\n"));
+            s.push_str(&format!(
+                "    {label:<11} n={count:<3} recall {recall:.3}\n"
+            ));
         }
         s.push_str(&format!(
             "\nL2 position locality\n  mean |Δpos| over kNN edges {:.2} vs null {:.2}  ratio {:.3}\n\nL3 antecedent retrieval\narm                 n    top1    top3    top1 95% CI\n",
@@ -925,11 +920,10 @@ mod position_tests {
 // is what makes the extractor unsupervised rather than a lexicon in disguise.
 
 const STOPWORDS: [&str; 40] = [
-    "the", "and", "that", "with", "from", "this", "then", "than", "into", "over",
-    "under", "after", "before", "while", "when", "were", "was", "are", "its",
-    "his", "her", "their", "they", "them", "have", "has", "had", "been", "being",
-    "which", "what", "each", "both", "some", "more", "most", "less", "very",
-    "also", "still",
+    "the", "and", "that", "with", "from", "this", "then", "than", "into", "over", "under", "after",
+    "before", "while", "when", "were", "was", "are", "its", "his", "her", "their", "they", "them",
+    "have", "has", "had", "been", "being", "which", "what", "each", "both", "some", "more", "most",
+    "less", "very", "also", "still",
 ];
 
 /// Normalise a surface form to an entity key: lowercase, spaces to hyphens,
@@ -1050,8 +1044,16 @@ pub fn extraction_prf(extracted: &[Vec<String>], gold: &[Vec<String>]) -> (f64, 
         }
     }
     let p = if tp + fp > 0.0 { tp / (tp + fp) } else { 0.0 };
-    let r = if tp + fneg > 0.0 { tp / (tp + fneg) } else { 0.0 };
-    let f = if p + r > 0.0 { 2.0 * p * r / (p + r) } else { 0.0 };
+    let r = if tp + fneg > 0.0 {
+        tp / (tp + fneg)
+    } else {
+        0.0
+    };
+    let f = if p + r > 0.0 {
+        2.0 * p * r / (p + r)
+    } else {
+        0.0
+    };
     (p, r, f)
 }
 
@@ -1151,8 +1153,12 @@ pub fn extract_noun_phrases(texts: &[&str], max_len: usize) -> Vec<Vec<String>> 
                             && b.chars().all(|c| c.is_alphanumeric())
                     })
                     .unwrap_or(false);
-                let capital_mid =
-                    i > 0 && toks[i].chars().next().map(|c| c.is_uppercase()).unwrap_or(false);
+                let capital_mid = i > 0
+                    && toks[i]
+                        .chars()
+                        .next()
+                        .map(|c| c.is_uppercase())
+                        .unwrap_or(false);
                 if id_shaped || capital_mid {
                     let k = entity_key(&toks[i]);
                     if !k.is_empty() && !out.contains(&k) {
@@ -1235,7 +1241,10 @@ mod np_tests {
     fn merge_is_a_union_without_duplicates() {
         let a = vec![vec!["x".to_string()]];
         let b = vec![vec!["x".to_string(), "y".to_string()]];
-        assert_eq!(merge_entities(&a, &b)[0], vec!["x".to_string(), "y".to_string()]);
+        assert_eq!(
+            merge_entities(&a, &b)[0],
+            vec!["x".to_string(), "y".to_string()]
+        );
     }
 }
 
@@ -1263,17 +1272,12 @@ pub fn extract_code_identifiers(texts: &[&str]) -> Vec<Vec<String>> {
                     || (w.contains('/') && w.contains('.'))
                     || w.ends_with(".rs")
                     || w.contains('_')
-                    || (w.len() >= 4
-                        && w.chars().all(|c| c.is_ascii_uppercase() || c == '_'));
+                    || (w.len() >= 4 && w.chars().all(|c| c.is_ascii_uppercase() || c == '_'));
                 if !code_shaped {
                     continue;
                 }
                 let full = entity_key(w);
-                let seg = full
-                    .rsplit(['/', ':'])
-                    .next()
-                    .unwrap_or(&full)
-                    .to_string();
+                let seg = full.rsplit(['/', ':']).next().unwrap_or(&full).to_string();
                 let stem = seg.strip_suffix(".rs").unwrap_or(&seg).to_string();
                 for k in [full, seg, stem] {
                     if k.len() > 2 && !out.contains(&k) {
@@ -1398,7 +1402,9 @@ pub fn word_table_count(texts: &[&str], dim: usize, window: usize) -> HashMap<St
             continue;
         }
         let sig = &sig_cache[c];
-        let e = table.entry((*w).to_string()).or_insert_with(|| vec![0.0; dim]);
+        let e = table
+            .entry((*w).to_string())
+            .or_insert_with(|| vec![0.0; dim]);
         for (slot, s) in e.iter_mut().zip(sig.iter()) {
             *slot += ppmi * s;
         }
@@ -1577,7 +1583,11 @@ pub fn lexical_margin(texts: &[String], sample: usize) -> f64 {
     if n < 3 {
         return 1.0;
     }
-    let stride = if sample > 0 && n > sample { n / sample } else { 1 };
+    let stride = if sample > 0 && n > sample {
+        n / sample
+    } else {
+        1
+    };
     let mut total = 0.0;
     let mut counted = 0.0;
     for i in (0..n).step_by(stride.max(1)) {

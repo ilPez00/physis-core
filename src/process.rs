@@ -299,7 +299,10 @@ mod tests {
         let d = m.deviation_against(&c, "cyc-1").expect("should flag");
         assert_eq!(d.metric, "temp");
         assert_eq!(d.expected_value, 100.0);
-        assert!((d.severity - 0.5).abs() < 1e-9, "50 over a span of 100 → 0.5");
+        assert!(
+            (d.severity - 0.5).abs() < 1e-9,
+            "50 over a span of 100 → 0.5"
+        );
         assert!(d.description.contains("150"));
     }
 

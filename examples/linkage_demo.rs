@@ -46,7 +46,11 @@ fn main() {
             .collect();
 
         let graph = LinkageGraph::build(&classifier, &embedder, &texts);
-        println!("{} texts -> {} bridged cell pairs\n", texts.len(), graph.len());
+        println!(
+            "{} texts -> {} bridged cell pairs\n",
+            texts.len(),
+            graph.len()
+        );
         println!("Strongest links:");
         for l in graph.strongest(10) {
             println!(

@@ -175,9 +175,10 @@
 //! - [`provenance`]: Cryptographic hash chains and provenance tracking for epistemological traceability.
 //! - [`rag`]: Token-budget bounded retrieval-augmented generation with MMR diversity filtering.
 
-pub mod bench;
-pub mod claim_identity;
 pub mod becoming;
+pub mod bench;
+pub mod chain;
+pub mod claim_identity;
 pub mod classify;
 pub mod coherence_dimensions;
 pub mod coherence_query;
@@ -193,29 +194,28 @@ pub mod embed;
 pub mod embed_ngram;
 pub mod epistemic;
 pub mod explanation;
+pub mod grid_fitness;
+pub mod hypothesis;
 pub mod linkage;
 pub mod machines;
 pub mod map;
-pub mod tokenizer;
-pub mod hypothesis;
 pub mod model_provider;
 pub mod models;
 pub mod ngram_table;
 pub mod observe;
-pub mod oracle;
 pub mod ontology;
-pub mod propose;
+pub mod oracle;
 pub mod process;
+pub mod propose;
 pub mod provenance;
 pub mod rag;
 pub mod relation;
-pub mod chain;
-pub mod grid_fitness;
 pub mod store;
 pub mod temporal;
-pub mod worldstate;
-pub mod transplant;
+pub mod tokenizer;
 pub mod transform;
+pub mod transplant;
+pub mod worldstate;
 
 /// Restore the default `SIGPIPE` behaviour for a command-line program.
 ///
@@ -249,19 +249,20 @@ pub use delta_engine::{
     GAMMA, MAX_PROPAGATION_DEPTH, MAX_REVISION_WALK_NODES, MIN_IMPACT,
 };
 pub use discovery::{discover, DiscoveryConfig, DiscoveryReport, ProposedDomain};
+pub use dream::{
+    dream_over_history, ProposalKind, RetrospectiveProposal, RETIRE_AFTER_CONTRADICTIONS,
+};
 pub use embed::{RandomProjectionEmbedder, VectorEmbed};
 pub use epistemic::{
     EpistemicAuditTrail, EpistemicEvent, EpistemicEventType, HighWaterMark, IntakeReceipt,
 };
-pub use dream::{dream_over_history, ProposalKind, RetrospectiveProposal, RETIRE_AFTER_CONTRADICTIONS};
 pub use explanation::{ExplanationReport, HistoricalPrecedent};
 pub use hypothesis::{
     Evidence, EvidencePolarity, FitnessBreakdown, Hypothesis, HypothesisStatus, Prediction,
     Revision, CONTRADICTION_PENALTY_CAP, CONTRADICTION_PENALTY_PER_ITEM,
     FAILED_PREDICTION_PENALTY_CAP, FAILED_PREDICTION_PENALTY_PER_ITEM,
     FITNESS_WEIGHT_EMPIRICAL_SUPPORT, FITNESS_WEIGHT_LOGICAL_CONSISTENCY,
-    FITNESS_WEIGHT_ONTOLOGICAL_FIT, FITNESS_WEIGHT_PREDICTIVE_SUCCESS,
-    FITNESS_WEIGHT_SEMANTIC_FIT,
+    FITNESS_WEIGHT_ONTOLOGICAL_FIT, FITNESS_WEIGHT_PREDICTIVE_SUCCESS, FITNESS_WEIGHT_SEMANTIC_FIT,
 };
 pub use models::*;
 pub use ontology::OntologyLoader;
@@ -275,8 +276,8 @@ pub use rag::{count_tokens, RagChunk, RagCorpus, RetrievalResult, TokenFixedRetr
 pub use relation::{RelationType, TypedEdge};
 pub use temporal::TemporalValidity;
 pub use transform::{
-    ACCEPT_FLOOR, Constraint, ConstraintKind, PatElem, Predicate, PropKind, Proposition,
-    TraceStep, Transform, Triple, TriplePattern, WorldState, apply, find_homomorphisms,
+    apply, find_homomorphisms, Constraint, ConstraintKind, PatElem, Predicate, PropKind,
+    Proposition, TraceStep, Transform, Triple, TriplePattern, WorldState, ACCEPT_FLOOR,
 };
 
 #[cfg(feature = "embed-onnx")]

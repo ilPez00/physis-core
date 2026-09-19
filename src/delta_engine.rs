@@ -73,14 +73,9 @@ pub enum MutationOp {
         new_embedding: Vec<f32>,
     },
     /// Sever an outgoing relationship edge to another node.
-    RelationSevered {
-        target_id: String,
-    },
+    RelationSevered { target_id: String },
     /// Create a new outgoing relationship edge to another node.
-    RelationCreated {
-        target_id: String,
-        weight: f32,
-    },
+    RelationCreated { target_id: String, weight: f32 },
 }
 
 /// A complete mutation event targeting a specific node.
@@ -198,8 +193,7 @@ impl<'a> EvaluationContext<'a> {
     pub fn ensure_shadowed(&mut self, node_id: &str) -> Option<&mut CoherenceNode> {
         if !self.shadow_nodes.contains_key(node_id) {
             if let Some(base) = self.base_nodes.iter().find(|n| n.id == node_id) {
-                self.shadow_nodes
-                    .insert(node_id.to_string(), base.clone());
+                self.shadow_nodes.insert(node_id.to_string(), base.clone());
             }
         }
         self.shadow_nodes.get_mut(node_id)
@@ -845,7 +839,9 @@ pub fn evaluate_mutation(
     for hyp_id in &hyp_ids {
         // Capture pre-mutation values from the effective (base or shadow) view
         let (prev_coherence, prev_fitness, prev_status) = {
-            let hyp = ctx.effective_hypothesis(hyp_id).expect("hypothesis must exist");
+            let hyp = ctx
+                .effective_hypothesis(hyp_id)
+                .expect("hypothesis must exist");
             (hyp.coherence, hyp.fitness, hyp.status)
         };
 
@@ -978,7 +974,7 @@ mod tests {
         n
     }
 
-     #[test]
+    #[test]
     fn property_set_does_not_change_embedding() {
         let mut n = node("n1", vec![1.0, 0.0, 0.0, 0.0], 0.5);
         n.label = Some("test_node".to_string());

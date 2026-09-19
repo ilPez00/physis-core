@@ -584,8 +584,8 @@ impl Hypothesis {
                 .filter(|p| p.correct == Some(false))
                 .count() as Score;
             let s_ratio = succ / resolved_preds.len() as Score;
-            let f_penalty = (fail * FAILED_PREDICTION_PENALTY_PER_ITEM)
-                .min(FAILED_PREDICTION_PENALTY_CAP);
+            let f_penalty =
+                (fail * FAILED_PREDICTION_PENALTY_PER_ITEM).min(FAILED_PREDICTION_PENALTY_CAP);
             (s_ratio, f_penalty)
         };
 
@@ -623,10 +623,7 @@ impl Hypothesis {
     pub fn fitness_term_breakdown(&self) -> Vec<(&'static str, Score)> {
         let b = &self.fitness_breakdown;
         vec![
-            (
-                "semantic_fit",
-                FITNESS_WEIGHT_SEMANTIC_FIT * b.semantic_fit,
-            ),
+            ("semantic_fit", FITNESS_WEIGHT_SEMANTIC_FIT * b.semantic_fit),
             (
                 "ontological_fit",
                 FITNESS_WEIGHT_ONTOLOGICAL_FIT * b.ontological_fit,
@@ -644,10 +641,7 @@ impl Hypothesis {
                 FITNESS_WEIGHT_PREDICTIVE_SUCCESS * b.predictive_success,
             ),
             ("contradiction_penalty", -b.contradiction_penalty),
-            (
-                "failed_prediction_penalty",
-                -b.failed_prediction_penalty,
-            ),
+            ("failed_prediction_penalty", -b.failed_prediction_penalty),
         ]
     }
 
@@ -809,7 +803,10 @@ mod resolution_tests {
         h.add_supporting_evidence(Evidence::supports("src", "it held"));
         assert_eq!(h.status, HypothesisStatus::Supported, "the status did move");
 
-        let r = h.revision_history.last().expect("the move must be recorded");
+        let r = h
+            .revision_history
+            .last()
+            .expect("the move must be recorded");
         assert_eq!(
             r.previous_status,
             HypothesisStatus::Candidate,
@@ -837,7 +834,10 @@ mod resolution_tests {
             last.previous_status, last.new_status,
             "no boundary crossed, so the revision is a no-op record"
         );
-        assert!(h.revision_history.len() > after_first, "but it is still audited");
+        assert!(
+            h.revision_history.len() > after_first,
+            "but it is still audited"
+        );
     }
 
     #[test]
@@ -903,7 +903,10 @@ mod resolution_tests {
         assert_eq!(open.len(), 2);
         assert_eq!(h.pending_predictions(), 2);
         assert_eq!(open[0].0, 0);
-        assert_eq!(open[1].0, 2, "indices must survive a gap, not be renumbered");
+        assert_eq!(
+            open[1].0, 2,
+            "indices must survive a gap, not be renumbered"
+        );
         assert_eq!(open[1].1.statement, "third");
     }
 

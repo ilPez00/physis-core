@@ -112,7 +112,11 @@ pub fn append(path: &Path, obs: &mut [Observation]) -> anyhow::Result<(u64, u64)
     }
     // `read(true)` is required to inspect the tail byte below: an append-only
     // handle is write-only by default, and reading from it fails with EBADF.
-    let mut f = std::fs::OpenOptions::new().create(true).append(true).read(true).open(path)?;
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .read(true)
+        .open(path)?;
     // A process killed mid-write leaves a final line with no newline. Writing
     // the next record directly onto it concatenates the two into one line, and
     // `read` drops that whole line — so the interrupted record AND the first
@@ -229,8 +233,7 @@ pub fn read_tail(path: &Path, n: usize) -> anyhow::Result<Vec<Observation>> {
 
 /// Observations from one source, newest first.
 pub fn by_source(all: &[Observation], source: &str) -> Vec<Observation> {
-    let mut v: Vec<Observation> =
-        all.iter().filter(|o| o.source == source).cloned().collect();
+    let mut v: Vec<Observation> = all.iter().filter(|o| o.source == source).cloned().collect();
     v.sort_by_key(|o| std::cmp::Reverse(o.seq));
     v
 }
@@ -303,7 +306,12 @@ pub fn promote(
 ) -> crate::hypothesis::Hypothesis {
     let mut h = crate::hypothesis::Hypothesis::new(statement, embedding);
     let claim = if obs.body.is_empty() {
-        format!("{} observed {} at {}", obs.source, obs.subject, obs.at.to_rfc3339())
+        format!(
+            "{} observed {} at {}",
+            obs.source,
+            obs.subject,
+            obs.at.to_rfc3339()
+        )
     } else {
         format!(
             "{} observed {} at {}: {}",
@@ -343,9 +351,17 @@ pub fn promote(
 /// citation means the log and the claims have diverged.
 pub fn cited_by(h: &crate::hypothesis::Hypothesis, all: &[Observation]) -> Vec<Observation> {
     let mut out = Vec::new();
-    for e in h.supporting_evidence.iter().chain(h.contradicting_evidence.iter()) {
-        let Some(rest) = e.source.strip_prefix("obs:") else { continue };
-        let Ok(seq) = rest.trim().parse::<u64>() else { continue };
+    for e in h
+        .supporting_evidence
+        .iter()
+        .chain(h.contradicting_evidence.iter())
+    {
+        let Some(rest) = e.source.strip_prefix("obs:") else {
+            continue;
+        };
+        let Ok(seq) = rest.trim().parse::<u64>() else {
+            continue;
+        };
         if let Some(o) = all.iter().find(|o| o.seq == seq) {
             out.push(o.clone());
         }
@@ -373,8 +389,11 @@ mod tests {
         let p = tmp("append").join("o.jsonl");
         let (a1, b1) = append(&p, &mut [Observation::new("fs", "x")]).unwrap();
         assert_eq!((a1, b1), (1, 1));
-        let (a2, b2) =
-            append(&p, &mut [Observation::new("git", "y"), Observation::new("git", "z")]).unwrap();
+        let (a2, b2) = append(
+            &p,
+            &mut [Observation::new("git", "y"), Observation::new("git", "z")],
+        )
+        .unwrap();
         assert_eq!((a2, b2), (2, 3));
         let all = read(&p).unwrap();
         assert_eq!(all.len(), 3);
@@ -412,12 +431,23 @@ mod tests {
         drop(f);
 
         let (a, b) = append(&p, &mut [Observation::new("git", "after")]).unwrap();
-        assert_eq!((a, b), (2, 2), "the fragment parsed to no seq, so 2 is next");
+        assert_eq!(
+            (a, b),
+            (2, 2),
+            "the fragment parsed to no seq, so 2 is next"
+        );
         let all = read(&p).unwrap();
-        assert_eq!(all.len(), 2, "the fragment is dropped; both real records survive");
+        assert_eq!(
+            all.len(),
+            2,
+            "the fragment is dropped; both real records survive"
+        );
         assert_eq!(all[0].subject, "good");
         assert_eq!(all[1].subject, "after");
-        assert_eq!(all[1].seq, 2, "no gap — the new record takes the fragment's number");
+        assert_eq!(
+            all[1].seq, 2,
+            "no gap — the new record takes the fragment's number"
+        );
     }
 
     /// `duration_ms` earns its keep here: overlap across sources, which is the
@@ -467,7 +497,8 @@ mod tests {
         // And it can be refuted — which no surveyed system's record can be.
         let mut h = h;
         h.add_contradicting_evidence(crate::hypothesis::Evidence::contradicts(
-            "measurement", "delta was exactly zero",
+            "measurement",
+            "delta was exactly zero",
         ));
         assert_eq!(h.status, crate::hypothesis::HypothesisStatus::Contradicted);
     }
@@ -498,7 +529,11 @@ mod tests {
 
         let tail = read_tail(&p, 10).unwrap();
         assert_eq!(tail.len(), 10, "must return exactly n");
-        assert_eq!(tail.last().unwrap().seq, 5_000, "and they must be the NEWEST");
+        assert_eq!(
+            tail.last().unwrap().seq,
+            5_000,
+            "and they must be the NEWEST"
+        );
         assert_eq!(tail.first().unwrap().seq, 4_991);
 
         // Asking for more than exists returns everything, not an error.

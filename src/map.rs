@@ -89,8 +89,17 @@ impl MapReport {
 /// Negated-obligation markers. One side affirming what the other forbids is a
 /// contradiction even at near-identical wording (the duplicate trap).
 const NEGATION_MARKERS: &[&str] = &[
-    "not ", "no ", "non ", "mai ", "vietato", "divieto", "proibito", "must not", "shall not",
-    "non può", "non deve",
+    "not ",
+    "no ",
+    "non ",
+    "mai ",
+    "vietato",
+    "divieto",
+    "proibito",
+    "must not",
+    "shall not",
+    "non può",
+    "non deve",
 ];
 
 fn negation_hits(text: &str) -> usize {
@@ -111,7 +120,12 @@ fn negation_hits(text: &str) -> usize {
 fn leading_number(text: &str) -> Option<String> {
     text.split_whitespace()
         .map(|t| t.trim_matches(|c: char| !c.is_alphanumeric()))
-        .find(|t| t.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false))
+        .find(|t| {
+            t.chars()
+                .next()
+                .map(|c| c.is_ascii_digit())
+                .unwrap_or(false)
+        })
         .map(|t| {
             t.chars()
                 .take_while(|c| c.is_ascii_digit() || *c == '.')
@@ -143,8 +157,10 @@ fn lexical_overlap(a: &str, b: &str) -> f32 {
 /// Deterministic cosine (no library dependency on models.rs to keep map.rs
 /// self-composable).
 fn cosine(a: &[f32], b: &[f32]) -> f32 {
-    let (dot, na, nb) =
-        a.iter().zip(b).fold((0.0f32, 0.0f32, 0.0f32), |(d, x, y), (p, q)| {
+    let (dot, na, nb) = a
+        .iter()
+        .zip(b)
+        .fold((0.0f32, 0.0f32, 0.0f32), |(d, x, y), (p, q)| {
             (d + p * q, x + p * p, y + q * q)
         });
     if na == 0.0 || nb == 0.0 {
@@ -191,8 +207,7 @@ pub fn build_map(
         })
         .collect();
     let mut sorted_nnds = nnds.clone();
-    sorted_nnds
-        .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    sorted_nnds.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let median_nnd = if sorted_nnds.is_empty() {
         0.0
     } else {
@@ -273,8 +288,7 @@ pub fn build_map(
         .collect();
     // Median nearest-neighbour similarity = what "repeated" looks like here.
     let mut sorted_nnds = nnds.clone();
-    sorted_nnds
-        .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    sorted_nnds.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let median_nnd = if sorted_nnds.is_empty() {
         0.0
     } else {
@@ -317,12 +331,7 @@ pub fn build_map(
         let items: Vec<(usize, &(String, String))> = docs
             .iter()
             .enumerate()
-            .filter(|(_, (path, _))| {
-                cluster
-                    .instances
-                    .iter()
-                    .any(|s| &s.path == path)
-            })
+            .filter(|(_, (path, _))| cluster.instances.iter().any(|s| &s.path == path))
             .collect();
         for (ii, (i_idx, (pa, ba))) in items.iter().enumerate() {
             for (j_idx, (pb, bb)) in items.iter().skip(ii + 1) {
@@ -344,8 +353,14 @@ pub fn build_map(
                 // keeping both. (README: dedup must not hide disagreement.)
                 if sim < 0.55 || (lex >= 0.5 && (na != nb || number_clash)) {
                     contradictions.push(ContradictionPair {
-                        a: SourceRef { path: pa.clone(), title: title_of(pa) },
-                        b: SourceRef { path: pb.clone(), title: title_of(pb) },
+                        a: SourceRef {
+                            path: pa.clone(),
+                            title: title_of(pa),
+                        },
+                        b: SourceRef {
+                            path: pb.clone(),
+                            title: title_of(pb),
+                        },
                         cluster: cluster.name.clone(),
                         lexical_overlap: lex,
                         embedding_sim: sim,
@@ -428,8 +443,7 @@ fn top_shared_terms(members: &[usize], texts: &[String]) -> Vec<String> {
             *freq.entry(w).or_insert(0) += 1;
         }
     }
-    let mut ranked: Vec<(usize, String)> =
-        freq.into_iter().map(|(w, c)| (c, w)).collect();
+    let mut ranked: Vec<(usize, String)> = freq.into_iter().map(|(w, c)| (c, w)).collect();
     ranked.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
     ranked
         .into_iter()
@@ -459,7 +473,10 @@ pub fn render(report: &MapReport) -> String {
             "  {} — {} instances — {}\n    hints: {}\n",
             r.name,
             r.count,
-            r.instances.first().map(|s| s.path.clone()).unwrap_or_default(),
+            r.instances
+                .first()
+                .map(|s| s.path.clone())
+                .unwrap_or_default(),
             r.hints.join(", ")
         ));
     }
@@ -546,23 +563,40 @@ mod tests {
         let docs = corpus();
         let r1 = build_map(&docs, &e, None).unwrap();
         let r2 = build_map(&docs, &e, None).unwrap();
-        assert_eq!(r1.structure_hash, r2.structure_hash, "same corpus, same map");
+        assert_eq!(
+            r1.structure_hash, r2.structure_hash,
+            "same corpus, same map"
+        );
         assert!(!r1.repeats.is_empty(), "repeated situations found");
         assert!(!r1.differences.is_empty(), "the outlier is found");
         // The outlier is different ⇒ it ranks first (lowest best-cell sim).
         assert!(
-            r1.differences.first().map(|d| d.path.contains("x.md")).unwrap_or(false),
+            r1.differences
+                .first()
+                .map(|d| d.path.contains("x.md"))
+                .unwrap_or(false),
             "the mandelbrot outlier is the most different thing in the corpus"
         );
-        assert!(r1.repeats.iter().all(|c| !c.instances.is_empty()), "provenance kept");
+        assert!(
+            r1.repeats.iter().all(|c| !c.instances.is_empty()),
+            "provenance kept"
+        );
     }
 
     #[test]
     fn corpus_loader_is_sorted_and_recursive() {
         let tmp = tempfile::tempdir().unwrap();
-        std::fs::write(tmp.path().join("b.txt"), "later file with a body long enough to survive the corpus loader filter").unwrap();
+        std::fs::write(
+            tmp.path().join("b.txt"),
+            "later file with a body long enough to survive the corpus loader filter",
+        )
+        .unwrap();
         std::fs::create_dir(tmp.path().join("sub")).unwrap();
-        std::fs::write(tmp.path().join("sub/a.md"), "nested file also carrying more than forty characters of body text").unwrap();
+        std::fs::write(
+            tmp.path().join("sub/a.md"),
+            "nested file also carrying more than forty characters of body text",
+        )
+        .unwrap();
         let docs = load_corpus(tmp.path()).unwrap();
         assert_eq!(docs.len(), 2);
         assert!(docs[0].0.ends_with("b.txt"), "sorted: b before sub/a");
@@ -647,15 +681,9 @@ pub fn compile_context(
 
     // Physis: the same retriever, but capped at the fixed budget.
     let top_k = docs.len().clamp(3, 8);
-    let (_res, physis_context) = crate::rag::retrieve_from_texts(
-        &texts,
-        query,
-        embedder,
-        budget.max(64),
-        top_k,
-    );
-    let physis_tokens =
-        crate::rag::count_tokens(&physis_context);
+    let (_res, physis_context) =
+        crate::rag::retrieve_from_texts(&texts, query, embedder, budget.max(64), top_k);
+    let physis_tokens = crate::rag::count_tokens(&physis_context);
 
     // Structural tag: the deterministic map over the same corpus.
     let map = build_map(docs, embedder, None)?;

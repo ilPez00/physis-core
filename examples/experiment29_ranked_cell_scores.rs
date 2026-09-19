@@ -34,8 +34,8 @@ fn main() {
     #[cfg(feature = "embed-onnx")]
     {
         use physis_core::embed::VectorEmbed;
-        use std::collections::HashMap;
         use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
+        use std::collections::HashMap;
 
         let dir = match ["models", "../models"]
             .iter()
@@ -60,12 +60,17 @@ fn main() {
 
         let ontology = OntologyLoader::load_all();
         let classifier = CellClassifier::build(&ontology, &embedder);
-        println!("Classifier built: {} populated cells.\n", classifier.cell_count());
+        println!(
+            "Classifier built: {} populated cells.\n",
+            classifier.cell_count()
+        );
 
         // Every real entry, with the cell it was authored into.
         let mut items: Vec<(String, String, String)> = Vec::new(); // (text, domain, mode)
         for def in ontology.classification_domains() {
-            let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut t = def.name.clone();
             for h in &def.hints {
                 t.push(' ');
@@ -73,7 +78,10 @@ fn main() {
             }
             items.push((t, d.clone(), m.clone()));
         }
-        println!("Classifying {} real entries against their own ontology...\n", items.len());
+        println!(
+            "Classifying {} real entries against their own ontology...\n",
+            items.len()
+        );
 
         let mut rank_hist: HashMap<usize, usize> = HashMap::new();
         let mut unranked = 0usize;
@@ -104,11 +112,17 @@ fn main() {
 
         let n = items.len() as f64;
         let at = |k: usize| -> f64 {
-            (1..=k).map(|r| *rank_hist.get(&r).unwrap_or(&0)).sum::<usize>() as f64 / n
+            (1..=k)
+                .map(|r| *rank_hist.get(&r).unwrap_or(&0))
+                .sum::<usize>() as f64
+                / n
         };
 
         println!("=== Where does an entry's OWN authored cell land in the ranking? ===\n");
-        println!("  cells returned per query (mean): {:.1}", n_results_total as f64 / n);
+        println!(
+            "  cells returned per query (mean): {:.1}",
+            n_results_total as f64 / n
+        );
         println!("  top-1 (the argmax alone)  : {:.3}", at(1));
         println!("  top-2                     : {:.3}", at(2));
         println!("  top-3                     : {:.3}", at(3));
@@ -119,8 +133,16 @@ fn main() {
         let gain_2 = at(2) - at(1);
         let gain_5 = at(5) - at(1);
         println!("\n  information the argmax DISCARDS:");
-        println!("    +{:.3} recovered by looking at rank 2 as well ({:.0}% relative)", gain_2, 100.0 * gain_2 / at(1).max(1e-9));
-        println!("    +{:.3} recovered by looking at ranks 2-5      ({:.0}% relative)", gain_5, 100.0 * gain_5 / at(1).max(1e-9));
+        println!(
+            "    +{:.3} recovered by looking at rank 2 as well ({:.0}% relative)",
+            gain_2,
+            100.0 * gain_2 / at(1).max(1e-9)
+        );
+        println!(
+            "    +{:.3} recovered by looking at ranks 2-5      ({:.0}% relative)",
+            gain_5,
+            100.0 * gain_5 / at(1).max(1e-9)
+        );
 
         println!("\n=== Cross-cutting evidence (Iteration 8's claim, at scale) ===\n");
         println!(
@@ -130,7 +152,10 @@ fn main() {
             100.0 * second_diff_domain as f64 / n
         );
         if margin_n > 0 {
-            println!("  mean score margin between rank 1 and rank 2: {:.4}", margin_sum / margin_n as f64);
+            println!(
+                "  mean score margin between rank 1 and rank 2: {:.4}",
+                margin_sum / margin_n as f64
+            );
         }
 
         println!("\n=== Verdict for roadmap item 25 ===\n");
@@ -138,11 +163,17 @@ fn main() {
         println!("  scores' needs no code change — the report was wrong about the current");
         println!("  behavior. The measured question is whether that list is worth reading:");
         if gain_5 > 0.05 {
-            println!("    YES — ranks 2-5 recover {:.1} points of an entry's own cell that the", 100.0 * gain_5);
+            println!(
+                "    YES — ranks 2-5 recover {:.1} points of an entry's own cell that the",
+                100.0 * gain_5
+            );
             println!("    argmax alone misses. The single-valued OntologyEntry storage is");
             println!("    discarding information the classifier already computes.");
         } else {
-            println!("    MARGINAL — ranks 2-5 add only {:.1} points over the argmax, so", 100.0 * gain_5);
+            println!(
+                "    MARGINAL — ranks 2-5 add only {:.1} points over the argmax, so",
+                100.0 * gain_5
+            );
             println!("    reading past rank 1 buys little on this corpus.");
         }
         println!(

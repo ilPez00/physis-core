@@ -30,7 +30,11 @@ use std::collections::HashMap;
 fn centroid(embeddings: &[&Vec<f32>]) -> Vec<f32> {
     let dim = embeddings[0].len();
     let mut sum = vec![0.0f32; dim];
-    for e in embeddings { for d in 0..dim { sum[d] += e[d]; } }
+    for e in embeddings {
+        for d in 0..dim {
+            sum[d] += e[d];
+        }
+    }
     let norm: f32 = sum.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
     sum.iter().map(|x| x / norm).collect()
 }
@@ -41,24 +45,41 @@ fn main() {
     #[cfg(feature = "embed-onnx")]
     {
         use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
-        let minilm_dir = ["models", "../models"].iter().find(|d| std::path::Path::new(d).join("model.onnx").exists());
+        let minilm_dir = ["models", "../models"]
+            .iter()
+            .find(|d| std::path::Path::new(d).join("model.onnx").exists());
         // Multi-threaded embedding is fine here: this experiment's run-to-run
         // variation was NOT float nondeterminism (a direct probe showed embeddings
         // are bit-identical across runs and thread counts). It was entry ORDER —
         // `classification_domains()` used to iterate HashMaps — plus an untied sort
         // below. Both are fixed; single-threading was not needed.
-        let minilm = match minilm_dir.map(|dir| OnnxEmbedder::with_config(&OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), pooling: PoolingStrategy::Mean, ..OnnxConfig::default() })) {
+        let minilm = match minilm_dir.map(|dir| {
+            OnnxEmbedder::with_config(&OnnxConfig {
+                dim: 384,
+                model_dir: Some(dir.to_string()),
+                pooling: PoolingStrategy::Mean,
+                ..OnnxConfig::default()
+            })
+        }) {
             Some(e) if e.is_available() => e,
-            _ => { println!("WARNING: MiniLM not available — aborting."); return; }
+            _ => {
+                println!("WARNING: MiniLM not available — aborting.");
+                return;
+            }
         };
 
         let ontology = OntologyLoader::load_all();
         let mut texts = Vec::new();
         let mut cells = Vec::new();
         for def in ontology.classification_domains() {
-            let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut text = def.name.clone();
-            for hint in &def.hints { text.push(' '); text.push_str(hint); }
+            for hint in &def.hints {
+                text.push(' ');
+                text.push_str(hint);
+            }
             texts.push(text);
             cells.push((d.clone(), m.clone()));
         }
@@ -69,25 +90,52 @@ fn main() {
         // Well-populated cells only (Iteration 4's filter: >=5 entries) — a fixed
         // point built from too few examples is a noisy anchor, not a stable one.
         let mut cell_counts: HashMap<(String, String), usize> = HashMap::new();
-        for c in &cells { *cell_counts.entry(c.clone()).or_default() += 1; }
+        for c in &cells {
+            *cell_counts.entry(c.clone()).or_default() += 1;
+        }
         let cell_names: Vec<(String, String)> = {
-            let mut v: Vec<(String, String)> = cell_counts.iter().filter(|(_, &c)| c >= 5).map(|(k, _)| k.clone()).collect();
+            let mut v: Vec<(String, String)> = cell_counts
+                .iter()
+                .filter(|(_, &c)| c >= 5)
+                .map(|(k, _)| k.clone())
+                .collect();
             v.sort();
             v
         };
         let n_cells = cell_names.len();
-        let cell_id: HashMap<(String, String), usize> = cell_names.iter().enumerate().map(|(i, c)| (c.clone(), i)).collect();
+        let cell_id: HashMap<(String, String), usize> = cell_names
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.clone(), i))
+            .collect();
         println!("{n_cells} well-populated fixed cells (>=5 entries each) out of {} total distinct (domain,mode) pairs seen.\n", cell_counts.len());
 
-        let keep: Vec<usize> = (0..texts.len()).filter(|&i| cell_counts[&cells[i]] >= 5).collect();
-        println!("{} of {} entries fall in a well-populated cell.\n", keep.len(), texts.len());
+        let keep: Vec<usize> = (0..texts.len())
+            .filter(|&i| cell_counts[&cells[i]] >= 5)
+            .collect();
+        println!(
+            "{} of {} entries fall in a well-populated cell.\n",
+            keep.len(),
+            texts.len()
+        );
 
-        let cell_centroids: Vec<Vec<f32>> = (0..n_cells).map(|c| {
-            let members: Vec<&Vec<f32>> = keep.iter().filter(|&&i| cell_id[&cells[i]] == c).map(|&i| &embeddings[i]).collect();
-            centroid(&members)
-        }).collect();
-        let sims_for = |e: &Vec<f32>| -> Vec<f32> { cell_centroids.iter().map(|c| cosine_sim(e, c)).collect() };
-        let keep_sims: HashMap<usize, Vec<f32>> = keep.iter().map(|&i| (i, sims_for(&embeddings[i]))).collect();
+        let cell_centroids: Vec<Vec<f32>> = (0..n_cells)
+            .map(|c| {
+                let members: Vec<&Vec<f32>> = keep
+                    .iter()
+                    .filter(|&&i| cell_id[&cells[i]] == c)
+                    .map(|&i| &embeddings[i])
+                    .collect();
+                centroid(&members)
+            })
+            .collect();
+        let sims_for = |e: &Vec<f32>| -> Vec<f32> {
+            cell_centroids.iter().map(|c| cosine_sim(e, c)).collect()
+        };
+        let keep_sims: HashMap<usize, Vec<f32>> = keep
+            .iter()
+            .map(|&i| (i, sims_for(&embeddings[i])))
+            .collect();
 
         // NOT a threshold search — Iteration 13's delta-calibration needs known-good/
         // known-bad examples to calibrate against, which do not exist for this real
@@ -110,7 +158,8 @@ fn main() {
         let membership_set = |i: usize| -> Vec<usize> {
             let sims = &keep_sims[&i];
             let own = cell_id[&cells[i]];
-            let second_best = (0..n_cells).filter(|&c| c != own)
+            let second_best = (0..n_cells)
+                .filter(|&c| c != own)
                 .max_by(|&a, &b| sims[a].partial_cmp(&sims[b]).unwrap())
                 .unwrap();
             vec![own, second_best]
@@ -127,7 +176,10 @@ fn main() {
             }
         }
 
-        println!("=== Fixed-cell linkage graph: {} cell pairs bridged by at least one real entry ===\n", bridge_counts.len());
+        println!(
+            "=== Fixed-cell linkage graph: {} cell pairs bridged by at least one real entry ===\n",
+            bridge_counts.len()
+        );
         let mut sorted_links: Vec<(&(usize, usize), &Vec<usize>)> = bridge_counts.iter().collect();
         // Tiebreak on the cell-pair key, not just count: the source is a HashMap
         // iterator (randomly seeded per process), and a stable sort preserves that
@@ -135,23 +187,44 @@ fn main() {
         // run even after the entry-order fix.
         sorted_links.sort_by(|a, b| b.1.len().cmp(&a.1.len()).then_with(|| a.0.cmp(b.0)));
         for (&(a, b), items) in sorted_links.iter().take(20) {
-            let examples: Vec<&str> = items.iter().take(3).map(|&i| texts[i].split_whitespace().next().unwrap_or("")).collect();
+            let examples: Vec<&str> = items
+                .iter()
+                .take(3)
+                .map(|&i| texts[i].split_whitespace().next().unwrap_or(""))
+                .collect();
             println!(
                 "  {}/{}  <->  {}/{}   bridged by {} entries (e.g. {:?})",
-                cell_names[a].0, cell_names[a].1, cell_names[b].0, cell_names[b].1, items.len(), examples
+                cell_names[a].0,
+                cell_names[a].1,
+                cell_names[b].0,
+                cell_names[b].1,
+                items.len(),
+                examples
             );
         }
 
         // Cross-domain-only view: these are the links that couldn't exist in a
         // single-domain hard classification at all — the genuinely new structure.
         println!("\n=== Cross-DOMAIN links only (structurally invisible to single-label classification) ===\n");
-        let mut cross_links: Vec<(&(usize, usize), &Vec<usize>)> = bridge_counts.iter().filter(|((a, b), _)| domain_of(*a) != domain_of(*b)).collect();
+        let mut cross_links: Vec<(&(usize, usize), &Vec<usize>)> = bridge_counts
+            .iter()
+            .filter(|((a, b), _)| domain_of(*a) != domain_of(*b))
+            .collect();
         cross_links.sort_by(|a, b| b.1.len().cmp(&a.1.len()).then_with(|| a.0.cmp(b.0)));
         for (&(a, b), items) in cross_links.iter().take(15) {
-            let examples: Vec<&str> = items.iter().take(3).map(|&i| texts[i].split_whitespace().next().unwrap_or("")).collect();
+            let examples: Vec<&str> = items
+                .iter()
+                .take(3)
+                .map(|&i| texts[i].split_whitespace().next().unwrap_or(""))
+                .collect();
             println!(
                 "  {}/{}  <->  {}/{}   bridged by {} entries (e.g. {:?})",
-                cell_names[a].0, cell_names[a].1, cell_names[b].0, cell_names[b].1, items.len(), examples
+                cell_names[a].0,
+                cell_names[a].1,
+                cell_names[b].0,
+                cell_names[b].1,
+                items.len(),
+                examples
             );
         }
 

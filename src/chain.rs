@@ -290,9 +290,18 @@ fn shuffled_grouping_candidates(
                     w.replace_range(0..1, &up);
                 }
             }
-            let name = if words.is_empty() { "Unnamed Cluster".to_string() } else { words.join(" & ") };
+            let name = if words.is_empty() {
+                "Unnamed Cluster".to_string()
+            } else {
+                words.join(" & ")
+            };
             let mut embeddings = vec![embedder.embed(&name)];
-            embeddings.extend(hints.iter().take(n.saturating_sub(1)).map(|h| embedder.embed(h)));
+            embeddings.extend(
+                hints
+                    .iter()
+                    .take(n.saturating_sub(1))
+                    .map(|h| embedder.embed(h)),
+            );
             let n = embeddings.len();
             Cell {
                 domain: c.domain.clone(),
@@ -394,7 +403,9 @@ pub fn run(
 
     let mut unplaced = Vec::new();
     for id in &unplaced_ids {
-        let Some((_, emb)) = records.iter().find(|(n, _)| n == id) else { continue };
+        let Some((_, emb)) = records.iter().find(|(n, _)| n == id) else {
+            continue;
+        };
         let live = clf.best_entry_sim(emb).map(|(s, _, _)| s).unwrap_or(0.0);
         unplaced.push(Unplaced {
             id: id.clone(),
@@ -462,8 +473,14 @@ mod tests {
 
     fn corpus() -> Vec<(String, String)> {
         vec![
-            ("a.md".into(), "Pump maintenance: replace the seal on line 1.".into()),
-            ("b.md".into(), "Pump maintenance: replace the seal on line 2.".into()),
+            (
+                "a.md".into(),
+                "Pump maintenance: replace the seal on line 1.".into(),
+            ),
+            (
+                "b.md".into(),
+                "Pump maintenance: replace the seal on line 2.".into(),
+            ),
             ("c.md".into(), "Payment terms are net thirty days.".into()),
         ]
     }
@@ -473,17 +490,30 @@ mod tests {
     #[test]
     fn a_vacuous_comparison_is_not_a_verdict() {
         let mut r = ChainReport {
-            documents: 1, repeats: 0, differences: 0, contradictions: 0,
-            structure_hash: "x".into(), baseline_tokens: 10, context_tokens: 5,
-            unplaced: vec![], mean_gain: 0.0, null: 0.0, drifts: vec![],
-            candidates: 0, embedder: "test".into(),
+            documents: 1,
+            repeats: 0,
+            differences: 0,
+            contradictions: 0,
+            structure_hash: "x".into(),
+            baseline_tokens: 10,
+            context_tokens: 5,
+            unplaced: vec![],
+            mean_gain: 0.0,
+            null: 0.0,
+            drifts: vec![],
+            candidates: 0,
+            embedder: "test".into(),
         };
         assert!(!r.testable(), "no unplaced records: nothing to score");
         assert!(!r.discriminates());
         assert!(r.render().contains("not run"));
 
-        r.unplaced = vec![Unplaced { id: "x".into(), live_score: 0.5,
-                                     shortlist: vec![], top_gain: 0.0 }];
+        r.unplaced = vec![Unplaced {
+            id: "x".into(),
+            live_score: 0.5,
+            shortlist: vec![],
+            top_gain: 0.0,
+        }];
         assert!(!r.testable(), "no candidates: nothing to rank");
 
         r.candidates = 2;
@@ -499,12 +529,23 @@ mod tests {
     #[test]
     fn losing_to_the_control_reaches_the_output() {
         let r = ChainReport {
-            documents: 3, repeats: 1, differences: 0, contradictions: 0,
-            structure_hash: "abcdef123456".into(), baseline_tokens: 100,
+            documents: 3,
+            repeats: 1,
+            differences: 0,
+            contradictions: 0,
+            structure_hash: "abcdef123456".into(),
+            baseline_tokens: 100,
             context_tokens: 50,
-            unplaced: vec![Unplaced { id: "z".into(), live_score: 0.4,
-                                      shortlist: vec!["A/B".into()], top_gain: 0.01 }],
-            mean_gain: 0.01, null: 0.90, drifts: vec![], candidates: 1,
+            unplaced: vec![Unplaced {
+                id: "z".into(),
+                live_score: 0.4,
+                shortlist: vec!["A/B".into()],
+                top_gain: 0.01,
+            }],
+            mean_gain: 0.01,
+            null: 0.90,
+            drifts: vec![],
+            candidates: 1,
             embedder: "test".into(),
         };
         assert!(r.testable());
@@ -518,22 +559,43 @@ mod tests {
     #[test]
     fn beating_the_control_reaches_the_output() {
         let r = ChainReport {
-            documents: 3, repeats: 1, differences: 0, contradictions: 0,
-            structure_hash: "abcdef123456".into(), baseline_tokens: 100,
+            documents: 3,
+            repeats: 1,
+            differences: 0,
+            contradictions: 0,
+            structure_hash: "abcdef123456".into(),
+            baseline_tokens: 100,
             context_tokens: 50,
-            unplaced: vec![Unplaced { id: "z".into(), live_score: 0.4,
-                                      shortlist: vec!["A/B".into()], top_gain: 0.30 }],
-            mean_gain: 0.30, null: 0.05, drifts: vec![], candidates: 1,
+            unplaced: vec![Unplaced {
+                id: "z".into(),
+                live_score: 0.4,
+                shortlist: vec!["A/B".into()],
+                top_gain: 0.30,
+            }],
+            mean_gain: 0.30,
+            null: 0.05,
+            drifts: vec![],
+            candidates: 1,
             embedder: "test".into(),
         };
         assert!(r.testable());
-        assert!(r.discriminates(), "0.30 must beat 0.05 by more than the 0.02 margin");
+        assert!(
+            r.discriminates(),
+            "0.30 must beat 0.05 by more than the 0.02 margin"
+        );
         assert!(r.render().contains("carries signal"));
         assert!(!r.render().contains("NOT ABOVE THE NULL"));
 
         // And the margin itself must bite: 0.02 is not "more than 0.02".
-        let edge = ChainReport { mean_gain: 0.07, null: 0.05, ..r };
-        assert!(!edge.discriminates(), "a margin of exactly 0.02 must not pass");
+        let edge = ChainReport {
+            mean_gain: 0.07,
+            null: 0.05,
+            ..r
+        };
+        assert!(
+            !edge.discriminates(),
+            "a margin of exactly 0.02 must not pass"
+        );
     }
 
     /// The pass runs end to end and reports the embedder it used — a run that

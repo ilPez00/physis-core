@@ -61,7 +61,9 @@ fn parse_wordnet(path: &std::path::Path) -> Vec<(String, String)> {
         if line.starts_with("  ") || line.trim().is_empty() {
             continue;
         }
-        let Some((head, gloss)) = line.split_once(" | ") else { continue };
+        let Some((head, gloss)) = line.split_once(" | ") else {
+            continue;
+        };
         let f: Vec<&str> = head.split_whitespace().collect();
         if f.len() < 5 {
             continue;
@@ -152,7 +154,9 @@ fn main() {
         let mut texts = Vec::new();
         let mut cells = Vec::new();
         for def in ontology.classification_domains() {
-            let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut t = def.name.clone();
             for h in &def.hints {
                 t.push(' ');
@@ -162,7 +166,10 @@ fn main() {
             cells.push((d.clone(), m.clone()));
         }
         println!("physis: {} entries, embedding...", texts.len());
-        let emb: Vec<Vec<f32>> = texts.iter().map(|t| normalize(&embedder.embed(t))).collect();
+        let emb: Vec<Vec<f32>> = texts
+            .iter()
+            .map(|t| normalize(&embedder.embed(t)))
+            .collect();
 
         // ---------- lexicon (cache shared with Iteration 31) ----------
         const STRIDE: usize = 4;
@@ -362,19 +369,33 @@ fn main() {
                     known_top: known_tops[ci].clone(),
                 });
             }
-            println!("  fold {fold}: {} held out, {} regions", held.len(), centroids.len());
+            println!(
+                "  fold {fold}: {} held out, {} regions",
+                held.len(),
+                centroids.len()
+            );
             let _ = cv_t;
         }
 
         // ---------- pooled analysis ----------
         let n = all_regions.len();
         let overall = all_regions.iter().filter(|r| r.hit).count() as f64 / n as f64;
-        println!("\n=== Pooled over {FOLDS} folds: {n} regions, overall hit rate {overall:.3} ===\n");
+        println!(
+            "\n=== Pooled over {FOLDS} folds: {n} regions, overall hit rate {overall:.3} ===\n"
+        );
 
         let rate = |f: &dyn Fn(&Region) -> bool| -> (usize, usize, f64) {
             let sel: Vec<&Region> = all_regions.iter().filter(|r| f(r)).collect();
             let h = sel.iter().filter(|r| r.hit).count();
-            (h, sel.len(), if sel.is_empty() { 0.0 } else { h as f64 / sel.len() as f64 })
+            (
+                h,
+                sel.len(),
+                if sel.is_empty() {
+                    0.0
+                } else {
+                    h as f64 / sel.len() as f64
+                },
+            )
         };
         let rate_k = |f: &dyn Fn(&Region) -> bool, k: usize| -> (usize, usize, f64) {
             let sel: Vec<&Region> = all_regions.iter().filter(|r| f(r)).collect();
@@ -382,7 +403,15 @@ fn main() {
                 .iter()
                 .filter(|r| r.known_top.get(k).is_some_and(|t| r.best_held > *t))
                 .count();
-            (h, sel.len(), if sel.is_empty() { 0.0 } else { h as f64 / sel.len() as f64 })
+            (
+                h,
+                sel.len(),
+                if sel.is_empty() {
+                    0.0
+                } else {
+                    h as f64 / sel.len() as f64
+                },
+            )
         };
 
         // Convergence threshold pooled across folds, so the split is one
@@ -421,16 +450,28 @@ fn main() {
         let mut verdicts: Vec<(usize, f64, f64)> = Vec::new();
         for k in [0usize, 1, 2, 3, 4, 6, 8, 12, 16] {
             let (_, _, ov) = rate_k(&|_r| true, k);
-            let (eh, en, er) = rate_k(&|r| r.convergence >= cv_t && !r.wn_known && !r.phys_covered, k);
-            let (fh, fnn, fr) = rate_k(&|r| r.convergence < cv_t && !r.wn_known && !r.phys_covered, k);
+            let (eh, en, er) = rate_k(
+                &|r| r.convergence >= cv_t && !r.wn_known && !r.phys_covered,
+                k,
+            );
+            let (fh, fnn, fr) = rate_k(
+                &|r| r.convergence < cv_t && !r.wn_known && !r.phys_covered,
+                k,
+            );
             let z = z_test(er, en as f64, fr, fnn as f64);
-            let flag = if !(0.10..=0.90).contains(&ov) { "  <- floored/saturated" } else { "" };
+            let flag = if !(0.10..=0.90).contains(&ov) {
+                "  <- floored/saturated"
+            } else {
+                ""
+            };
             println!("  {k:4}    {ov:.3}   {eh:3}/{en:<4} {er:.3}   {fh:4}/{fnn:<4} {fr:.3}   {z:+.2}{flag}");
             verdicts.push((k, ov, z));
         }
         // Read the verdict only from unsaturated k.
-        let usable: Vec<&(usize, f64, f64)> =
-            verdicts.iter().filter(|(_, ov, _)| (0.10..=0.90).contains(ov)).collect();
+        let usable: Vec<&(usize, f64, f64)> = verdicts
+            .iter()
+            .filter(|(_, ov, _)| (0.10..=0.90).contains(ov))
+            .collect();
         let zb_fixed = if usable.is_empty() {
             0.0
         } else {
@@ -438,7 +479,15 @@ fn main() {
         };
         println!(
             "\n  usable k (overall rate in 0.10-0.90): {}   mean z = {zb_fixed:+.2}",
-            if usable.is_empty() { "NONE".to_string() } else { usable.iter().map(|(k, _, _)| k.to_string()).collect::<Vec<_>>().join(", ") }
+            if usable.is_empty() {
+                "NONE".to_string()
+            } else {
+                usable
+                    .iter()
+                    .map(|(k, _, _)| k.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            }
         );
 
         println!("\n=== B2. Convergence as a trend, all uncovered regions ===\n");
@@ -459,8 +508,22 @@ fn main() {
         }
 
         println!("\n=== Verdict ===\n");
-        println!("  A (WordNet check):              z = {za:+.2}  ->  {}", if za > 1.96 { "SUPPORTED" } else { "NOT SUPPORTED" });
-        println!("  B (convergence, parent-excl):   z = {zb:+.2}  ->  {} [CONFOUNDED]", if zb > 1.96 { "supported" } else { "not supported" });
+        println!(
+            "  A (WordNet check):              z = {za:+.2}  ->  {}",
+            if za > 1.96 {
+                "SUPPORTED"
+            } else {
+                "NOT SUPPORTED"
+            }
+        );
+        println!(
+            "  B (convergence, parent-excl):   z = {zb:+.2}  ->  {} [CONFOUNDED]",
+            if zb > 1.96 {
+                "supported"
+            } else {
+                "not supported"
+            }
+        );
         println!("  B-CONTROL (fixed-k, mean over usable k): z = {zb_fixed:+.2}  ->  {}  <- the one that counts", if zb_fixed > 1.96 { "SUPPORTED" } else { "NOT SUPPORTED" });
         println!();
         if zb_fixed > 1.96 && za <= 1.96 {

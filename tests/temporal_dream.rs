@@ -35,11 +35,7 @@ fn dream_proposes_reactivation_from_retained_branches() {
     let mut trail = EpistemicAuditTrail::default();
     trail.record(event(EpistemicEventType::HypothesisGenerated, "h_old", 0));
     trail.record(transition("h_old", 200, "superseded"));
-    trail.record(event(
-        EpistemicEventType::ObservationIngested,
-        "h_old",
-        800,
-    ));
+    trail.record(event(EpistemicEventType::ObservationIngested, "h_old", 800));
 
     let proposals = dream_over_history(&trail, &[], chrono::Duration::seconds(1000));
     assert_eq!(proposals.len(), 1);
@@ -71,7 +67,12 @@ fn dream_proposes_restoring_severed_connections() {
     let proposals = dream_over_history(&trail, &[mutation], chrono::Duration::seconds(1000));
     assert_eq!(proposals.len(), 1);
     let p = &proposals[0];
-    assert_eq!(p.kind, ProposalKind::RestoreConnection { to: "n1".to_string() });
+    assert_eq!(
+        p.kind,
+        ProposalKind::RestoreConnection {
+            to: "n1".to_string()
+        }
+    );
     assert!(p.rationale.contains("re-confirmed"));
 }
 
@@ -106,21 +107,18 @@ fn dream_proposes_retiring_repeatedly_contradicted_connections() {
     mutation.timestamp = at(100);
 
     let mut trail = EpistemicAuditTrail::default();
-    trail.record(event(
-        EpistemicEventType::ContradictionDetected,
-        "n1",
-        200,
-    ));
-    trail.record(event(
-        EpistemicEventType::ContradictionDetected,
-        "n1",
-        400,
-    ));
+    trail.record(event(EpistemicEventType::ContradictionDetected, "n1", 200));
+    trail.record(event(EpistemicEventType::ContradictionDetected, "n1", 400));
 
     let proposals = dream_over_history(&trail, &[mutation], chrono::Duration::seconds(1000));
     assert_eq!(proposals.len(), 1);
     let p = &proposals[0];
-    assert_eq!(p.kind, ProposalKind::RetireConnection { to: "n1".to_string() });
+    assert_eq!(
+        p.kind,
+        ProposalKind::RetireConnection {
+            to: "n1".to_string()
+        }
+    );
     assert!(p.rationale.contains("2 contradiction"));
 }
 
@@ -132,11 +130,7 @@ fn dream_never_writes() {
     let mut trail = EpistemicAuditTrail::default();
     trail.record(event(EpistemicEventType::HypothesisGenerated, "h_old", 0));
     trail.record(transition("h_old", 200, "superseded"));
-    trail.record(event(
-        EpistemicEventType::ObservationIngested,
-        "h_old",
-        800,
-    ));
+    trail.record(event(EpistemicEventType::ObservationIngested, "h_old", 800));
 
     let mut sever = OntologyMutation::new(
         "n0",
@@ -151,8 +145,7 @@ fn dream_never_writes() {
     let events_before = serde_json::to_string(&trail.events).unwrap();
     let mutations_before = serde_json::to_string(&mutations).unwrap();
 
-    let proposals =
-        dream_over_history(&trail, &mutations, chrono::Duration::seconds(10_000));
+    let proposals = dream_over_history(&trail, &mutations, chrono::Duration::seconds(10_000));
 
     assert_eq!(
         serde_json::to_string(&trail.events).unwrap(),

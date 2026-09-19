@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
-use sha2::{Digest, Sha256};
 use physis_core::classify::{CellClassifier, CellScore};
 use physis_core::contradiction::{Contradiction, ContradictionParty, ResolutionStatus};
 use physis_core::core::PhysisCore;
@@ -9,12 +8,13 @@ use physis_core::embed::VectorEmbed;
 use physis_core::hypothesis::{
     Evidence, EvidencePolarity, Hypothesis, HypothesisStatus, Prediction,
 };
-use physis_core::models::{cosine_sim, Abstraction, Agency, FacetFilter, LifecyclePhase, PinEdit, Scale};
-use physis_core::ontology::OntologyLoader;
-use physis_core::rag::{
-    count_tokens, Bm25Index, RagChunk, RagCorpus, TokenFixedRetriever,
+use physis_core::models::{
+    cosine_sim, Abstraction, Agency, FacetFilter, LifecyclePhase, PinEdit, Scale,
 };
+use physis_core::ontology::OntologyLoader;
+use physis_core::rag::{count_tokens, Bm25Index, RagChunk, RagCorpus, TokenFixedRetriever};
 use physis_core::store;
+use sha2::{Digest, Sha256};
 
 /// physis-core — embed, classify, cohere, learn from feedback.
 #[derive(Parser)]
@@ -450,18 +450,41 @@ fn main() -> anyhow::Result<()> {
         Command::NGram { cmd } => cmd_ngram(cmd),
         Command::Demo { dir, query, order } => cmd_demo(&dir, &query, order),
         Command::Observed { source, json } => cmd_observed(source.as_deref(), json),
-        Command::Claim { from, statement, confidence } => {
-            cmd_claim(from, &statement, confidence)
-        }
-        Command::DirectionCmd { before, after, want, json } => {
-            cmd_direction(&before, &after, &want, json)
-        }
-        Command::Chain { corpus, query, budget, threshold, json } => {
-            cmd_chain(&corpus, &query, budget, threshold, json)
-        }
-        Command::Context { corpus, query, budget, json } => cmd_context(&corpus, &query, budget, json),
-        Command::Benchmark { order, budget, big_model } => cmd_benchmark(order, budget, big_model),
-        Command::Run { config, model, ngram, query } => cmd_run(&config, model, ngram, query),
+        Command::Claim {
+            from,
+            statement,
+            confidence,
+        } => cmd_claim(from, &statement, confidence),
+        Command::DirectionCmd {
+            before,
+            after,
+            want,
+            json,
+        } => cmd_direction(&before, &after, &want, json),
+        Command::Chain {
+            corpus,
+            query,
+            budget,
+            threshold,
+            json,
+        } => cmd_chain(&corpus, &query, budget, threshold, json),
+        Command::Context {
+            corpus,
+            query,
+            budget,
+            json,
+        } => cmd_context(&corpus, &query, budget, json),
+        Command::Benchmark {
+            order,
+            budget,
+            big_model,
+        } => cmd_benchmark(order, budget, big_model),
+        Command::Run {
+            config,
+            model,
+            ngram,
+            query,
+        } => cmd_run(&config, model, ngram, query),
     }
 }
 
@@ -904,7 +927,11 @@ fn require_hypothesis_id(core: &PhysisCore, needle: &str) -> anyhow::Result<Stri
         IdMatch::Unknown => anyhow::bail!("hypothesis {needle} not found"),
         IdMatch::Ambiguous(_) => {
             let mut msg = format!("'{needle}' is ambiguous — these hypotheses match:\n");
-            for (id, h) in core.hypotheses.iter().filter(|(id, _)| id.starts_with(needle)) {
+            for (id, h) in core
+                .hypotheses
+                .iter()
+                .filter(|(id, _)| id.starts_with(needle))
+            {
                 msg.push_str(&format!("  {id}  {}\n", h.statement));
             }
             msg.push_str("Use more characters of the id.");
@@ -1042,7 +1069,10 @@ fn run_hypothesis(cmd: HypothesisCmd) -> anyhow::Result<()> {
                     } else {
                         format!(
                             ", {} of them dead and hidden (--include-dead to see them)",
-                            core.hypotheses.values().filter(|h| is_dead(h.status)).count()
+                            core.hypotheses
+                                .values()
+                                .filter(|h| is_dead(h.status))
+                                .count()
                         )
                     }
                 );
@@ -1137,7 +1167,9 @@ fn run_hypothesis(cmd: HypothesisCmd) -> anyhow::Result<()> {
                 &id[..8],
                 if correct { "CORRECT" } else { "WRONG" }
             );
-            println!("  fitness {before:.3} -> {after:.3}   status={status:?}   {pending} still pending");
+            println!(
+                "  fitness {before:.3} -> {after:.3}   status={status:?}   {pending} still pending"
+            );
         }
         HypothesisCmd::Open { older_than } => {
             let cutoff = chrono::Utc::now() - chrono::Duration::days(older_than.max(0));
@@ -1451,9 +1483,15 @@ enum NGramCmd {
         structural: bool,
     },
     List,
-    Info { id: String },
-    Remove { id: String },
-    Path { id: String },
+    Info {
+        id: String,
+    },
+    Remove {
+        id: String,
+    },
+    Path {
+        id: String,
+    },
     /// Human-readable continuation inspection of an installed table.
     Inspect {
         id: String,
@@ -1479,8 +1517,14 @@ enum NGramCmd {
         #[arg(long, default_value_t = 10)]
         min_support: usize,
     },
-    Export { id: String, dest: PathBuf },
-    Import { id: String, src: PathBuf },
+    Export {
+        id: String,
+        dest: PathBuf,
+    },
+    Import {
+        id: String,
+        src: PathBuf,
+    },
 }
 
 fn cmd_model(cmd: ModelCmd) -> anyhow::Result<()> {
@@ -1492,7 +1536,10 @@ fn cmd_model(cmd: ModelCmd) -> anyhow::Result<()> {
     match cmd {
         ModelCmd::List => {
             for m in reg.list() {
-                println!("{:<24} {:<28} {} MB", m.record.id, m.record.architecture, m.record.memory_estimate_mb);
+                println!(
+                    "{:<24} {:<28} {} MB",
+                    m.record.id, m.record.architecture, m.record.memory_estimate_mb
+                );
             }
             if reg.list().is_empty() {
                 eprintln!("no models installed — install one with `model install --id … --src …`");
@@ -1517,7 +1564,11 @@ fn cmd_model(cmd: ModelCmd) -> anyhow::Result<()> {
                 license: "unspecified".into(),
             };
             let m = reg.install_local(record, &src, &files)?;
-            println!("installed {} ({} files verified)", m.record.id, m.files.len());
+            println!(
+                "installed {} ({} files verified)",
+                m.record.id,
+                m.files.len()
+            );
         }
         ModelCmd::Use { id } => {
             let mreg = physis_core::model_provider::ModelRegistry::new(
@@ -1572,12 +1623,30 @@ fn cmd_ngram(cmd: NGramCmd) -> anyhow::Result<()> {
     use physis_core::tokenizer::{Tokenizer, WhitespaceTokenizer};
     let reg = TableRegistry::new(TableRegistry::default_root());
     match cmd {
-        NGramCmd::Build { input, output, order, min_count, max_vocabulary, structural } => {
+        NGramCmd::Build {
+            input,
+            output,
+            order,
+            min_count,
+            max_vocabulary,
+            structural,
+        } => {
             let docs = physis_core::map::load_corpus(&input)?;
-            anyhow::ensure!(!docs.is_empty(), "no md/txt documents under {}", input.display());
+            anyhow::ensure!(
+                !docs.is_empty(),
+                "no md/txt documents under {}",
+                input.display()
+            );
             let cfg = TableConfig {
-                table_id: output.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "table".into()),
-                kind: if structural { TableKind::Structural } else { TableKind::Lexical },
+                table_id: output
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "table".into()),
+                kind: if structural {
+                    TableKind::Structural
+                } else {
+                    TableKind::Lexical
+                },
                 max_order: order,
                 min_count,
                 max_vocabulary,
@@ -1591,7 +1660,8 @@ fn cmd_ngram(cmd: NGramCmd) -> anyhow::Result<()> {
                 // distribution over misfilings. This was the last site still
                 // constructing its own RandomProjectionEmbedder directly.
                 let embedder = load_embedder();
-                let clf = physis_core::classify::CellClassifier::build(&ontology, embedder.as_ref());
+                let clf =
+                    physis_core::classify::CellClassifier::build(&ontology, embedder.as_ref());
                 ngram_table::build_structural(&docs, cfg, |seg| {
                     let emb = embedder.as_ref().embed(seg);
                     clf.best_entry_sim(&emb)
@@ -1615,37 +1685,61 @@ fn cmd_ngram(cmd: NGramCmd) -> anyhow::Result<()> {
             std::fs::create_dir_all(output.parent().unwrap_or(Path::new(".")))?;
             std::fs::write(&output, &bytes)?;
             let st = table.statistics();
-            println!("built {} — {} entries, vocab {}, max order {}, {} bytes, sha-checksummed", table.manifest().table_id, st.entry_count, st.vocabulary, st.max_order, bytes.len());
+            println!(
+                "built {} — {} entries, vocab {}, max order {}, {} bytes, sha-checksummed",
+                table.manifest().table_id,
+                st.entry_count,
+                st.vocabulary,
+                st.max_order,
+                bytes.len()
+            );
         }
         NGramCmd::List => {
             let all = reg.list();
-            if all.is_empty() { eprintln!("no tables — build one with `ngram build --input … --output …`"); }
+            if all.is_empty() {
+                eprintln!("no tables — build one with `ngram build --input … --output …`");
+            }
             for (id, m) in all {
-                println!("{:<28} {:?} order {} {} entries", id, m.kind, m.max_order, m.entry_count);
+                println!(
+                    "{:<28} {:?} order {} {} entries",
+                    id, m.kind, m.max_order, m.entry_count
+                );
             }
         }
         NGramCmd::Info { id } => println!("{}", serde_json::to_string_pretty(&reg.info(&id)?)?),
-        NGramCmd::Remove { id } => { reg.remove(&id)?; println!("removed {id}"); }
+        NGramCmd::Remove { id } => {
+            reg.remove(&id)?;
+            println!("removed {id}");
+        }
         NGramCmd::Path { id } => println!("{}", reg.path(&id).display()),
         NGramCmd::Inspect { id, context, top } => {
             let table = reg.load(&id, None)?;
             let t = WhitespaceTokenizer::new(0);
             let ctx = t.encode(&context);
-            println!("CONTEXT
+            println!(
+                "CONTEXT
 {context}
-");
+"
+            );
             let m = table.manifest();
             println!("BACKOFF ORDER {} → {}", m.max_order, 1);
-            println!("
+            println!(
+                "
 CANDIDATES (count-ordered)
-");
+"
+            );
             println!("{:<24} probability", "token");
             println!("-----------------------------------");
             for (w, p) in table.top_next(&ctx, top) {
                 println!("{:<24} {:.4}", w, p);
             }
         }
-        NGramCmd::Cells { input, order, min_count, min_support } => {
+        NGramCmd::Cells {
+            input,
+            order,
+            min_count,
+            min_support,
+        } => {
             return cmd_ngram_cells(&input, order, min_count, min_support);
         }
         NGramCmd::Export { id, dest } => {
@@ -1654,7 +1748,10 @@ CANDIDATES (count-ordered)
         }
         NGramCmd::Import { id, src } => {
             let m = reg.import(&id, &src)?;
-            println!("imported {} (order {}, {} entries)", id, m.max_order, m.entry_count);
+            println!(
+                "imported {} (order {}, {} entries)",
+                id, m.max_order, m.entry_count
+            );
         }
     }
     Ok(())
@@ -1665,25 +1762,46 @@ fn cmd_demo(dir: &Path, query: &str, order: u8) -> anyhow::Result<()> {
     use physis_core::ngram_table::{TableBuilder, TableConfig};
     use std::sync::Arc;
     let docs = physis_core::map::load_corpus(dir)?;
-    anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", dir.display());
+    anyhow::ensure!(
+        !docs.is_empty(),
+        "no corpus documents under {}",
+        dir.display()
+    );
     let embedder = load_embedder();
     let report = physis_core::map::build_map(&docs, &embedder, None)?;
     println!("── PHYSIS STRUCTURAL MAP (deterministic) ──");
-    for l in report.hero_lines() { println!("{l}"); }
+    for l in report.hero_lines() {
+        println!("{l}");
+    }
     // The n-gram floor + model, built in-process from the same corpus.
     let tok = physis_core::tokenizer::WhitespaceTokenizer::new(0);
-    let cfg = TableConfig { table_id: "demo".into(), max_order: order, ..Default::default() };
+    let cfg = TableConfig {
+        table_id: "demo".into(),
+        max_order: order,
+        ..Default::default()
+    };
     let mut b = TableBuilder::new(cfg);
-    for (_, body) in &docs { b.push_text(&tok, body); }
+    for (_, body) in &docs {
+        b.push_text(&tok, body);
+    }
     let (table, _bytes) = b.finish(&tok, "demo-corpus");
     let model = NgramDecoderModel::new("demo-ngram", Arc::new(table), Box::new(tok));
-    println!("
-── LOCAL MODEL (n-gram decoder, offline, deterministic) ──");
-    println!("model: {} — caps {:?} — ~{} MB", model.metadata().id, model.capabilities(), model.memory_requirements_mb());
+    println!(
+        "
+── LOCAL MODEL (n-gram decoder, offline, deterministic) ──"
+    );
+    println!(
+        "model: {} — caps {:?} — ~{} MB",
+        model.metadata().id,
+        model.capabilities(),
+        model.memory_requirements_mb()
+    );
     println!("score(query) = {:.4} mean log-prob", model.score(query)?);
     println!("continuation: {}…", model.generate(query, 8)?);
-    println!("
-less context, more structure — physis.");
+    println!(
+        "
+less context, more structure — physis."
+    );
     Ok(())
 }
 
@@ -1727,7 +1845,10 @@ fn cmd_claim(from: u64, statement: &str, confidence: f32) -> anyhow::Result<()> 
     println!("  cites obs:{} — {} {}", obs.seq, obs.source, obs.subject);
     println!();
     println!("It is a Candidate: asserted, not established. Refute or support it:");
-    println!("  physis-core hypothesis evidence {} \"<measurement>\" --polarity contradicting", &id[..8]);
+    println!(
+        "  physis-core hypothesis evidence {} \"<measurement>\" --polarity contradicting",
+        &id[..8]
+    );
     println!("  physis-core ground        # see it beside everything else believed");
     Ok(())
 }
@@ -1760,17 +1881,23 @@ fn cmd_chain(
     json: bool,
 ) -> anyhow::Result<()> {
     let docs = physis_core::map::load_corpus(corpus)?;
-    anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", corpus.display());
+    anyhow::ensure!(
+        !docs.is_empty(),
+        "no corpus documents under {}",
+        corpus.display()
+    );
     let (embedder, kind) = physis_core::embed::select(384);
     let ontology = physis_core::ontology::OntologyLoader::load_all();
     let clf = physis_core::classify::CellClassifier::build(&ontology, embedder.as_ref());
     // An empty query still needs something to compile context against; the
     // corpus's own first title is a neutral default that keeps the run
     // reproducible instead of erroring on a flag the user did not need.
-    let q = if query.trim().is_empty() { docs[0].0.as_str() } else { query };
-    let r = physis_core::chain::run(
-        &docs, q, embedder.as_ref(), &clf, budget, threshold, kind,
-    )?;
+    let q = if query.trim().is_empty() {
+        docs[0].0.as_str()
+    } else {
+        query
+    };
+    let r = physis_core::chain::run(&docs, q, embedder.as_ref(), &clf, budget, threshold, kind)?;
     if json {
         println!("{}", serde_json::to_string_pretty(&r)?);
     } else {
@@ -1795,7 +1922,11 @@ fn cmd_ngram_cells(
 ) -> anyhow::Result<()> {
     use physis_core::ngram_table::{build_cell_tables, TableConfig, TableKind};
     let docs = physis_core::map::load_corpus(input)?;
-    anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", input.display());
+    anyhow::ensure!(
+        !docs.is_empty(),
+        "no corpus documents under {}",
+        input.display()
+    );
     let embedder = load_embedder();
     let ontology = physis_core::ontology::OntologyLoader::load_all();
     let clf = physis_core::classify::CellClassifier::build(&ontology, embedder.as_ref());
@@ -1832,19 +1963,33 @@ fn cmd_ngram_cells(
     // OCCURRENCE, while a cell only gets a table if it was ever followed by
     // something. A cell appearing once, at the end of a document, has support
     // but no transitions and therefore no table.
-    println!("{} document(s) → {} sequence(s)", docs.len(), sequences.len());
-    println!("{} cell(s) seen, {} with a following transition (so with a table)",
-             fam.support.len(), fam.tables.len());
+    println!(
+        "{} document(s) → {} sequence(s)",
+        docs.len(),
+        sequences.len()
+    );
+    println!(
+        "{} cell(s) seen, {} with a following transition (so with a table)",
+        fam.support.len(),
+        fam.tables.len()
+    );
     println!("min_support {min_support}: cells below it fall back to the flat control\n");
     println!("{:<28} {:>8}  OWN TABLE?", "CELL", "SUPPORT");
     let mut used = 0;
     for (cell, n) in fam.by_support() {
         let own = n >= min_support && fam.tables.contains_key(cell);
         used += own as usize;
-        println!("{:<28} {:>8}  {}", cell, n, if own { "yes" } else { "flat" });
+        println!(
+            "{:<28} {:>8}  {}",
+            cell,
+            n,
+            if own { "yes" } else { "flat" }
+        );
     }
-    println!("\n{used} of {} cell(s) with a table carry support >= {min_support}.",
-             fam.tables.len());
+    println!(
+        "\n{used} of {} cell(s) with a table carry support >= {min_support}.",
+        fam.tables.len()
+    );
     println!("The flat control was built from the same sequences in the same pass.");
     println!("Compare against it before claiming per-cell tables help.");
     Ok(())
@@ -1853,16 +1998,26 @@ fn cmd_ngram_cells(
 fn cmd_context(corpus: &Path, query: &str, budget: usize, json: bool) -> anyhow::Result<()> {
     use physis_core::map::compile_context;
     let docs = physis_core::map::load_corpus(corpus)?;
-    anyhow::ensure!(!docs.is_empty(), "no corpus documents under {}", corpus.display());
+    anyhow::ensure!(
+        !docs.is_empty(),
+        "no corpus documents under {}",
+        corpus.display()
+    );
     let embedder = load_embedder();
     let report = compile_context(&docs, &embedder, query, budget)?;
     if json {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         print!("{}", report.render());
-        println!("
-── COMPILED CONTEXT (first {} chars) ──", 400);
-        println!("{}", report.physis_context.chars().take(400).collect::<String>());
+        println!(
+            "
+── COMPILED CONTEXT (first {} chars) ──",
+            400
+        );
+        println!(
+            "{}",
+            report.physis_context.chars().take(400).collect::<String>()
+        );
     }
     Ok(())
 }
@@ -1897,8 +2052,14 @@ Retrieval quality here is lexical; the numbers are a floor, not a claim."
     let adir = out.artifacts_dir.clone();
     physis_core::bench::materialise_ground_truth(&PathBuf::from(cfg.corpus_root))?;
     std::fs::create_dir_all(&adir)?;
-    std::fs::write(PathBuf::from(&adir).join("run.json"), serde_json::to_vec_pretty(&out.run)?)?;
-    std::fs::write(PathBuf::from(&adir).join("metrics.json"), serde_json::to_vec_pretty(&out.run.metrics)?)?;
+    std::fs::write(
+        PathBuf::from(&adir).join("run.json"),
+        serde_json::to_vec_pretty(&out.run)?,
+    )?;
+    std::fs::write(
+        PathBuf::from(&adir).join("metrics.json"),
+        serde_json::to_vec_pretty(&out.run.metrics)?,
+    )?;
     std::fs::write(
         PathBuf::from(&adir).join("provenance.json"),
         serde_json::to_vec_pretty(&serde_json::json!({
@@ -1918,16 +2079,42 @@ Retrieval quality here is lexical; the numbers are a floor, not a claim."
     let cp = (m.contradiction_recall * 100.0).round();
     let cpct = (m.context_compression_ratio * 100.0).round();
     println!("BENCHMARK (ground truth, deterministic)");
-    println!("repeat/recall        {}% ({}/{})", rp, m.families_found, m.families_known);
-    println!("anomaly recall       {}% ({}/{})", ap, m.anomalies_caught, m.anomalies_known);
-    println!("contradiction recall {}% ({}/{})", cp, m.contradictions_found, m.contradictions_known);
-    println!("map deterministic    {} ({})", m.map_deterministic, m.structure_hash.chars().take(12).collect::<String>());
-    println!("context compression  {}% ({} to {} tokens)", cpct, m.baseline_tokens, m.physis_tokens);
-    println!("ngram build {} ms, load {} ms, {} lookups/s, {} bytes on disk", m.ngram_build_ms.round(), m.ngram_load_ms.round(), m.ngram_lookup_per_sec.round(), m.ngram_disk_bytes);
+    println!(
+        "repeat/recall        {}% ({}/{})",
+        rp, m.families_found, m.families_known
+    );
+    println!(
+        "anomaly recall       {}% ({}/{})",
+        ap, m.anomalies_caught, m.anomalies_known
+    );
+    println!(
+        "contradiction recall {}% ({}/{})",
+        cp, m.contradictions_found, m.contradictions_known
+    );
+    println!(
+        "map deterministic    {} ({})",
+        m.map_deterministic,
+        m.structure_hash.chars().take(12).collect::<String>()
+    );
+    println!(
+        "context compression  {}% ({} to {} tokens)",
+        cpct, m.baseline_tokens, m.physis_tokens
+    );
+    println!(
+        "ngram build {} ms, load {} ms, {} lookups/s, {} bytes on disk",
+        m.ngram_build_ms.round(),
+        m.ngram_load_ms.round(),
+        m.ngram_lookup_per_sec.round(),
+        m.ngram_disk_bytes
+    );
     println!("ngram RAM estimate   {} MB", m.ngram_ram_estimate_mb);
     println!("embedder             {}", embedder_kind);
     println!("interchangeable      {}", m.interchange_ok);
-    println!("held-out ({} docs) score  {}", m.heldout_docs, (m.heldout_score * 100.0).round());
+    println!(
+        "held-out ({} docs) score  {}",
+        m.heldout_docs,
+        (m.heldout_score * 100.0).round()
+    );
     println!("big-model oracle leg {}", m.big_model_leg);
     println!(
         "oracle agreement     {}% · evidence {}/{} · per-case detail in metrics.json oracle_cases",
@@ -1939,10 +2126,16 @@ Retrieval quality here is lexical; the numbers are a floor, not a claim."
     Ok(())
 }
 
-fn cmd_run(config: &Path, model: Option<String>, ngram: Option<String>, query: Option<String>) -> anyhow::Result<()> {
-    
+fn cmd_run(
+    config: &Path,
+    model: Option<String>,
+    ngram: Option<String>,
+    query: Option<String>,
+) -> anyhow::Result<()> {
     use physis_core::model_provider::{ModelProvider, NgramDecoderModel};
-    use physis_core::ngram_table::{NGramTable, TableBuilder, TableConfig, TableKind, TableRegistry};
+    use physis_core::ngram_table::{
+        NGramTable, TableBuilder, TableConfig, TableKind, TableRegistry,
+    };
     use physis_core::tokenizer::WhitespaceTokenizer;
     use std::sync::Arc;
     let mut cfg = physis_core::config_run::load_config(&PathBuf::from(config))?;
@@ -1959,7 +2152,11 @@ fn cmd_run(config: &Path, model: Option<String>, ngram: Option<String>, query: O
     } else {
         let docs = physis_core::map::load_corpus(&cfg.corpus)?;
         let tok = WhitespaceTokenizer::new(50_000);
-        let bcfg = TableConfig { table_id: "run".into(), max_order: cfg.ngram.order, ..Default::default() };
+        let bcfg = TableConfig {
+            table_id: "run".into(),
+            max_order: cfg.ngram.order,
+            ..Default::default()
+        };
         let mut tb = TableBuilder::new(bcfg);
         for (_, b) in &docs {
             tb.push_text(&tok, b);
@@ -1989,14 +2186,27 @@ fn cmd_run(config: &Path, model: Option<String>, ngram: Option<String>, query: O
     };
     let cont = m.generate(&cfg.query, 8)?;
     println!("── PHYSIS RUN (config-driven, offline, deterministic) ──");
-    println!("model: {} · architecture: {} · ngram kind: {}", m.metadata().id, m.metadata().architecture, kind);
+    println!(
+        "model: {} · architecture: {} · ngram kind: {}",
+        m.metadata().id,
+        m.metadata().architecture,
+        kind
+    );
     println!("corpus: {} · query: {}", cfg.corpus.display(), cfg.query);
     for l in map.hero_lines() {
         println!("{l}");
     }
-    println!("context compression {}% ({} to {} tokens)", (ctx.compression_ratio * 100.0).round(), ctx.baseline_tokens, ctx.physis_tokens);
+    println!(
+        "context compression {}% ({} to {} tokens)",
+        (ctx.compression_ratio * 100.0).round(),
+        ctx.baseline_tokens,
+        ctx.physis_tokens
+    );
     println!("score(query) {} (mean log-prob * 100)", score);
-    println!("continuation: {} ...", cont.trim().chars().take(60).collect::<String>());
+    println!(
+        "continuation: {} ...",
+        cont.trim().chars().take(60).collect::<String>()
+    );
     println!("less context, more structure — physis.");
     Ok(())
 }

@@ -17,12 +17,20 @@ fn main() {
         let Some(dir) = ["models", "../models"]
             .iter()
             .find(|d| std::path::Path::new(d).join("model.onnx").exists())
-        else { println!("no model"); return };
+        else {
+            println!("no model");
+            return;
+        };
         let embedder = OnnxEmbedder::with_config(&OnnxConfig {
-            dim: 384, model_dir: Some(dir.to_string()),
-            pooling: PoolingStrategy::Mean, ..OnnxConfig::default()
+            dim: 384,
+            model_dir: Some(dir.to_string()),
+            pooling: PoolingStrategy::Mean,
+            ..OnnxConfig::default()
         });
-        if !embedder.is_available() { println!("embedder unavailable"); return }
+        if !embedder.is_available() {
+            println!("embedder unavailable");
+            return;
+        }
 
         let ontology = OntologyLoader::load_all();
         let defs: Vec<_> = ontology
@@ -75,21 +83,34 @@ fn main() {
         // Threshold at the median live score, so about half start uncovered.
         let mut live: Vec<f32> = records
             .iter()
-            .map(|(_, e)| classifier.best_entry_sim(e).map(|(s, _, _)| s).unwrap_or(0.0))
+            .map(|(_, e)| {
+                classifier
+                    .best_entry_sim(e)
+                    .map(|(s, _, _)| s)
+                    .unwrap_or(0.0)
+            })
             .collect();
         live.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let threshold = live[live.len() / 2];
 
         let gaps = uncovered(&classifier, &records, threshold);
-        println!("{} records, {} uncovered at threshold {:.3}\n", records.len(), gaps.len(), threshold);
+        println!(
+            "{} records, {} uncovered at threshold {:.3}\n",
+            records.len(),
+            gaps.len(),
+            threshold
+        );
 
         // Two candidates: a duplicate of an existing entry, and a synthetic
         // cell sitting exactly on an uncovered record.
         let dup_text = text_of(defs[1]);
         let target = records.iter().find(|(id, _)| gaps.contains(id)).unwrap();
         let mk = |name: &str, v: Vec<f32>| Cell {
-            domain: "CANDIDATE".into(), mode: name.into(),
-            entries: vec![name.into()], facets: vec![Facets::default()], embeddings: vec![v],
+            domain: "CANDIDATE".into(),
+            mode: name.into(),
+            entries: vec![name.into()],
+            facets: vec![Facets::default()],
+            embeddings: vec![v],
         };
         let candidates = vec![
             mk("duplicate-of-existing", embedder.embed(&dup_text)),

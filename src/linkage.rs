@@ -223,7 +223,10 @@ mod tests {
         let link = &g.links()[0];
         assert_eq!(link.bridge_count, 2);
         assert_eq!(link.bridges, vec!["a".to_string(), "b".to_string()]);
-        assert!(link.is_cross_domain(), "HEAL and BOND are different domains");
+        assert!(
+            link.is_cross_domain(),
+            "HEAL and BOND are different domains"
+        );
     }
 
     #[test]
@@ -286,6 +289,10 @@ mod tests {
         let embedder = FixedEmbed { map: vec![] };
         let g = LinkageGraph::build(&clf, &embedder, Vec::<&str>::new());
         assert!(g.is_empty());
-        assert_eq!(g.strongest(5).len(), 0, "strongest must not panic on an empty graph");
+        assert_eq!(
+            g.strongest(5).len(),
+            0,
+            "strongest must not panic on an empty graph"
+        );
     }
 }

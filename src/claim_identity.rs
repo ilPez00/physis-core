@@ -115,23 +115,57 @@ use serde::{Deserialize, Serialize};
 /// same word cannot make two claims look alike and then be asked to tell them
 /// apart.
 const NEGATIVE: [&str; 24] = [
-    "not", "never", "no", "cannot", "fails", "fail", "failed", "failing", "breaks", "broke",
-    "broken", "rejected", "rejects", "drops", "loses", "lost", "corrupts", "exhausts",
-    "miscompiles", "without", "missing", "stale", "wrong", "slower",
+    "not",
+    "never",
+    "no",
+    "cannot",
+    "fails",
+    "fail",
+    "failed",
+    "failing",
+    "breaks",
+    "broke",
+    "broken",
+    "rejected",
+    "rejects",
+    "drops",
+    "loses",
+    "lost",
+    "corrupts",
+    "exhausts",
+    "miscompiles",
+    "without",
+    "missing",
+    "stale",
+    "wrong",
+    "slower",
 ];
 
 /// Words that carry the opposite verdict.
 const POSITIVE: [&str; 16] = [
-    "passes", "pass", "passed", "succeeds", "succeed", "succeeded", "works", "finishes",
-    "completes", "accepted", "accepts", "healthy", "idempotent", "resolves", "fine", "correct",
+    "passes",
+    "pass",
+    "passed",
+    "succeeds",
+    "succeed",
+    "succeeded",
+    "works",
+    "finishes",
+    "completes",
+    "accepted",
+    "accepts",
+    "healthy",
+    "idempotent",
+    "resolves",
+    "fine",
+    "correct",
 ];
 
 /// Function words, which carry neither.
 const STOP: [&str; 40] = [
-    "the", "a", "an", "and", "or", "to", "of", "in", "on", "at", "for", "with", "is", "are",
-    "it", "this", "that", "as", "by", "from", "into", "than", "when", "then", "there", "here",
-    "its", "was", "were", "be", "been", "so", "but", "if", "any", "every", "all", "each",
-    "run", "runs",
+    "the", "a", "an", "and", "or", "to", "of", "in", "on", "at", "for", "with", "is", "are", "it",
+    "this", "that", "as", "by", "from", "into", "than", "when", "then", "there", "here", "its",
+    "was", "were", "be", "been", "so", "but", "if", "any", "every", "all", "each", "run", "runs",
 ];
 
 /// The structural identity, in its poorest form: what the claim is about, and
@@ -152,7 +186,11 @@ impl Signature {
         if self.content.is_empty() || other.content.is_empty() {
             return 0.0;
         }
-        let shared = self.content.iter().filter(|w| other.content.contains(w)).count();
+        let shared = self
+            .content
+            .iter()
+            .filter(|w| other.content.contains(w))
+            .count();
         let union = self.content.len() + other.content.len() - shared;
         if union == 0 {
             return 0.0;
@@ -340,7 +378,10 @@ impl IdentityRun {
                 self.polarity_unresolved, self.known_contradictions
             ));
             for e in self.unresolved_examples.iter().take(4) {
-                o.push_str(&format!("    · {}\n", e.chars().take(88).collect::<String>()));
+                o.push_str(&format!(
+                    "    · {}\n",
+                    e.chars().take(88).collect::<String>()
+                ));
             }
         }
         o
@@ -366,7 +407,9 @@ pub fn run(
 ) -> IdentityRun {
     let sigs: Vec<Signature> = claims.iter().map(|(s, _)| signature(s)).collect();
     let is_true = |i: usize, j: usize| {
-        truth.iter().any(|&(a, b)| (a == i && b == j) || (a == j && b == i))
+        truth
+            .iter()
+            .any(|&(a, b)| (a == i && b == j) || (a == j && b == i))
     };
 
     let mut scores = Vec::new();
@@ -394,7 +437,11 @@ pub fn run(
             pairs_examined = seen;
             let recall = tp as f32 / truth.len().max(1) as f32;
             let flagged = tp + fp;
-            let precision = if flagged == 0 { 0.0 } else { tp as f32 / flagged as f32 };
+            let precision = if flagged == 0 {
+                0.0
+            } else {
+                tp as f32 / flagged as f32
+            };
             let f1 = if precision + recall > 0.0 {
                 2.0 * precision * recall / (precision + recall)
             } else {
@@ -464,16 +511,25 @@ mod tests {
     #[test]
     fn verdict_words_are_not_content() {
         let s = signature("the build fails and never passes");
-        assert!(!s.content.iter().any(|w| w == "fails" || w == "passes" || w == "never"));
+        assert!(!s
+            .content
+            .iter()
+            .any(|w| w == "fails" || w == "passes" || w == "never"));
     }
 
     /// The pair this module exists for, in the case the extractor can read.
     #[test]
     fn a_refutation_and_its_endorsement_overlap_and_oppose() {
         let a = signature("cargo test fails on this crate: the ort linker step never resolves");
-        let b = signature("cargo test passes on this crate: the ort linker step resolves every time");
+        let b =
+            signature("cargo test passes on this crate: the ort linker step resolves every time");
         assert!(a.overlap(&b) > 0.4, "overlap was {}", a.overlap(&b));
-        assert!(a.opposed(&b), "polarities {} and {}", a.polarity, b.polarity);
+        assert!(
+            a.opposed(&b),
+            "polarities {} and {}",
+            a.polarity,
+            b.polarity
+        );
     }
 
     /// And the case it CANNOT read, kept as a test rather than patched away.
@@ -490,7 +546,10 @@ mod tests {
     #[test]
     fn double_negation_over_an_unlisted_predicate_is_unreadable() {
         let b = signature("the release build finishes on this box in four minutes — the LTO stage never runs out of memory");
-        assert_eq!(b.polarity, 0, "if this ever becomes nonzero, say why in the doc");
+        assert_eq!(
+            b.polarity, 0,
+            "if this ever becomes nonzero, say why in the doc"
+        );
     }
 
     /// And the case that must NOT fire: two claims that agree.
@@ -499,7 +558,10 @@ mod tests {
         let a = signature("the release build fails at the LTO stage");
         let b = signature("the release build breaks at the LTO stage");
         assert!(a.overlap(&b) > 0.5);
-        assert!(!a.opposed(&b), "two refutations must not read as a contradiction");
+        assert!(
+            !a.opposed(&b),
+            "two refutations must not read as a contradiction"
+        );
     }
 
     /// An unknown polarity is a silence, not a disagreement.
@@ -515,9 +577,18 @@ mod tests {
     #[test]
     fn the_run_finds_a_planted_contradiction() {
         let claims = vec![
-            ("the migrate script fails when the audit table is present".to_string(), vec![1.0, 0.0]),
-            ("the migrate script succeeds when the audit table is present".to_string(), vec![0.9, 0.1]),
-            ("the semiotic grid holds five domains".to_string(), vec![0.0, 1.0]),
+            (
+                "the migrate script fails when the audit table is present".to_string(),
+                vec![1.0, 0.0],
+            ),
+            (
+                "the migrate script succeeds when the audit table is present".to_string(),
+                vec![0.9, 0.1],
+            ),
+            (
+                "the semiotic grid holds five domains".to_string(),
+                vec![0.0, 1.0],
+            ),
         ];
         let r = run(&claims, &[(0, 1)], "test");
         assert_eq!(r.pairs_examined, 3);

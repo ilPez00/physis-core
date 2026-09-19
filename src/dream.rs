@@ -72,7 +72,10 @@ pub fn dream_over_history(
     // Assertion-ordered history per subject (the G3 replay discipline).
     let mut by_subject: HashMap<&str, Vec<&crate::epistemic::EpistemicEvent>> = HashMap::new();
     for ev in &trail.events {
-        by_subject.entry(ev.subject_id.as_str()).or_default().push(ev);
+        by_subject
+            .entry(ev.subject_id.as_str())
+            .or_default()
+            .push(ev);
     }
     for events in by_subject.values_mut() {
         events.sort_by_key(|e| e.assertion_time());

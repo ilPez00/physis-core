@@ -62,19 +62,34 @@ fn z_prop(p1: f64, n1: f64, p2: f64, n2: f64) -> f64 {
     }
     let pooled = (p1 * n1 + p2 * n2) / (n1 + n2);
     let se = (pooled * (1.0 - pooled) * (1.0 / n1 + 1.0 / n2)).sqrt();
-    if se <= 0.0 { 0.0 } else { (p1 - p2) / se }
+    if se <= 0.0 {
+        0.0
+    } else {
+        (p1 - p2) / se
+    }
 }
 
 fn words(s: &str) -> Vec<String> {
     s.split_whitespace()
-        .map(|w| w.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect::<String>())
+        .map(|w| {
+            w.to_lowercase()
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+        })
         .filter(|w| w.len() > 2)
         .collect()
 }
 
 /// IDF-weighted intersection of two sorted token slices, skipping anything
 /// either embedding already read.
-fn shared(a: &[String], b: &[String], own_i: &HashSet<String>, own_j: &HashSet<String>, idf: &dyn Fn(&str) -> f64) -> f64 {
+fn shared(
+    a: &[String],
+    b: &[String],
+    own_i: &HashSet<String>,
+    own_j: &HashSet<String>,
+    idf: &dyn Fn(&str) -> f64,
+) -> f64 {
     let (mut x, mut y, mut acc) = (0usize, 0usize, 0.0f64);
     while x < a.len() && y < b.len() {
         match a[x].cmp(&b[y]) {
@@ -100,12 +115,16 @@ fn main() {
         use physis_core::embed::VectorEmbed;
         use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
 
-        let path = std::env::args().nth(1).unwrap_or_else(|| "operational_corpus.json".into());
+        let path = std::env::args()
+            .nth(1)
+            .unwrap_or_else(|| "operational_corpus.json".into());
         let Ok(raw) = std::fs::read_to_string(&path) else {
-            println!("WARNING: cannot read {path}"); return;
+            println!("WARNING: cannot read {path}");
+            return;
         };
         let Ok(events) = serde_json::from_str::<Vec<Event>>(&raw) else {
-            println!("WARNING: {path} is not a Vec<Event>"); return;
+            println!("WARNING: {path} is not a Vec<Event>");
+            return;
         };
         let ep_toks: Vec<Vec<String>> = events
             .iter()
@@ -118,21 +137,36 @@ fn main() {
             .collect();
         println!("corpus: {} episodes", ep_toks.len());
 
-        let Some(dir) = ["models", "../models"].iter().find(|d| std::path::Path::new(d).join("model.onnx").exists()) else {
-            println!("WARNING: MiniLM not available"); return;
+        let Some(dir) = ["models", "../models"]
+            .iter()
+            .find(|d| std::path::Path::new(d).join("model.onnx").exists())
+        else {
+            println!("WARNING: MiniLM not available");
+            return;
         };
         let embedder = OnnxEmbedder::with_config(&OnnxConfig {
-            dim: 384, model_dir: Some(dir.to_string()),
-            pooling: PoolingStrategy::Mean, ..OnnxConfig::default()
+            dim: 384,
+            model_dir: Some(dir.to_string()),
+            pooling: PoolingStrategy::Mean,
+            ..OnnxConfig::default()
         });
-        if !embedder.is_available() { println!("WARNING: embedder unavailable"); return; }
+        if !embedder.is_available() {
+            println!("WARNING: embedder unavailable");
+            return;
+        }
 
         let ontology = OntologyLoader::load_all();
-        let (mut texts, mut cells, mut own, mut names) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        let (mut texts, mut cells, mut own, mut names) =
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new());
         for def in ontology.classification_domains() {
-            let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut t = def.name.clone();
-            for h in &def.hints { t.push(' '); t.push_str(h); }
+            for h in &def.hints {
+                t.push(' ');
+                t.push_str(h);
+            }
             own.push(words(&t).into_iter().collect::<HashSet<String>>());
             names.push(words(&def.name));
             texts.push(t);
@@ -140,7 +174,10 @@ fn main() {
         }
         let n = texts.len();
         println!("{n} ontology entries, embedding...");
-        let emb: Vec<Vec<f32>> = texts.iter().map(|t| normalize(&embedder.embed(t))).collect();
+        let emb: Vec<Vec<f32>> = texts
+            .iter()
+            .map(|t| normalize(&embedder.embed(t)))
+            .collect();
 
         // NUMBERED INSTANCES: (entry, episode) pairs, capped for cost, never
         // unioned. This is the whole difference from Iteration 36.
@@ -150,9 +187,16 @@ fn main() {
             let mut v = Vec::new();
             if name.len() >= 2 {
                 for (e, toks) in ep_toks.iter().enumerate() {
-                    if name.iter().filter(|w| toks.binary_search(w).is_ok()).count() >= 2 {
+                    if name
+                        .iter()
+                        .filter(|w| toks.binary_search(w).is_ok())
+                        .count()
+                        >= 2
+                    {
                         v.push(e);
-                        if v.len() >= MAX_INST { break; }
+                        if v.len() >= MAX_INST {
+                            break;
+                        }
                     }
                 }
             }
@@ -167,23 +211,44 @@ fn main() {
 
         // IDF over episode tokens.
         let mut df: HashMap<&str, usize> = HashMap::new();
-        for t in &ep_toks { for w in t { *df.entry(w.as_str()).or_default() += 1; } }
+        for t in &ep_toks {
+            for w in t {
+                *df.entry(w.as_str()).or_default() += 1;
+            }
+        }
         let ne = ep_toks.len() as f64;
         let idf = move |w: &str| -> f64 { (ne / *df.get(w).unwrap_or(&1) as f64).ln() };
 
-        struct P { cos: f32, pooled: f64, best: f64, coep: f64, sc: bool, sd: bool }
+        struct P {
+            cos: f32,
+            pooled: f64,
+            best: f64,
+            coep: f64,
+            sc: bool,
+            sd: bool,
+        }
         let mut pairs: Vec<P> = Vec::new();
         for i in 0..n {
-            if inst[i].is_empty() { continue }
+            if inst[i].is_empty() {
+                continue;
+            }
             // Pooled bag, only to reproduce Iteration 36's baseline.
             let mut bag_i: Vec<String> = Vec::new();
-            for &e in &inst[i] { bag_i.extend(ep_toks[e].iter().cloned()); }
-            bag_i.sort(); bag_i.dedup();
+            for &e in &inst[i] {
+                bag_i.extend(ep_toks[e].iter().cloned());
+            }
+            bag_i.sort();
+            bag_i.dedup();
             for j in (i + 1)..n {
-                if inst[j].is_empty() { continue }
+                if inst[j].is_empty() {
+                    continue;
+                }
                 let mut bag_j: Vec<String> = Vec::new();
-                for &e in &inst[j] { bag_j.extend(ep_toks[e].iter().cloned()); }
-                bag_j.sort(); bag_j.dedup();
+                for &e in &inst[j] {
+                    bag_j.extend(ep_toks[e].iter().cloned());
+                }
+                bag_j.sort();
+                bag_j.dedup();
 
                 let pooled = shared(&bag_i, &bag_j, &own[i], &own[j], &idf);
 
@@ -196,23 +261,37 @@ fn main() {
                         // Same episode: both primitives in one context. Score
                         // its content, minus what either embedding already had.
                         let s = shared(&ep_toks[a], &ep_toks[a], &own[i], &own[j], &idf);
-                        if s > coep { coep = s; }
+                        if s > coep {
+                            coep = s;
+                        }
                     }
                     for &b in &inst[j] {
-                        if a == b { continue }
+                        if a == b {
+                            continue;
+                        }
                         let s = shared(&ep_toks[a], &ep_toks[b], &own[i], &own[j], &idf);
-                        if s > best { best = s; }
+                        if s > best {
+                            best = s;
+                        }
                     }
                 }
                 pairs.push(P {
                     cos: cosine_sim(&emb[i], &emb[j]),
-                    pooled, best, coep,
-                    sc: cells[i] == cells[j], sd: cells[i].0 == cells[j].0,
+                    pooled,
+                    best,
+                    coep,
+                    sc: cells[i] == cells[j],
+                    sd: cells[i].0 == cells[j].0,
                 });
             }
         }
         let co_n = pairs.iter().filter(|p| p.coep > 0.0).count();
-        println!("{} pairs; {} share at least one episode ({:.1}%)\n", pairs.len(), co_n, 100.0 * co_n as f64 / pairs.len() as f64);
+        println!(
+            "{} pairs; {} share at least one episode ({:.1}%)\n",
+            pairs.len(),
+            co_n,
+            100.0 * co_n as f64 / pairs.len() as f64
+        );
 
         let mut order: Vec<usize> = (0..pairs.len()).collect();
         order.sort_by(|&a, &b| pairs[a].cos.partial_cmp(&pairs[b].cos).unwrap());
@@ -221,34 +300,65 @@ fn main() {
         let per = order.len() / STRATA;
 
         println!("  statistic     target        all-strata z    well-controlled z");
-        for (sname, pick) in [
-            ("POOLED    ", 0usize),
-            ("BEST-PAIR ", 1),
-            ("CO-EPISODE", 2),
-        ] {
+        for (sname, pick) in [("POOLED    ", 0usize), ("BEST-PAIR ", 1), ("CO-EPISODE", 2)] {
             for (tname, fine) in [("same-cell  ", true), ("same-domain", false)] {
                 let (mut th, mut nh, mut tl, mut nl) = (0usize, 0usize, 0usize, 0usize);
-                let (mut wth, mut wnh, mut wtl, mut wnl, mut wk) = (0usize, 0usize, 0usize, 0usize, 0usize);
+                let (mut wth, mut wnh, mut wtl, mut wnl, mut wk) =
+                    (0usize, 0usize, 0usize, 0usize, 0usize);
                 for s in 0..STRATA {
                     let lo = s * per;
-                    let hi = if s == STRATA - 1 { order.len() } else { (s + 1) * per };
+                    let hi = if s == STRATA - 1 {
+                        order.len()
+                    } else {
+                        (s + 1) * per
+                    };
                     let mut idx: Vec<usize> = order[lo..hi].to_vec();
-                    if idx.len() < 20 { continue }
-                    let val = |k: usize| match pick { 0 => pairs[k].pooled, 1 => pairs[k].best, _ => pairs[k].coep };
+                    if idx.len() < 20 {
+                        continue;
+                    }
+                    let val = |k: usize| match pick {
+                        0 => pairs[k].pooled,
+                        1 => pairs[k].best,
+                        _ => pairs[k].coep,
+                    };
                     idx.sort_by(|&a, &b| val(a).partial_cmp(&val(b)).unwrap());
                     let mid = idx.len() / 2;
                     let hit = |k: &usize| if fine { pairs[*k].sc } else { pairs[*k].sd };
                     let (lo_i, hi_i) = idx.split_at(mid);
-                    let (hc, lc) = (hi_i.iter().filter(|k| hit(k)).count(), lo_i.iter().filter(|k| hit(k)).count());
-                    let mc = |v: &[usize]| v.iter().map(|&k| pairs[k].cos as f64).sum::<f64>() / v.len() as f64;
-                    th += hc; nh += hi_i.len(); tl += lc; nl += lo_i.len();
+                    let (hc, lc) = (
+                        hi_i.iter().filter(|k| hit(k)).count(),
+                        lo_i.iter().filter(|k| hit(k)).count(),
+                    );
+                    let mc = |v: &[usize]| {
+                        v.iter().map(|&k| pairs[k].cos as f64).sum::<f64>() / v.len() as f64
+                    };
+                    th += hc;
+                    nh += hi_i.len();
+                    tl += lc;
+                    nl += lo_i.len();
                     if (mc(hi_i) - mc(lo_i)).abs() < MAX_IMB {
-                        wth += hc; wnh += hi_i.len(); wtl += lc; wnl += lo_i.len(); wk += 1;
+                        wth += hc;
+                        wnh += hi_i.len();
+                        wtl += lc;
+                        wnl += lo_i.len();
+                        wk += 1;
                     }
                 }
-                let z = z_prop(th as f64 / nh as f64, nh as f64, tl as f64 / nl as f64, nl as f64);
-                let wz = z_prop(wth as f64 / wnh.max(1) as f64, wnh as f64, wtl as f64 / wnl.max(1) as f64, wnl as f64);
-                println!("  {sname}    {tname}      {z:+7.2}         {wz:+7.2}   ({wk}/{STRATA} strata)");
+                let z = z_prop(
+                    th as f64 / nh as f64,
+                    nh as f64,
+                    tl as f64 / nl as f64,
+                    nl as f64,
+                );
+                let wz = z_prop(
+                    wth as f64 / wnh.max(1) as f64,
+                    wnh as f64,
+                    wtl as f64 / wnl.max(1) as f64,
+                    wnl as f64,
+                );
+                println!(
+                    "  {sname}    {tname}      {z:+7.2}         {wz:+7.2}   ({wk}/{STRATA} strata)"
+                );
             }
         }
 

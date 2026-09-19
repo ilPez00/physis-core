@@ -21,9 +21,15 @@ fn main() {
     #[cfg(feature = "embed-onnx")]
     {
         use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
-        let dir = match ["models", "../models"].iter().find(|d| std::path::Path::new(d).join("model.onnx").exists()) {
+        let dir = match ["models", "../models"]
+            .iter()
+            .find(|d| std::path::Path::new(d).join("model.onnx").exists())
+        {
             Some(d) => *d,
-            None => { println!("no model"); return; }
+            None => {
+                println!("no model");
+                return;
+            }
         };
 
         for threads in [None, Some(1usize)] {
@@ -34,7 +40,10 @@ fn main() {
                 intra_threads: threads,
                 ..OnnxConfig::default()
             });
-            if !e.is_available() { println!("embedder unavailable"); return; }
+            if !e.is_available() {
+                println!("embedder unavailable");
+                return;
+            }
 
             let text = "The hybrid battery works alongside the engine to reduce gasoline use.";
             let a = e.embed(text);
@@ -47,7 +56,13 @@ fn main() {
             let c = e.embed(text);
             let stable_after_other_calls = a == c;
 
-            let label = match threads { None => "all-cores", Some(n) => { let _ = n; "1-thread" } };
+            let label = match threads {
+                None => "all-cores",
+                Some(n) => {
+                    let _ = n;
+                    "1-thread"
+                }
+            };
             println!(
                 "[{label}] same-text-twice-in-process: {same_in_process}   stable-after-other-calls: {stable_after_other_calls}"
             );

@@ -140,7 +140,9 @@ fn main() {
         let mut texts = Vec::new();
         let mut cells = Vec::new();
         for def in ontology.classification_domains() {
-            let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut t = def.name.clone();
             for h in &def.hints {
                 t.push(' ');
@@ -150,7 +152,10 @@ fn main() {
             cells.push((d.clone(), m.clone()));
         }
         println!("physis: {} entries, embedding...", texts.len());
-        let emb: Vec<Vec<f32>> = texts.iter().map(|t| normalize(&embedder.embed(t))).collect();
+        let emb: Vec<Vec<f32>> = texts
+            .iter()
+            .map(|t| normalize(&embedder.embed(t)))
+            .collect();
 
         const FOLDS: usize = 5;
         const SAMPLE: usize = 400; // candidates per arm per fold
@@ -212,8 +217,7 @@ fn main() {
             let mut sorted = base.clone();
             sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
             let threshold = quantile(&sorted, 0.50);
-            let uncovered: Vec<usize> =
-                (0..held.len()).filter(|&i| base[i] < threshold).collect();
+            let uncovered: Vec<usize> = (0..held.len()).filter(|&i| base[i] < threshold).collect();
             total_uncovered += uncovered.len();
             total_records += held.len();
 
@@ -361,16 +365,37 @@ fn main() {
 
         println!("  1. DOES THE MACHINE DISPOSER DISCRIMINATE?  Yes, decisively.");
         println!("     An existing entry re-added as a candidate rescues {m_entry:.3} records —");
-        println!("     {}/{} of them, exactly zero — because records near it were", entry_scores.iter().filter(|x| **x > 0.0).count(), entry_scores.len());
-        println!("     already covered. Interpolations rescue {mp:.3} (t = {t_entry:+.2}). The check");
+        println!(
+            "     {}/{} of them, exactly zero — because records near it were",
+            entry_scores.iter().filter(|x| **x > 0.0).count(),
+            entry_scores.len()
+        );
+        println!(
+            "     already covered. Interpolations rescue {mp:.3} (t = {t_entry:+.2}). The check"
+        );
         println!("     is not fooled by a candidate that adds nothing, and it needs no human");
-        println!("     and no lexicon to say so. Of {} candidates it marks {} as", prop_scores.len(), prop_scores.iter().filter(|x| **x > 0.0).count());
-        println!("     demonstrably coverage-adding — a {:.0}x reduction in what anyone would", prop_scores.len() as f64 / prop_scores.iter().filter(|x| **x > 0.0).count().max(1) as f64);
+        println!(
+            "     and no lexicon to say so. Of {} candidates it marks {} as",
+            prop_scores.len(),
+            prop_scores.iter().filter(|x| **x > 0.0).count()
+        );
+        println!(
+            "     demonstrably coverage-adding — a {:.0}x reduction in what anyone would",
+            prop_scores.len() as f64
+                / prop_scores.iter().filter(|x| **x > 0.0).count().max(1) as f64
+        );
         println!("     have to read.");
         println!();
         println!("  2. DOES IT PREFER ITERATION 30'S PROPOSER?  No.");
         println!("     Near-neighbour midpoints {mp:.3} vs medium-rank midpoints {m_mid:.3}");
-        println!("     ({:.2}x, t = {t_mid:+.2}). Any midpoint of two RELATED entries works as", if m_mid > 1e-9 { mp / m_mid } else { f64::INFINITY });
+        println!(
+            "     ({:.2}x, t = {t_mid:+.2}). Any midpoint of two RELATED entries works as",
+            if m_mid > 1e-9 {
+                mp / m_mid
+            } else {
+                f64::INFINITY
+            }
+        );
         println!("     well; only midpoints of UNRELATED entries do worse ({m_ctrl:.3}). So what");
         println!("     carries the operational value is interpolating between related content");
         println!("     at all — not the near-neighbour specificity Iteration 30 measured.");
@@ -382,8 +407,15 @@ fn main() {
         println!();
         println!("  Practical consequence, which is the useful part: a machine can stand");
         println!("  where the human was, not to judge whether a concept is GOOD, but to");
-        println!("  throw away the {:.0}% of candidates that provably change nothing. The", 100.0 * (1.0 - rate_p));
-        println!("  human then reads {} instead of {}.", prop_scores.iter().filter(|x| **x > 0.0).count(), prop_scores.len());
+        println!(
+            "  throw away the {:.0}% of candidates that provably change nothing. The",
+            100.0 * (1.0 - rate_p)
+        );
+        println!(
+            "  human then reads {} instead of {}.",
+            prop_scores.iter().filter(|x| **x > 0.0).count(),
+            prop_scores.len()
+        );
 
         println!(
             "\n(What this does NOT establish: that a rescued record is rescued CORRECTLY. The\n planner's coverage rule asks whether a record now classifies confidently, not\n whether it classifies rightly — a candidate that swallows records into a wrong\n cell scores identically to one that captures a real gap. That distinction needs\n labels this corpus does not carry, and it is exactly the question nine\n representational mechanisms failed to answer. The claim here is narrower and\n operational: coverage, not correctness.)"

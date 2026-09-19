@@ -28,49 +28,163 @@ use serde::Serialize;
 
 /// (bare term, contextual sentence, coarse [Mammal/Bird], fine [sub-group])
 const CORPUS: &[(&str, &str, &str, &str)] = &[
-    ("dog", "The dog wagged its tail and waited by the door for its owner to come home.", "mammal", "domestic"),
-    ("cat", "The cat curled up on the windowsill and purred in the afternoon sun.", "mammal", "domestic"),
-    ("horse", "The horse trotted around the paddock, its mane flowing in the breeze.", "mammal", "domestic"),
-    ("sheep", "The sheep grazed quietly in the pasture, following the rest of the flock.", "mammal", "domestic"),
-    ("lion", "The lion stalked its prey across the savanna before launching a sudden charge.", "mammal", "predator"),
-    ("wolf", "The wolf howled at dusk, calling the rest of its pack to the hunt.", "mammal", "predator"),
-    ("bear", "The bear caught a salmon in its claws as the fish leapt upstream.", "mammal", "predator"),
-    ("tiger", "The tiger prowled silently through the tall grass, stripes blending with the shadows.", "mammal", "predator"),
-    ("eagle", "The eagle soared high above the canyon, scanning the ground for movement.", "bird", "flying"),
-    ("sparrow", "The sparrow hopped along the branch before darting off between the leaves.", "bird", "flying"),
-    ("owl", "The owl turned its head silently, watching for the faintest movement in the dark.", "bird", "flying"),
-    ("swan", "The swan glided smoothly across the lake, barely rippling the water.", "bird", "flying"),
-    ("penguin", "The penguin waddled across the ice before diving into the frigid water.", "bird", "flightless"),
-    ("ostrich", "The ostrich sprinted across the plain on powerful legs, kicking up dust.", "bird", "flightless"),
-    ("kiwi", "The kiwi foraged in the undergrowth at night, sniffing out insects with its long beak.", "bird", "flightless"),
+    (
+        "dog",
+        "The dog wagged its tail and waited by the door for its owner to come home.",
+        "mammal",
+        "domestic",
+    ),
+    (
+        "cat",
+        "The cat curled up on the windowsill and purred in the afternoon sun.",
+        "mammal",
+        "domestic",
+    ),
+    (
+        "horse",
+        "The horse trotted around the paddock, its mane flowing in the breeze.",
+        "mammal",
+        "domestic",
+    ),
+    (
+        "sheep",
+        "The sheep grazed quietly in the pasture, following the rest of the flock.",
+        "mammal",
+        "domestic",
+    ),
+    (
+        "lion",
+        "The lion stalked its prey across the savanna before launching a sudden charge.",
+        "mammal",
+        "predator",
+    ),
+    (
+        "wolf",
+        "The wolf howled at dusk, calling the rest of its pack to the hunt.",
+        "mammal",
+        "predator",
+    ),
+    (
+        "bear",
+        "The bear caught a salmon in its claws as the fish leapt upstream.",
+        "mammal",
+        "predator",
+    ),
+    (
+        "tiger",
+        "The tiger prowled silently through the tall grass, stripes blending with the shadows.",
+        "mammal",
+        "predator",
+    ),
+    (
+        "eagle",
+        "The eagle soared high above the canyon, scanning the ground for movement.",
+        "bird",
+        "flying",
+    ),
+    (
+        "sparrow",
+        "The sparrow hopped along the branch before darting off between the leaves.",
+        "bird",
+        "flying",
+    ),
+    (
+        "owl",
+        "The owl turned its head silently, watching for the faintest movement in the dark.",
+        "bird",
+        "flying",
+    ),
+    (
+        "swan",
+        "The swan glided smoothly across the lake, barely rippling the water.",
+        "bird",
+        "flying",
+    ),
+    (
+        "penguin",
+        "The penguin waddled across the ice before diving into the frigid water.",
+        "bird",
+        "flightless",
+    ),
+    (
+        "ostrich",
+        "The ostrich sprinted across the plain on powerful legs, kicking up dust.",
+        "bird",
+        "flightless",
+    ),
+    (
+        "kiwi",
+        "The kiwi foraged in the undergrowth at night, sniffing out insects with its long beak.",
+        "bird",
+        "flightless",
+    ),
 ];
 
-fn coarse(i: usize) -> &'static str { CORPUS[i].2 }
-fn fine(i: usize) -> &'static str { CORPUS[i].3 }
+fn coarse(i: usize) -> &'static str {
+    CORPUS[i].2
+}
+fn fine(i: usize) -> &'static str {
+    CORPUS[i].3
+}
 
-fn naive_nn_f1(embeddings: &[Vec<f32>], ref_idx: usize, label_of: impl Fn(usize) -> &'static str) -> Option<f32> {
+fn naive_nn_f1(
+    embeddings: &[Vec<f32>],
+    ref_idx: usize,
+    label_of: impl Fn(usize) -> &'static str,
+) -> Option<f32> {
     let true_label = label_of(ref_idx);
-    let field_size = (0..embeddings.len()).filter(|&i| i != ref_idx && label_of(i) == true_label).count();
-    if field_size == 0 { return None; }
+    let field_size = (0..embeddings.len())
+        .filter(|&i| i != ref_idx && label_of(i) == true_label)
+        .count();
+    if field_size == 0 {
+        return None;
+    }
     let r = &embeddings[ref_idx];
-    let mut scored: Vec<(usize, f32)> = (0..embeddings.len()).filter(|&i| i != ref_idx).map(|i| (i, cosine_sim(&embeddings[i], r))).collect();
+    let mut scored: Vec<(usize, f32)> = (0..embeddings.len())
+        .filter(|&i| i != ref_idx)
+        .map(|i| (i, cosine_sim(&embeddings[i], r)))
+        .collect();
     scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-    let hits = scored.iter().take(field_size).filter(|(i, _)| label_of(*i) == true_label).count();
+    let hits = scored
+        .iter()
+        .take(field_size)
+        .filter(|(i, _)| label_of(*i) == true_label)
+        .count();
     Some(hits as f32 / field_size as f32)
 }
 
-fn delta_direction_f1(embeddings: &[Vec<f32>], ref_idx: usize, threshold: f32, label_of: impl Fn(usize) -> &'static str) -> Option<f32> {
+fn delta_direction_f1(
+    embeddings: &[Vec<f32>],
+    ref_idx: usize,
+    threshold: f32,
+    label_of: impl Fn(usize) -> &'static str,
+) -> Option<f32> {
     let true_label = label_of(ref_idx);
-    let field_size = (0..embeddings.len()).filter(|&i| i != ref_idx && label_of(i) == true_label).count();
-    if field_size == 0 { return None; }
+    let field_size = (0..embeddings.len())
+        .filter(|&i| i != ref_idx && label_of(i) == true_label)
+        .count();
+    if field_size == 0 {
+        return None;
+    }
     let r = &embeddings[ref_idx];
     let others: Vec<usize> = (0..embeddings.len()).filter(|&i| i != ref_idx).collect();
-    let deltas: Vec<Vec<f32>> = others.iter().map(|&i| embeddings[i].iter().zip(r.iter()).map(|(a, b)| a - b).collect()).collect();
+    let deltas: Vec<Vec<f32>> = others
+        .iter()
+        .map(|&i| {
+            embeddings[i]
+                .iter()
+                .zip(r.iter())
+                .map(|(a, b)| a - b)
+                .collect()
+        })
+        .collect();
     let n = deltas.len();
     let mut assigned = vec![false; n];
     let mut clusters: Vec<Vec<usize>> = Vec::new();
     for i in 0..n {
-        if assigned[i] { continue; }
+        if assigned[i] {
+            continue;
+        }
         assigned[i] = true;
         let mut members = vec![i];
         for j in (i + 1)..n {
@@ -81,16 +195,25 @@ fn delta_direction_f1(embeddings: &[Vec<f32>], ref_idx: usize, threshold: f32, l
         }
         clusters.push(members);
     }
-    let nearest = (0..n).min_by(|&a, &b| {
-        let da: f32 = deltas[a].iter().map(|x| x * x).sum();
-        let db: f32 = deltas[b].iter().map(|x| x * x).sum();
-        da.partial_cmp(&db).unwrap()
-    }).unwrap();
+    let nearest = (0..n)
+        .min_by(|&a, &b| {
+            let da: f32 = deltas[a].iter().map(|x| x * x).sum();
+            let db: f32 = deltas[b].iter().map(|x| x * x).sum();
+            da.partial_cmp(&db).unwrap()
+        })
+        .unwrap();
     let chosen = clusters.iter().find(|c| c.contains(&nearest)).unwrap();
-    let hits = chosen.iter().filter(|&&k| label_of(others[k]) == true_label).count();
+    let hits = chosen
+        .iter()
+        .filter(|&&k| label_of(others[k]) == true_label)
+        .count();
     let precision = hits as f32 / chosen.len() as f32;
     let recall = hits as f32 / field_size as f32;
-    Some(if precision + recall > 0.0 { 2.0 * precision * recall / (precision + recall) } else { 0.0 })
+    Some(if precision + recall > 0.0 {
+        2.0 * precision * recall / (precision + recall)
+    } else {
+        0.0
+    })
 }
 
 fn kmeans(embeddings: &[Vec<f32>], k: usize, iterations: usize) -> Vec<usize> {
@@ -98,28 +221,49 @@ fn kmeans(embeddings: &[Vec<f32>], k: usize, iterations: usize) -> Vec<usize> {
     let dim = embeddings[0].len();
     let mut centroid_idx = vec![0usize];
     while centroid_idx.len() < k {
-        let next = (0..n).max_by(|&a, &b| {
-            let da = centroid_idx.iter().map(|&c| 1.0 - cosine_sim(&embeddings[a], &embeddings[c])).fold(f32::INFINITY, f32::min);
-            let db = centroid_idx.iter().map(|&c| 1.0 - cosine_sim(&embeddings[b], &embeddings[c])).fold(f32::INFINITY, f32::min);
-            da.partial_cmp(&db).unwrap()
-        }).unwrap();
+        let next = (0..n)
+            .max_by(|&a, &b| {
+                let da = centroid_idx
+                    .iter()
+                    .map(|&c| 1.0 - cosine_sim(&embeddings[a], &embeddings[c]))
+                    .fold(f32::INFINITY, f32::min);
+                let db = centroid_idx
+                    .iter()
+                    .map(|&c| 1.0 - cosine_sim(&embeddings[b], &embeddings[c]))
+                    .fold(f32::INFINITY, f32::min);
+                da.partial_cmp(&db).unwrap()
+            })
+            .unwrap();
         centroid_idx.push(next);
     }
-    let mut centroids: Vec<Vec<f32>> = centroid_idx.iter().map(|&i| embeddings[i].clone()).collect();
+    let mut centroids: Vec<Vec<f32>> = centroid_idx
+        .iter()
+        .map(|&i| embeddings[i].clone())
+        .collect();
     let mut assignment = vec![0usize; n];
     for _ in 0..iterations {
         for i in 0..n {
-            assignment[i] = (0..k).max_by(|&a, &b| cosine_sim(&embeddings[i], &centroids[a]).partial_cmp(&cosine_sim(&embeddings[i], &centroids[b])).unwrap()).unwrap();
+            assignment[i] = (0..k)
+                .max_by(|&a, &b| {
+                    cosine_sim(&embeddings[i], &centroids[a])
+                        .partial_cmp(&cosine_sim(&embeddings[i], &centroids[b]))
+                        .unwrap()
+                })
+                .unwrap();
         }
         let mut sums = vec![vec![0.0f32; dim]; k];
         let mut counts = vec![0usize; k];
         for i in 0..n {
             let c = assignment[i];
             counts[c] += 1;
-            for d in 0..dim { sums[c][d] += embeddings[i][d]; }
+            for d in 0..dim {
+                sums[c][d] += embeddings[i][d];
+            }
         }
         for c in 0..k {
-            if counts[c] == 0 { continue; }
+            if counts[c] == 0 {
+                continue;
+            }
             let norm: f32 = sums[c].iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
             centroids[c] = sums[c].iter().map(|x| x / norm).collect();
         }
@@ -133,7 +277,9 @@ fn purity(assignment: &[usize], k: usize, label_of: impl Fn(usize) -> &'static s
     for c in 0..k {
         let mut counts = std::collections::HashMap::new();
         for (i, a) in assignment.iter().enumerate() {
-            if *a == c { *counts.entry(label_of(i)).or_insert(0usize) += 1; }
+            if *a == c {
+                *counts.entry(label_of(i)).or_insert(0usize) += 1;
+            }
         }
         correct += counts.values().copied().max().unwrap_or(0);
     }
@@ -156,10 +302,20 @@ fn evaluate(embeddings: &[Vec<f32>], label: &str) -> Comparison {
     let (mut nc_sum, mut nf_sum, mut dc_sum, mut df_sum) = (0.0, 0.0, 0.0, 0.0);
     let (mut nc_n, mut nf_n) = (0, 0);
     for i in 0..CORPUS.len() {
-        if let Some(v) = naive_nn_f1(embeddings, i, coarse) { nc_sum += v; nc_n += 1; }
-        if let Some(v) = naive_nn_f1(embeddings, i, fine) { nf_sum += v; nf_n += 1; }
-        if let Some(v) = delta_direction_f1(embeddings, i, delta_threshold, coarse) { dc_sum += v; }
-        if let Some(v) = delta_direction_f1(embeddings, i, delta_threshold, fine) { df_sum += v; }
+        if let Some(v) = naive_nn_f1(embeddings, i, coarse) {
+            nc_sum += v;
+            nc_n += 1;
+        }
+        if let Some(v) = naive_nn_f1(embeddings, i, fine) {
+            nf_sum += v;
+            nf_n += 1;
+        }
+        if let Some(v) = delta_direction_f1(embeddings, i, delta_threshold, coarse) {
+            dc_sum += v;
+        }
+        if let Some(v) = delta_direction_f1(embeddings, i, delta_threshold, fine) {
+            df_sum += v;
+        }
     }
     let k2 = kmeans(embeddings, 2, 25);
     let k4 = kmeans(embeddings, 4, 25);
@@ -184,8 +340,14 @@ fn main() {
         let mut embedder = None;
         for dir in ["models", "../models"] {
             let p = std::path::Path::new(dir);
-            if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) { continue; }
-            let cfg = OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), ..OnnxConfig::default() };
+            if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) {
+                continue;
+            }
+            let cfg = OnnxConfig {
+                dim: 384,
+                model_dir: Some(dir.to_string()),
+                ..OnnxConfig::default()
+            };
             let e = OnnxEmbedder::with_config(&cfg);
             if e.is_available() {
                 println!("Using real semantic embedder: {dir}/model.onnx\n");
@@ -193,30 +355,74 @@ fn main() {
                 break;
             }
         }
-        let embedder = match embedder { Some(e) => e, None => { println!("WARNING: no ONNX model — aborting."); return; } };
+        let embedder = match embedder {
+            Some(e) => e,
+            None => {
+                println!("WARNING: no ONNX model — aborting.");
+                return;
+            }
+        };
 
-        let bare: Vec<Vec<f32>> = CORPUS.iter().map(|(term, ..)| embedder.embed(term)).collect();
+        let bare: Vec<Vec<f32>> = CORPUS
+            .iter()
+            .map(|(term, ..)| embedder.embed(term))
+            .collect();
         let ctx: Vec<Vec<f32>> = CORPUS.iter().map(|(_, s, ..)| embedder.embed(s)).collect();
 
         let bare_result = evaluate(&bare, "bare-term");
         let ctx_result = evaluate(&ctx, "contextual-sentence");
 
-        println!("{:<24} {:>8} {:>8} {:>8} {:>8} {:>10} {:>10}", "representation", "nv_C", "nv_F", "dl_C", "dl_F", "km2_pur", "km4_pur");
+        println!(
+            "{:<24} {:>8} {:>8} {:>8} {:>8} {:>10} {:>10}",
+            "representation", "nv_C", "nv_F", "dl_C", "dl_F", "km2_pur", "km4_pur"
+        );
         for r in [&bare_result, &ctx_result] {
-            println!("{:<24} {:>8.3} {:>8.3} {:>8.3} {:>8.3} {:>10.3} {:>10.3}",
-                r.representation, r.mean_f1_naive_coarse, r.mean_f1_naive_fine, r.mean_f1_delta_coarse, r.mean_f1_delta_fine, r.kmeans_k2_purity, r.kmeans_k4_purity);
+            println!(
+                "{:<24} {:>8.3} {:>8.3} {:>8.3} {:>8.3} {:>10.3} {:>10.3}",
+                r.representation,
+                r.mean_f1_naive_coarse,
+                r.mean_f1_naive_fine,
+                r.mean_f1_delta_coarse,
+                r.mean_f1_delta_fine,
+                r.kmeans_k2_purity,
+                r.kmeans_k4_purity
+            );
         }
         println!("\n=== DELTA (contextual - bare) ===");
-        println!("naive/coarse:  {:+.3}", ctx_result.mean_f1_naive_coarse - bare_result.mean_f1_naive_coarse);
-        println!("naive/fine:    {:+.3}", ctx_result.mean_f1_naive_fine - bare_result.mean_f1_naive_fine);
-        println!("delta/coarse:  {:+.3}", ctx_result.mean_f1_delta_coarse - bare_result.mean_f1_delta_coarse);
-        println!("delta/fine:    {:+.3}", ctx_result.mean_f1_delta_fine - bare_result.mean_f1_delta_fine);
-        println!("kmeans coarse: {:+.3}", ctx_result.kmeans_k2_purity - bare_result.kmeans_k2_purity);
-        println!("kmeans fine:   {:+.3}", ctx_result.kmeans_k4_purity - bare_result.kmeans_k4_purity);
+        println!(
+            "naive/coarse:  {:+.3}",
+            ctx_result.mean_f1_naive_coarse - bare_result.mean_f1_naive_coarse
+        );
+        println!(
+            "naive/fine:    {:+.3}",
+            ctx_result.mean_f1_naive_fine - bare_result.mean_f1_naive_fine
+        );
+        println!(
+            "delta/coarse:  {:+.3}",
+            ctx_result.mean_f1_delta_coarse - bare_result.mean_f1_delta_coarse
+        );
+        println!(
+            "delta/fine:    {:+.3}",
+            ctx_result.mean_f1_delta_fine - bare_result.mean_f1_delta_fine
+        );
+        println!(
+            "kmeans coarse: {:+.3}",
+            ctx_result.kmeans_k2_purity - bare_result.kmeans_k2_purity
+        );
+        println!(
+            "kmeans fine:   {:+.3}",
+            ctx_result.kmeans_k4_purity - bare_result.kmeans_k4_purity
+        );
 
         println!("\n=== Cross-corpus comparison (CAR = Iteration 5, ANIMAL = this experiment) ===");
-        println!("k-means coarse purity delta:  CAR +0.333   ANIMAL {:+.3}", ctx_result.kmeans_k2_purity - bare_result.kmeans_k2_purity);
-        println!("naive NN fine F1 delta:       CAR -0.183   ANIMAL {:+.3}", ctx_result.mean_f1_naive_fine - bare_result.mean_f1_naive_fine);
+        println!(
+            "k-means coarse purity delta:  CAR +0.333   ANIMAL {:+.3}",
+            ctx_result.kmeans_k2_purity - bare_result.kmeans_k2_purity
+        );
+        println!(
+            "naive NN fine F1 delta:       CAR -0.183   ANIMAL {:+.3}",
+            ctx_result.mean_f1_naive_fine - bare_result.mean_f1_naive_fine
+        );
 
         let json = serde_json::to_string_pretty(&[&bare_result, &ctx_result]).unwrap();
         std::fs::write("experiment6_results.json", &json).expect("write");

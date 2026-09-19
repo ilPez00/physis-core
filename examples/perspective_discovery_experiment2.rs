@@ -95,7 +95,10 @@ struct PerReferenceResult {
 }
 
 fn embed_all(embedder: &dyn VectorEmbed) -> Vec<Vec<f32>> {
-    CORPUS.iter().map(|(text, ..)| embedder.embed(text)).collect()
+    CORPUS
+        .iter()
+        .map(|(text, ..)| embedder.embed(text))
+        .collect()
 }
 
 /// Deterministic k-means: farthest-point (k-means++-style, no randomness)
@@ -125,7 +128,10 @@ fn kmeans(embeddings: &[Vec<f32>], k: usize, iterations: usize) -> Vec<usize> {
             .unwrap();
         centroid_idx.push(next);
     }
-    let mut centroids: Vec<Vec<f32>> = centroid_idx.iter().map(|&i| embeddings[i].clone()).collect();
+    let mut centroids: Vec<Vec<f32>> = centroid_idx
+        .iter()
+        .map(|&i| embeddings[i].clone())
+        .collect();
 
     let mut assignment = vec![0usize; n];
     for _ in 0..iterations {
@@ -183,7 +189,11 @@ fn purity(assignment: &[usize], k: usize, label_of: impl Fn(usize) -> &'static s
 /// Field size = how many OTHER items share ref_idx's label under that
 /// function; if that's zero (a label with no other members, e.g. a fine
 /// group of size 1) the method is undefined and reported as `None`.
-fn naive_nn_f1(embeddings: &[Vec<f32>], ref_idx: usize, label_of: impl Fn(usize) -> &'static str) -> Option<f32> {
+fn naive_nn_f1(
+    embeddings: &[Vec<f32>],
+    ref_idx: usize,
+    label_of: impl Fn(usize) -> &'static str,
+) -> Option<f32> {
     let true_label = label_of(ref_idx);
     let field_size = (0..embeddings.len())
         .filter(|&i| i != ref_idx && label_of(i) == true_label)
@@ -197,7 +207,11 @@ fn naive_nn_f1(embeddings: &[Vec<f32>], ref_idx: usize, label_of: impl Fn(usize)
         .map(|i| (i, cosine_sim(&embeddings[i], r)))
         .collect();
     scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-    let hits = scored.iter().take(field_size).filter(|(i, _)| label_of(*i) == true_label).count();
+    let hits = scored
+        .iter()
+        .take(field_size)
+        .filter(|(i, _)| label_of(*i) == true_label)
+        .count();
     // Fixed-size retrieval: precision == recall == hits/field_size, so F1
     // collapses to the same value.
     Some(hits as f32 / field_size as f32)
@@ -223,7 +237,13 @@ fn delta_direction_f1(
     let others: Vec<usize> = (0..embeddings.len()).filter(|&i| i != ref_idx).collect();
     let deltas: Vec<Vec<f32>> = others
         .iter()
-        .map(|&i| embeddings[i].iter().zip(r.iter()).map(|(a, b)| a - b).collect())
+        .map(|&i| {
+            embeddings[i]
+                .iter()
+                .zip(r.iter())
+                .map(|(a, b)| a - b)
+                .collect()
+        })
         .collect();
     let n = deltas.len();
     let mut assigned = vec![false; n];
@@ -250,7 +270,10 @@ fn delta_direction_f1(
         })
         .unwrap();
     let chosen = clusters.iter().find(|c| c.contains(&nearest)).unwrap();
-    let hits = chosen.iter().filter(|&&k| label_of(others[k]) == true_label).count();
+    let hits = chosen
+        .iter()
+        .filter(|&&k| label_of(others[k]) == true_label)
+        .count();
     let precision = hits as f32 / chosen.len() as f32;
     let recall = hits as f32 / field_size as f32;
     Some(if precision + recall > 0.0 {
@@ -269,7 +292,10 @@ fn fine(i: usize) -> &'static str {
 
 fn main() {
     println!("Experiment 2 (Iteration 2): fixed k-means baseline + fine-grained ground truth");
-    println!("Dataset B extended: {} items, 3 coarse labels, 6 fine labels\n", CORPUS.len());
+    println!(
+        "Dataset B extended: {} items, 3 coarse labels, 6 fine labels\n",
+        CORPUS.len()
+    );
 
     #[cfg(feature = "embed-onnx")]
     let embeddings = {
@@ -280,10 +306,16 @@ fn main() {
             if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) {
                 continue;
             }
-            let cfg = OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), ..OnnxConfig::default() };
+            let cfg = OnnxConfig {
+                dim: 384,
+                model_dir: Some(dir.to_string()),
+                ..OnnxConfig::default()
+            };
             let e = OnnxEmbedder::with_config(&cfg);
             if e.is_available() {
-                println!("Using real semantic embedder: {dir}/model.onnx (all-MiniLM-L6-v2, 384d)\n");
+                println!(
+                    "Using real semantic embedder: {dir}/model.onnx (all-MiniLM-L6-v2, 384d)\n"
+                );
                 found = Some(embed_all(&e));
                 break;
             }
@@ -326,13 +358,21 @@ fn main() {
                 nc_sum += nc;
                 dc_sum += dc;
                 nc_n += 1;
-                if dc > nc { delta_wins_c += 1 } else if (dc - nc).abs() < 1e-6 { ties_c += 1 }
+                if dc > nc {
+                    delta_wins_c += 1
+                } else if (dc - nc).abs() < 1e-6 {
+                    ties_c += 1
+                }
             }
             if let (Some(nf), Some(df)) = (naive_f, delta_f) {
                 nf_sum += nf;
                 df_sum += df;
                 nf_n += 1;
-                if df > nf { delta_wins_f += 1 } else if (df - nf).abs() < 1e-6 { ties_f += 1 }
+                if df > nf {
+                    delta_wins_f += 1
+                } else if (df - nf).abs() < 1e-6 {
+                    ties_f += 1
+                }
             }
 
             per_reference.push(PerReferenceResult {
@@ -353,7 +393,13 @@ fn main() {
         for pr in &per_reference {
             println!(
                 "{:<20} {:<8} {:<8} {:>8.3} {:>8.3} {:>8.3} {:>8.3}",
-                pr.reference, pr.coarse, pr.fine, pr.naive_f1_coarse, pr.delta_f1_coarse, pr.naive_f1_fine, pr.delta_f1_fine
+                pr.reference,
+                pr.coarse,
+                pr.fine,
+                pr.naive_f1_coarse,
+                pr.delta_f1_coarse,
+                pr.naive_f1_fine,
+                pr.delta_f1_fine
             );
         }
 
@@ -375,12 +421,30 @@ fn main() {
 
         println!("\n=== AGGREGATE (n={} references; fine-label aggregates exclude {} singleton groups) ===",
             agg.n_references_tested, agg.n_references_tested - nf_n);
-        println!("k-means(k=3) purity vs coarse:  {:.3}", agg.kmeans_k3_purity_vs_coarse);
-        println!("k-means(k=6) purity vs fine:    {:.3}", agg.kmeans_k6_purity_vs_fine);
-        println!("mean F1  naive/coarse: {:.3}   delta/coarse: {:.3}   (delta wins {}/{}, ties {})",
-            agg.mean_f1_naive_coarse, agg.mean_f1_delta_coarse, agg.delta_wins_coarse, nc_n, agg.ties_coarse);
-        println!("mean F1  naive/fine:   {:.3}   delta/fine:   {:.3}   (delta wins {}/{}, ties {})",
-            agg.mean_f1_naive_fine, agg.mean_f1_delta_fine, agg.delta_wins_fine, nf_n, agg.ties_fine);
+        println!(
+            "k-means(k=3) purity vs coarse:  {:.3}",
+            agg.kmeans_k3_purity_vs_coarse
+        );
+        println!(
+            "k-means(k=6) purity vs fine:    {:.3}",
+            agg.kmeans_k6_purity_vs_fine
+        );
+        println!(
+            "mean F1  naive/coarse: {:.3}   delta/coarse: {:.3}   (delta wins {}/{}, ties {})",
+            agg.mean_f1_naive_coarse,
+            agg.mean_f1_delta_coarse,
+            agg.delta_wins_coarse,
+            nc_n,
+            agg.ties_coarse
+        );
+        println!(
+            "mean F1  naive/fine:   {:.3}   delta/fine:   {:.3}   (delta wins {}/{}, ties {})",
+            agg.mean_f1_naive_fine,
+            agg.mean_f1_delta_fine,
+            agg.delta_wins_fine,
+            nf_n,
+            agg.ties_fine
+        );
 
         let json = serde_json::to_string_pretty(&agg).unwrap();
         std::fs::write("experiment2_results.json", &json).expect("write results");

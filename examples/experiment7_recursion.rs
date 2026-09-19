@@ -42,21 +42,96 @@ use physis_core::embed::VectorEmbed;
 use physis_core::models::cosine_sim;
 
 const CORPUS: &[(&str, &str, &str, &str)] = &[
-    ("dog", "The dog wagged its tail and waited by the door for its owner to come home.", "mammal", "domestic"),
-    ("cat", "The cat curled up on the windowsill and purred in the afternoon sun.", "mammal", "domestic"),
-    ("horse", "The horse trotted around the paddock, its mane flowing in the breeze.", "mammal", "domestic"),
-    ("sheep", "The sheep grazed quietly in the pasture, following the rest of the flock.", "mammal", "domestic"),
-    ("lion", "The lion stalked its prey across the savanna before launching a sudden charge.", "mammal", "predator"),
-    ("wolf", "The wolf howled at dusk, calling the rest of its pack to the hunt.", "mammal", "predator"),
-    ("bear", "The bear caught a salmon in its claws as the fish leapt upstream.", "mammal", "predator"),
-    ("tiger", "The tiger prowled silently through the tall grass, stripes blending with the shadows.", "mammal", "predator"),
-    ("eagle", "The eagle soared high above the canyon, scanning the ground for movement.", "bird", "flying"),
-    ("sparrow", "The sparrow hopped along the branch before darting off between the leaves.", "bird", "flying"),
-    ("owl", "The owl turned its head silently, watching for the faintest movement in the dark.", "bird", "flying"),
-    ("swan", "The swan glided smoothly across the lake, barely rippling the water.", "bird", "flying"),
-    ("penguin", "The penguin waddled across the ice before diving into the frigid water.", "bird", "flightless"),
-    ("ostrich", "The ostrich sprinted across the plain on powerful legs, kicking up dust.", "bird", "flightless"),
-    ("kiwi", "The kiwi foraged in the undergrowth at night, sniffing out insects with its long beak.", "bird", "flightless"),
+    (
+        "dog",
+        "The dog wagged its tail and waited by the door for its owner to come home.",
+        "mammal",
+        "domestic",
+    ),
+    (
+        "cat",
+        "The cat curled up on the windowsill and purred in the afternoon sun.",
+        "mammal",
+        "domestic",
+    ),
+    (
+        "horse",
+        "The horse trotted around the paddock, its mane flowing in the breeze.",
+        "mammal",
+        "domestic",
+    ),
+    (
+        "sheep",
+        "The sheep grazed quietly in the pasture, following the rest of the flock.",
+        "mammal",
+        "domestic",
+    ),
+    (
+        "lion",
+        "The lion stalked its prey across the savanna before launching a sudden charge.",
+        "mammal",
+        "predator",
+    ),
+    (
+        "wolf",
+        "The wolf howled at dusk, calling the rest of its pack to the hunt.",
+        "mammal",
+        "predator",
+    ),
+    (
+        "bear",
+        "The bear caught a salmon in its claws as the fish leapt upstream.",
+        "mammal",
+        "predator",
+    ),
+    (
+        "tiger",
+        "The tiger prowled silently through the tall grass, stripes blending with the shadows.",
+        "mammal",
+        "predator",
+    ),
+    (
+        "eagle",
+        "The eagle soared high above the canyon, scanning the ground for movement.",
+        "bird",
+        "flying",
+    ),
+    (
+        "sparrow",
+        "The sparrow hopped along the branch before darting off between the leaves.",
+        "bird",
+        "flying",
+    ),
+    (
+        "owl",
+        "The owl turned its head silently, watching for the faintest movement in the dark.",
+        "bird",
+        "flying",
+    ),
+    (
+        "swan",
+        "The swan glided smoothly across the lake, barely rippling the water.",
+        "bird",
+        "flying",
+    ),
+    (
+        "penguin",
+        "The penguin waddled across the ice before diving into the frigid water.",
+        "bird",
+        "flightless",
+    ),
+    (
+        "ostrich",
+        "The ostrich sprinted across the plain on powerful legs, kicking up dust.",
+        "bird",
+        "flightless",
+    ),
+    (
+        "kiwi",
+        "The kiwi foraged in the undergrowth at night, sniffing out insects with its long beak.",
+        "bird",
+        "flightless",
+    ),
 ];
 
 fn kmeans(embeddings: &[Vec<f32>], k: usize, iterations: usize) -> Vec<usize> {
@@ -67,28 +142,49 @@ fn kmeans(embeddings: &[Vec<f32>], k: usize, iterations: usize) -> Vec<usize> {
     let dim = embeddings[0].len();
     let mut centroid_idx = vec![0usize];
     while centroid_idx.len() < k {
-        let next = (0..n).max_by(|&a, &b| {
-            let da = centroid_idx.iter().map(|&c| 1.0 - cosine_sim(&embeddings[a], &embeddings[c])).fold(f32::INFINITY, f32::min);
-            let db = centroid_idx.iter().map(|&c| 1.0 - cosine_sim(&embeddings[b], &embeddings[c])).fold(f32::INFINITY, f32::min);
-            da.partial_cmp(&db).unwrap()
-        }).unwrap();
+        let next = (0..n)
+            .max_by(|&a, &b| {
+                let da = centroid_idx
+                    .iter()
+                    .map(|&c| 1.0 - cosine_sim(&embeddings[a], &embeddings[c]))
+                    .fold(f32::INFINITY, f32::min);
+                let db = centroid_idx
+                    .iter()
+                    .map(|&c| 1.0 - cosine_sim(&embeddings[b], &embeddings[c]))
+                    .fold(f32::INFINITY, f32::min);
+                da.partial_cmp(&db).unwrap()
+            })
+            .unwrap();
         centroid_idx.push(next);
     }
-    let mut centroids: Vec<Vec<f32>> = centroid_idx.iter().map(|&i| embeddings[i].clone()).collect();
+    let mut centroids: Vec<Vec<f32>> = centroid_idx
+        .iter()
+        .map(|&i| embeddings[i].clone())
+        .collect();
     let mut assignment = vec![0usize; n];
     for _ in 0..iterations {
         for i in 0..n {
-            assignment[i] = (0..k).max_by(|&a, &b| cosine_sim(&embeddings[i], &centroids[a]).partial_cmp(&cosine_sim(&embeddings[i], &centroids[b])).unwrap()).unwrap();
+            assignment[i] = (0..k)
+                .max_by(|&a, &b| {
+                    cosine_sim(&embeddings[i], &centroids[a])
+                        .partial_cmp(&cosine_sim(&embeddings[i], &centroids[b]))
+                        .unwrap()
+                })
+                .unwrap();
         }
         let mut sums = vec![vec![0.0f32; dim]; k];
         let mut counts = vec![0usize; k];
         for i in 0..n {
             let c = assignment[i];
             counts[c] += 1;
-            for d in 0..dim { sums[c][d] += embeddings[i][d]; }
+            for d in 0..dim {
+                sums[c][d] += embeddings[i][d];
+            }
         }
         for c in 0..k {
-            if counts[c] == 0 { continue; }
+            if counts[c] == 0 {
+                continue;
+            }
             let norm: f32 = sums[c].iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
             centroids[c] = sums[c].iter().map(|x| x / norm).collect();
         }
@@ -96,22 +192,35 @@ fn kmeans(embeddings: &[Vec<f32>], k: usize, iterations: usize) -> Vec<usize> {
     assignment
 }
 
-fn purity_of(members: &[usize], assignment: &[usize], k: usize, label_of: impl Fn(usize) -> &'static str) -> f32 {
+fn purity_of(
+    members: &[usize],
+    assignment: &[usize],
+    k: usize,
+    label_of: impl Fn(usize) -> &'static str,
+) -> f32 {
     let n = members.len();
-    if n == 0 { return 0.0; }
+    if n == 0 {
+        return 0.0;
+    }
     let mut correct = 0usize;
     for c in 0..k {
         let mut counts = std::collections::HashMap::new();
         for (local_i, &global_i) in members.iter().enumerate() {
-            if assignment[local_i] == c { *counts.entry(label_of(global_i)).or_insert(0usize) += 1; }
+            if assignment[local_i] == c {
+                *counts.entry(label_of(global_i)).or_insert(0usize) += 1;
+            }
         }
         correct += counts.values().copied().max().unwrap_or(0);
     }
     correct as f32 / n as f32
 }
 
-fn coarse(i: usize) -> &'static str { CORPUS[i].2 }
-fn fine(i: usize) -> &'static str { CORPUS[i].3 }
+fn coarse(i: usize) -> &'static str {
+    CORPUS[i].2
+}
+fn fine(i: usize) -> &'static str {
+    CORPUS[i].3
+}
 
 /// Jaccard similarity between two 2-way partitions of the same item set —
 /// used as the stability metric for the depth-3 stress test (no ground
@@ -121,7 +230,11 @@ fn partition_agreement(a: &[usize], b: &[usize]) -> f32 {
     // Best matching under the 2 possible label permutations for k=2.
     let n = a.len();
     let direct = a.iter().zip(b.iter()).filter(|(x, y)| x == y).count();
-    let flipped = a.iter().zip(b.iter()).filter(|(x, y)| **x == 1 - **y).count();
+    let flipped = a
+        .iter()
+        .zip(b.iter())
+        .filter(|(x, y)| **x == 1 - **y)
+        .count();
     direct.max(flipped) as f32 / n as f32
 }
 
@@ -138,15 +251,21 @@ fn run_pipeline(embeddings: &[Vec<f32>], label: &str) {
     for c in 0..2 {
         let members: Vec<usize> = (0..CORPUS.len()).filter(|&i| depth1[i] == c).collect();
         if members.len() < 2 {
-            println!("  cluster {c}: only {} member(s), cannot recurse", members.len());
+            println!(
+                "  cluster {c}: only {} member(s), cannot recurse",
+                members.len()
+            );
             continue;
         }
-        let sub_embeddings: Vec<Vec<f32>> = members.iter().map(|&i| embeddings[i].clone()).collect();
+        let sub_embeddings: Vec<Vec<f32>> =
+            members.iter().map(|&i| embeddings[i].clone()).collect();
         let depth2 = kmeans(&sub_embeddings, 2, 25);
         let p = purity_of(&members, &depth2, 2, fine);
         let majority_coarse = {
             let mut counts = std::collections::HashMap::new();
-            for &i in &members { *counts.entry(coarse(i)).or_insert(0usize) += 1; }
+            for &i in &members {
+                *counts.entry(coarse(i)).or_insert(0usize) += 1;
+            }
             counts.into_iter().max_by_key(|(_, c)| *c).unwrap().0
         };
         println!(
@@ -158,11 +277,17 @@ fn run_pipeline(embeddings: &[Vec<f32>], label: &str) {
     // ORACLE pipeline: recurse into the TRUE mammal/bird groups instead.
     println!("ORACLE pipeline (recurse into TRUE mammal/bird groups):");
     for true_coarse in ["mammal", "bird"] {
-        let members: Vec<usize> = (0..CORPUS.len()).filter(|&i| coarse(i) == true_coarse).collect();
-        let sub_embeddings: Vec<Vec<f32>> = members.iter().map(|&i| embeddings[i].clone()).collect();
+        let members: Vec<usize> = (0..CORPUS.len())
+            .filter(|&i| coarse(i) == true_coarse)
+            .collect();
+        let sub_embeddings: Vec<Vec<f32>> =
+            members.iter().map(|&i| embeddings[i].clone()).collect();
         let depth2 = kmeans(&sub_embeddings, 2, 25);
         let p = purity_of(&members, &depth2, 2, fine);
-        println!("  {true_coarse} (n={}): depth-2 purity vs fine label = {p:.3}", members.len());
+        println!(
+            "  {true_coarse} (n={}): depth-2 purity vs fine label = {p:.3}",
+            members.len()
+        );
     }
 
     // STRESS TEST: recurse ONE level past where real structure ends. Take
@@ -173,7 +298,9 @@ fn run_pipeline(embeddings: &[Vec<f32>], label: &str) {
     // should be at least stable/motivated; if it's fitting noise, the two
     // representations will likely disagree on how to split a set with no
     // real substructure.
-    println!("STRESS TEST (recurse past real structure — 'domestic' leaf group, no known sub-labels):");
+    println!(
+        "STRESS TEST (recurse past real structure — 'domestic' leaf group, no known sub-labels):"
+    );
 }
 
 fn main() {
@@ -185,8 +312,14 @@ fn main() {
         let mut embedder = None;
         for dir in ["models", "../models"] {
             let p = std::path::Path::new(dir);
-            if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) { continue; }
-            let cfg = OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), ..OnnxConfig::default() };
+            if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) {
+                continue;
+            }
+            let cfg = OnnxConfig {
+                dim: 384,
+                model_dir: Some(dir.to_string()),
+                ..OnnxConfig::default()
+            };
             let e = OnnxEmbedder::with_config(&cfg);
             if e.is_available() {
                 println!("Using real semantic embedder: {dir}/model.onnx\n");
@@ -194,9 +327,18 @@ fn main() {
                 break;
             }
         }
-        let embedder = match embedder { Some(e) => e, None => { println!("WARNING: no ONNX model — aborting."); return; } };
+        let embedder = match embedder {
+            Some(e) => e,
+            None => {
+                println!("WARNING: no ONNX model — aborting.");
+                return;
+            }
+        };
 
-        let bare: Vec<Vec<f32>> = CORPUS.iter().map(|(term, ..)| embedder.embed(term)).collect();
+        let bare: Vec<Vec<f32>> = CORPUS
+            .iter()
+            .map(|(term, ..)| embedder.embed(term))
+            .collect();
         let ctx: Vec<Vec<f32>> = CORPUS.iter().map(|(_, s, ..)| embedder.embed(s)).collect();
 
         run_pipeline(&bare, "bare-term");
@@ -205,7 +347,9 @@ fn main() {
 
         // Stress test detail, run once with both representations for the
         // "domestic" leaf group specifically.
-        let domestic: Vec<usize> = (0..CORPUS.len()).filter(|&i| fine(i) == "domestic").collect();
+        let domestic: Vec<usize> = (0..CORPUS.len())
+            .filter(|&i| fine(i) == "domestic")
+            .collect();
         let bare_sub: Vec<Vec<f32>> = domestic.iter().map(|&i| bare[i].clone()).collect();
         let ctx_sub: Vec<Vec<f32>> = domestic.iter().map(|&i| ctx[i].clone()).collect();
         let split_bare = kmeans(&bare_sub, 2, 25);

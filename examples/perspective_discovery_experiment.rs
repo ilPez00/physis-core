@@ -84,7 +84,10 @@ struct ReferenceResult {
 }
 
 fn embed_all(embedder: &dyn VectorEmbed) -> Vec<Vec<f32>> {
-    CORPUS.iter().map(|(text, _)| embedder.embed(text)).collect()
+    CORPUS
+        .iter()
+        .map(|(text, _)| embedder.embed(text))
+        .collect()
 }
 
 /// Greedy single-link clustering at a fixed cosine threshold — the same shape
@@ -176,7 +179,13 @@ fn delta_direction_diagnose(
     let others: Vec<usize> = (0..embeddings.len()).filter(|&i| i != ref_idx).collect();
     let deltas: Vec<Vec<f32>> = others
         .iter()
-        .map(|&i| embeddings[i].iter().zip(r.iter()).map(|(a, b)| a - b).collect())
+        .map(|&i| {
+            embeddings[i]
+                .iter()
+                .zip(r.iter())
+                .map(|(a, b)| a - b)
+                .collect()
+        })
         .collect();
     let n = deltas.len();
     let mut assigned = vec![false; n];
@@ -208,7 +217,10 @@ fn delta_direction_diagnose(
     let chosen = clusters.iter().find(|c| c.contains(&nearest)).unwrap();
 
     let true_label = CORPUS[ref_idx].1;
-    let hits = chosen.iter().filter(|&&k| CORPUS[others[k]].1 == true_label).count();
+    let hits = chosen
+        .iter()
+        .filter(|&&k| CORPUS[others[k]].1 == true_label)
+        .count();
     let precision = hits as f32 / chosen.len() as f32;
     let recall = hits as f32 / FIELD_SIZE as f32;
     let f1 = if precision + recall > 0.0 {
@@ -239,12 +251,24 @@ fn delta_magnitude_vs_cosine_rank_agreement(embeddings: &[Vec<f32>], ref_idx: us
             .unwrap()
     });
     by_delta.sort_by(|&a, &b| {
-        let da: f32 = embeddings[a].iter().zip(r.iter()).map(|(x, y)| (x - y).powi(2)).sum();
-        let db: f32 = embeddings[b].iter().zip(r.iter()).map(|(x, y)| (x - y).powi(2)).sum();
+        let da: f32 = embeddings[a]
+            .iter()
+            .zip(r.iter())
+            .map(|(x, y)| (x - y).powi(2))
+            .sum();
+        let db: f32 = embeddings[b]
+            .iter()
+            .zip(r.iter())
+            .map(|(x, y)| (x - y).powi(2))
+            .sum();
         da.partial_cmp(&db).unwrap()
     });
     let n = by_cosine.len();
-    let agree = by_cosine.iter().zip(by_delta.iter()).filter(|(a, b)| a == b).count();
+    let agree = by_cosine
+        .iter()
+        .zip(by_delta.iter())
+        .filter(|(a, b)| a == b)
+        .count();
     agree as f32 / n as f32
 }
 
@@ -260,7 +284,8 @@ fn run(embedder: &dyn VectorEmbed, embedder_name: &str, is_semantic: bool) -> Ru
         .iter()
         .map(|&r| {
             let ref_idx = CORPUS.iter().position(|(t, _)| *t == r).unwrap();
-            let (precision, recall, f1, _) = delta_direction_diagnose(&embeddings, ref_idx, delta_threshold);
+            let (precision, recall, f1, _) =
+                delta_direction_diagnose(&embeddings, ref_idx, delta_threshold);
             ReferenceResult {
                 reference: r,
                 true_perspective: CORPUS[ref_idx].1,
@@ -293,7 +318,10 @@ fn run(embedder: &dyn VectorEmbed, embedder_name: &str, is_semantic: bool) -> Ru
 
 fn main() {
     println!("Experiment 1: reference-conditioned discovery vs. naive baselines");
-    println!("Dataset B: CAR, 3 perspectives x 7 terms = {} items\n", CORPUS.len());
+    println!(
+        "Dataset B: CAR, 3 perspectives x 7 terms = {} items\n",
+        CORPUS.len()
+    );
 
     let mut results = Vec::new();
 
@@ -312,7 +340,9 @@ fn main() {
             };
             let e = OnnxEmbedder::with_config(&cfg);
             if e.is_available() {
-                println!("Using real semantic embedder: {dir}/model.onnx (all-MiniLM-L6-v2, 384d)\n");
+                println!(
+                    "Using real semantic embedder: {dir}/model.onnx (all-MiniLM-L6-v2, 384d)\n"
+                );
                 results.push(run(&e, "onnx-minilm-384d", true));
             }
             break;
@@ -372,7 +402,9 @@ fn main() {
             for &r in REFERENCES {
                 let ref_idx = CORPUS.iter().position(|(t, _)| *t == r).unwrap();
                 let (p, rec, f1, members) = delta_direction_diagnose(&embeddings, ref_idx, 0.3);
-                println!("  reference={r:<16} P={p:.3} R={rec:.3} F1={f1:.3} retrieved={members:?}");
+                println!(
+                    "  reference={r:<16} P={p:.3} R={rec:.3} F1={f1:.3} retrieved={members:?}"
+                );
             }
             println!();
             println!("== threshold sweep: delta-direction F1 vs threshold ==");

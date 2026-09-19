@@ -133,9 +133,8 @@ fn main() {
         idx.truncate(3);
         idx
     };
-    let position_only = |p: usize| -> Vec<usize> {
-        (1..=3).filter(|d| *d <= p).map(|d| p - d).collect()
-    };
+    let position_only =
+        |p: usize| -> Vec<usize> { (1..=3).filter(|d| *d <= p).map(|d| p - d).collect() };
     // Null: keep the arm, destroy the positions. A permutation is drawn once and
     // reused for every query, so the arm still sees a consistent (wrong) order.
     let perm: Vec<usize> = {
@@ -176,7 +175,11 @@ fn main() {
 
     let out = Path::new("benchmarks/results");
     let _ = std::fs::create_dir_all(out);
-    let tag = if min_gap > 0 { format!("-gap{min_gap}") } else { String::new() };
+    let tag = if min_gap > 0 {
+        format!("-gap{min_gap}")
+    } else {
+        String::new()
+    };
     let path = out.join(format!("worldstate-e56{tag}.json"));
     std::fs::write(&path, serde_json::to_vec_pretty(&run).unwrap()).unwrap();
     println!("\nartifact -> {}", path.display());

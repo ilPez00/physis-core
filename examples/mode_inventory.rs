@@ -169,7 +169,10 @@ fn mean_sd(xs: &[f32]) -> (f32, f32) {
     }
     let n = xs.len() as f32;
     let m = xs.iter().sum::<f32>() / n;
-    (m, (xs.iter().map(|x| (x - m) * (x - m)).sum::<f32>() / n).sqrt())
+    (
+        m,
+        (xs.iter().map(|x| (x - m) * (x - m)).sum::<f32>() / n).sqrt(),
+    )
 }
 
 fn main() {
@@ -204,7 +207,9 @@ fn main() {
                 continue;
             }
             let offs = wn.synsets_for_lemma(Pos::Verb, &w);
-            let Some(first) = offs.first().copied() else { continue };
+            let Some(first) = offs.first().copied() else {
+                continue;
+            };
             if let Some(ss) = verb_supersense(&wn, first) {
                 bag.push(ss);
             }
@@ -229,7 +234,10 @@ fn main() {
     };
 
     let flat: Vec<&Vec<&'static str>> = per_entry.values().flatten().collect();
-    let sizes: Vec<(String, usize)> = per_entry.iter().map(|(m, v)| (m.clone(), v.len())).collect();
+    let sizes: Vec<(String, usize)> = per_entry
+        .iter()
+        .map(|(m, v)| (m.clone(), v.len()))
+        .collect();
 
     // The null: same mode sizes, entries shuffled between them.
     let mut rng = StdRng::seed_from_u64(7);
@@ -244,7 +252,10 @@ fn main() {
             let (c, total) = stats(&g);
             if total > 0 {
                 let top = c.values().max().copied().unwrap_or(0);
-                null_conc.entry(mode.clone()).or_default().push(top as f32 / total as f32);
+                null_conc
+                    .entry(mode.clone())
+                    .or_default()
+                    .push(top as f32 / total as f32);
             }
         }
     }
@@ -267,7 +278,11 @@ fn main() {
             .max_by_key(|(k, v)| (**v, std::cmp::Reverse(**k)))
             .map(|(k, v)| (*k, *v))
             .unwrap_or(("—", 0));
-        let share = if total == 0 { f32::NAN } else { topn as f32 / total as f32 };
+        let share = if total == 0 {
+            f32::NAN
+        } else {
+            topn as f32 / total as f32
+        };
         let ns = null_conc.get(mode).cloned().unwrap_or_default();
         let (nm, nsd) = mean_sd(&ns);
         let carves = share.is_finite() && nm.is_finite() && nsd > 0.0 && (share - nm) / nsd >= 2.0;
@@ -284,15 +299,26 @@ fn main() {
             n,
             verbs,
             top,
-            if share.is_nan() { "  —".into() } else { format!("{share:.2}") },
-            if nm.is_nan() { "  —".into() } else { format!("{nm:.2}") },
+            if share.is_nan() {
+                "  —".into()
+            } else {
+                format!("{share:.2}")
+            },
+            if nm.is_nan() {
+                "  —".into()
+            } else {
+                format!("{nm:.2}")
+            },
             if *carves { "yes" } else { "NO" }
         );
     }
 
     // ── the three proposals ──────────────────────────────────────────────
     let covered: BTreeSet<&'static str> = owned.keys().copied().collect();
-    let missing: Vec<&&str> = VERB_SUPERSENSE.iter().filter(|s| !covered.contains(*s)).collect();
+    let missing: Vec<&&str> = VERB_SUPERSENSE
+        .iter()
+        .filter(|s| !covered.contains(*s))
+        .collect();
 
     // An unowned supersense is only a gap if the corpus actually uses that kind
     // of verb. WordNet cannot tell `verb.weather` from `verb.possession` in
@@ -313,7 +339,15 @@ fn main() {
             .iter()
             .map(|m| {
                 let n = corpus_counts.get(**m).copied().unwrap_or(0);
-                (**m, if corpus_total == 0 { 0.0 } else { n as f32 / corpus_total as f32 }, n)
+                (
+                    **m,
+                    if corpus_total == 0 {
+                        0.0
+                    } else {
+                        n as f32 / corpus_total as f32
+                    },
+                    n,
+                )
             })
             .collect();
         ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -325,7 +359,13 @@ fn main() {
             } else {
                 "the corpus never does this — not a gap"
             };
-            println!("    {:<20} {:>5.1}%  ({:>4} uses)  {}", m, share * 100.0, n, verdict);
+            println!(
+                "    {:<20} {:>5.1}%  ({:>4} uses)  {}",
+                m,
+                share * 100.0,
+                n,
+                verdict
+            );
         }
     }
 

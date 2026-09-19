@@ -35,7 +35,12 @@ fn main() {
         let record: serde_json::Value = serde_json::from_str(&line).expect("json line");
         let text = record["text"].as_str().unwrap_or("");
         xs.push(record["x"].clone());
-        metas.push(record.get("meta").cloned().unwrap_or(serde_json::Value::Null));
+        metas.push(
+            record
+                .get("meta")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+        );
         lengths.push(text.len());
         vectors.push(embedder.embed(text));
     }

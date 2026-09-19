@@ -97,11 +97,7 @@ pub struct TriplePattern {
 }
 
 impl TriplePattern {
-    fn bind_elem(
-        elem: &PatElem,
-        value: &str,
-        binding: &mut HashMap<String, String>,
-    ) -> bool {
+    fn bind_elem(elem: &PatElem, value: &str, binding: &mut HashMap<String, String>) -> bool {
         match elem {
             PatElem::Const(c) => c == value,
             PatElem::Var(v) => match binding.get(v) {
@@ -464,8 +460,16 @@ pub fn apply(world: &WorldState, op: &Transform) -> (WorldState, TraceStep) {
         Transform::Substitute { from, to } => {
             for t in &before {
                 if t.s == *from || t.o == *from {
-                    let s = if t.s == *from { to.clone() } else { t.s.clone() };
-                    let o = if t.o == *from { to.clone() } else { t.o.clone() };
+                    let s = if t.s == *from {
+                        to.clone()
+                    } else {
+                        t.s.clone()
+                    };
+                    let o = if t.o == *from {
+                        to.clone()
+                    } else {
+                        t.o.clone()
+                    };
                     push_new(
                         &mut candidates,
                         Triple {
@@ -521,11 +525,7 @@ pub fn apply(world: &WorldState, op: &Transform) -> (WorldState, TraceStep) {
                     }
                 }
             }
-            note = format!(
-                "composed {}+{}",
-                first.as_str(),
-                second.as_str()
-            );
+            note = format!("composed {}+{}", first.as_str(), second.as_str());
         }
         Transform::Project { predicted } => {
             push_new(
@@ -604,7 +604,10 @@ pub fn apply(world: &WorldState, op: &Transform) -> (WorldState, TraceStep) {
     } else {
         0.0
     };
-    let temporal: Score = if after.iter().any(|t| t.p == Predicate::Precedes && t.s == t.o) {
+    let temporal: Score = if after
+        .iter()
+        .any(|t| t.p == Predicate::Precedes && t.s == t.o)
+    {
         0.0
     } else {
         1.0
@@ -613,16 +616,16 @@ pub fn apply(world: &WorldState, op: &Transform) -> (WorldState, TraceStep) {
         let mut bad = false;
         for a in &after {
             for b in &after {
-                if a.s == b.s
-                    && a.o == b.o
-                    && a.p.is_causal()
-                    && b.p == Predicate::Contradicts
-                {
+                if a.s == b.s && a.o == b.o && a.p.is_causal() && b.p == Predicate::Contradicts {
                     bad = true;
                 }
             }
         }
-        if bad { 0.0 } else { 1.0 }
+        if bad {
+            0.0
+        } else {
+            1.0
+        }
     };
     let procedural: Score = if op_valid { 1.0 } else { 0.0 };
 
@@ -633,8 +636,7 @@ pub fn apply(world: &WorldState, op: &Transform) -> (WorldState, TraceStep) {
     gates.causal = CoherenceDimension::new("causal", causal, 1.0);
     gates.procedural = CoherenceDimension::new("procedural", procedural, 1.0);
 
-    let accepted =
-        gates.composite() >= ACCEPT_FLOOR && logical == 1.0 && empirical == 1.0;
+    let accepted = gates.composite() >= ACCEPT_FLOOR && logical == 1.0 && empirical == 1.0;
 
     let step = TraceStep {
         op: method,
@@ -654,14 +656,8 @@ mod tests {
     fn exchange_world() -> WorldState {
         WorldState {
             facts: vec![
-                Proposition::observed(
-                    Triple::new("Alice", Predicate::Exchanges, "Bob"),
-                    "t",
-                ),
-                Proposition::observed(
-                    Triple::new("Bob", Predicate::Exchanges, "Alice"),
-                    "t",
-                ),
+                Proposition::observed(Triple::new("Alice", Predicate::Exchanges, "Bob"), "t"),
+                Proposition::observed(Triple::new("Bob", Predicate::Exchanges, "Alice"), "t"),
             ],
             constraints: vec![],
         }
@@ -692,20 +688,13 @@ mod tests {
     fn substitution_preserves_invariants() {
         let world = WorldState {
             facts: vec![
-                Proposition::observed(
-                    Triple::new("Alice", Predicate::Requires, "Water"),
-                    "t",
-                ),
-                Proposition::observed(
-                    Triple::new("Mill", Predicate::Produces, "Flour"),
-                    "t",
-                ),
+                Proposition::observed(Triple::new("Alice", Predicate::Requires, "Water"), "t"),
+                Proposition::observed(Triple::new("Mill", Predicate::Produces, "Flour"), "t"),
             ],
             constraints: vec![],
         };
         let invariants = world.substitution_invariants("Alice", "Alicia");
-        assert!(invariants
-            .contains(&Triple::new("Mill", Predicate::Produces, "Flour")));
+        assert!(invariants.contains(&Triple::new("Mill", Predicate::Produces, "Flour")));
         let (next, step) = apply(
             &world,
             &Transform::Substitute {
@@ -729,7 +718,9 @@ mod tests {
             facts: vec![Proposition::observed(triple.clone(), "t")],
             constraints: vec![Constraint {
                 desc: "exchange required".to_string(),
-                kind: ConstraintKind::Requires { triple: triple.clone() },
+                kind: ConstraintKind::Requires {
+                    triple: triple.clone(),
+                },
             }],
         };
         assert!(world.incoherent_after().is_empty());

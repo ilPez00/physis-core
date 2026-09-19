@@ -48,13 +48,30 @@ pub fn from_env() -> Option<(OracleConfig, String)> {
     let key = std::env::var("PHYSIS_ORACLE_KEY")
         .ok()
         .filter(|s| !s.trim().is_empty())
-        .or_else(|| std::env::var("OPENROUTER_API_KEY").ok().filter(|s| !s.trim().is_empty()))
-        .or_else(|| std::env::var("GROQ_API_KEY").ok().filter(|s| !s.trim().is_empty()));
+        .or_else(|| {
+            std::env::var("OPENROUTER_API_KEY")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+        })
+        .or_else(|| {
+            std::env::var("GROQ_API_KEY")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+        });
     let model = std::env::var("PHYSIS_ORACLE_MODEL")
         .ok()
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| "openai/gpt-4o".into());
-    key.map(|k| (OracleConfig { url, model, has_key: true }, k))
+    key.map(|k| {
+        (
+            OracleConfig {
+                url,
+                model,
+                has_key: true,
+            },
+            k,
+        )
+    })
 }
 
 /// Token Jaccard over lowercase alnum runs ≥3 chars — the linguistic-agreement

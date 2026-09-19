@@ -177,7 +177,10 @@ pub struct MemoEmbedder {
 
 impl MemoEmbedder {
     pub fn new(inner: Box<dyn VectorEmbed>) -> Self {
-        Self { inner, memo: std::sync::Mutex::new(std::collections::HashMap::new()) }
+        Self {
+            inner,
+            memo: std::sync::Mutex::new(std::collections::HashMap::new()),
+        }
     }
 }
 
@@ -187,7 +190,10 @@ impl VectorEmbed for MemoEmbedder {
             return v.clone();
         }
         let v = self.inner.embed(text);
-        self.memo.lock().unwrap().insert(text.to_string(), v.clone());
+        self.memo
+            .lock()
+            .unwrap()
+            .insert(text.to_string(), v.clone());
         v
     }
 
@@ -227,7 +233,10 @@ pub fn select(dim: usize) -> Selected {
         })
         .unwrap_or(false)
     {
-        return (Box::new(RandomProjectionEmbedder::new(dim)), "random-projection");
+        return (
+            Box::new(RandomProjectionEmbedder::new(dim)),
+            "random-projection",
+        );
     }
 
     #[cfg(feature = "embed-onnx")]
@@ -254,13 +263,21 @@ pub fn select(dim: usize) -> Selected {
         }
     }
 
-    (Box::new(RandomProjectionEmbedder::new(dim)), "random-projection")
+    (
+        Box::new(RandomProjectionEmbedder::new(dim)),
+        "random-projection",
+    )
 }
 
 /// Candidate ONNX model directories in preference order, with the dimension and
 /// pooling each export needs. `PHYSIS_MODEL_DIR` short-circuits the list.
 #[cfg(feature = "embed-onnx")]
-fn onnx_candidates() -> Vec<(String, usize, crate::embed_onnx::PoolingStrategy, &'static str)> {
+fn onnx_candidates() -> Vec<(
+    String,
+    usize,
+    crate::embed_onnx::PoolingStrategy,
+    &'static str,
+)> {
     use crate::embed_onnx::PoolingStrategy::Mean;
     if let Ok(dir) = std::env::var("PHYSIS_MODEL_DIR") {
         let dir = dir.trim().to_string();
@@ -385,9 +402,15 @@ mod tests {
         let (e, kind) = select(384);
         let passes = semantic_self_test(e.as_ref());
         if kind == "random-projection" {
-            assert!(!passes, "random projection is labelled honestly but passed the probe");
+            assert!(
+                !passes,
+                "random projection is labelled honestly but passed the probe"
+            );
         } else {
-            assert!(passes, "{kind} was selected without passing the semantic probe");
+            assert!(
+                passes,
+                "{kind} was selected without passing the semantic probe"
+            );
         }
         if let Some(p) = prev {
             unsafe { std::env::set_var("PHYSIS_EMBEDDER", p) };

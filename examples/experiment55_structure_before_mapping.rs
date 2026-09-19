@@ -67,7 +67,10 @@ fn main() {
     // Pre-registered defaults. The sweep below overrides them only to report
     // sensitivity; the headline row is k=5, profile=12, fixed before the run.
     let envnum = |n: &str, d: usize| {
-        std::env::var(n).ok().and_then(|v| v.trim().parse().ok()).unwrap_or(d)
+        std::env::var(n)
+            .ok()
+            .and_then(|v| v.trim().parse().ok())
+            .unwrap_or(d)
     };
     let k = envnum("PHYSIS_E55_K", 5);
     let profile = envnum("PHYSIS_E55_PROFILE", 12);
@@ -105,7 +108,9 @@ fn main() {
 
         // Anchors: evenly spaced by position, so the choice is not tuned.
         let step = idx.len() / n_anchors.max(1);
-        let anchors: Vec<usize> = (0..n_anchors).map(|i| (i * step).min(idx.len() - 1)).collect();
+        let anchors: Vec<usize> = (0..n_anchors)
+            .map(|i| (i * step).min(idx.len() - 1))
+            .collect();
 
         let arms = vec![
             ws::score_arm(

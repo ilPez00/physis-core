@@ -85,7 +85,9 @@ fn run() {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(json) {
             for e in v["domains"].as_array().into_iter().flatten() {
                 if let Some(nm) = e["name"].as_str() {
-                    source_of.entry(nm.to_string()).or_insert_with(|| (*kind).to_string());
+                    source_of
+                        .entry(nm.to_string())
+                        .or_insert_with(|| (*kind).to_string());
                 }
             }
         }
@@ -98,7 +100,9 @@ fn run() {
     let mut proses: Vec<bool> = Vec::new();
     let mut emb: Vec<Vec<f32>> = Vec::new();
     for def in ontology.classification_domains() {
-        let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+        let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+            continue;
+        };
         let mut t = def.name.clone();
         for h in &def.hints {
             t.push(' ');
@@ -119,7 +123,12 @@ fn run() {
         if std::env::var("PHYSIS_TEXT").as_deref() == Ok("name") {
             t = def.name.clone();
         }
-        srcs.push(source_of.get(&def.name).cloned().unwrap_or_else(|| "?".into()));
+        srcs.push(
+            source_of
+                .get(&def.name)
+                .cloned()
+                .unwrap_or_else(|| "?".into()),
+        );
         names.push(def.name.clone());
         cells.push(format!("{d}/{m}"));
         emb.push(normalize(&embedder.embed(&t)));
@@ -189,7 +198,14 @@ fn run() {
         };
         println!(
             "{:<20} {:>4} {:>8.4} {:>8.2} {:>9.3} {:>10.2} {:>7.0}%   {}",
-            cell, idx.len(), sep, z, stab, mz, 100.0 * balance, verdict
+            cell,
+            idx.len(),
+            sep,
+            z,
+            stab,
+            mz,
+            100.0 * balance,
+            verdict
         );
         if sep >= 0.05 && z >= 2.0 && stab >= 0.75 {
             printed.push(((*cell).clone(), a, b));
@@ -218,7 +234,11 @@ fn run() {
             let mut ns: Vec<&str> = side.iter().map(|&i| names[i].as_str()).collect();
             ns.sort();
             let pr = 100.0 * side.iter().filter(|&&i| proses[i]).count() as f64 / side.len() as f64;
-            println!("  {label} ({:>2})  prose-hints {pr:.0}%   sources: {}", ns.len(), top.join(", "));
+            println!(
+                "  {label} ({:>2})  prose-hints {pr:.0}%   sources: {}",
+                ns.len(),
+                top.join(", ")
+            );
             println!("        {}", ns.join(", "));
         }
     }
@@ -229,21 +249,37 @@ fn run() {
 fn split2(idx: &[usize], emb: &[Vec<f32>]) -> (Vec<usize>, Vec<usize>) {
     let mut best: Option<(f64, Vec<usize>, Vec<usize>)> = None;
     for seed in 0..8usize {
-        let (mut ca, mut cb) = (emb[idx[seed % idx.len()]].clone(), emb[idx[(seed * 7 + 3) % idx.len()]].clone());
+        let (mut ca, mut cb) = (
+            emb[idx[seed % idx.len()]].clone(),
+            emb[idx[(seed * 7 + 3) % idx.len()]].clone(),
+        );
         let (mut a, mut b) = (Vec::new(), Vec::new());
         for _ in 0..25 {
             a.clear();
             b.clear();
             for &i in idx {
-                if cos(&emb[i], &ca) >= cos(&emb[i], &cb) { a.push(i) } else { b.push(i) }
+                if cos(&emb[i], &ca) >= cos(&emb[i], &cb) {
+                    a.push(i)
+                } else {
+                    b.push(i)
+                }
             }
-            if a.is_empty() || b.is_empty() { break }
+            if a.is_empty() || b.is_empty() {
+                break;
+            }
             ca = centroid(&a, emb);
             cb = centroid(&b, emb);
         }
-        if a.is_empty() || b.is_empty() { continue }
-        let inertia: f64 = a.iter().map(|&i| 1.0 - cos(&emb[i], &ca) as f64).sum::<f64>()
-            + b.iter().map(|&i| 1.0 - cos(&emb[i], &cb) as f64).sum::<f64>();
+        if a.is_empty() || b.is_empty() {
+            continue;
+        }
+        let inertia: f64 = a
+            .iter()
+            .map(|&i| 1.0 - cos(&emb[i], &ca) as f64)
+            .sum::<f64>()
+            + b.iter()
+                .map(|&i| 1.0 - cos(&emb[i], &cb) as f64)
+                .sum::<f64>();
         if best.as_ref().map(|(x, _, _)| inertia < *x).unwrap_or(true) {
             best = Some((inertia, a.clone(), b.clone()));
         }
@@ -271,7 +307,9 @@ fn separation(a: &[usize], b: &[usize], emb: &[Vec<f32>]) -> f64 {
             acr.1 += 1;
         }
     }
-    if win.1 == 0 || acr.1 == 0 { return 0.0 }
+    if win.1 == 0 || acr.1 == 0 {
+        return 0.0;
+    }
     win.0 / win.1 as f64 - acr.0 / acr.1 as f64
 }
 
@@ -288,7 +326,11 @@ fn perm_z(idx: &[usize], emb: &[Vec<f32>], sep: f64, rng: &mut impl rand::Rng) -
     }
     let mu = v.iter().sum::<f64>() / v.len() as f64;
     let sd = (v.iter().map(|x| (x - mu).powi(2)).sum::<f64>() / v.len() as f64).sqrt();
-    if sd < 1e-12 { 0.0 } else { (sep - mu) / sd }
+    if sd < 1e-12 {
+        0.0
+    } else {
+        (sep - mu) / sd
+    }
 }
 
 /// Co-assignment consistency across 25 subsamples at 80%.
@@ -303,14 +345,19 @@ fn stability(idx: &[usize], emb: &[Vec<f32>], rng: &mut impl rand::Rng) -> f64 {
         scratch.shuffle(rng);
         let sub = &scratch[..keep];
         let (a, b) = split2(sub, emb);
-        let side: HashMap<usize, u8> =
-            a.iter().map(|&i| (i, 0u8)).chain(b.iter().map(|&i| (i, 1u8))).collect();
+        let side: HashMap<usize, u8> = a
+            .iter()
+            .map(|&i| (i, 0u8))
+            .chain(b.iter().map(|&i| (i, 1u8)))
+            .collect();
         for x in 0..sub.len() {
             for y in (x + 1)..sub.len() {
                 let (p, q) = (sub[x].min(sub[y]), sub[x].max(sub[y]));
                 let e = together.entry((p, q)).or_insert((0, 0));
                 e.1 += 1;
-                if side[&sub[x]] == side[&sub[y]] { e.0 += 1 }
+                if side[&sub[x]] == side[&sub[y]] {
+                    e.0 += 1
+                }
             }
         }
     }
@@ -318,12 +365,18 @@ fn stability(idx: &[usize], emb: &[Vec<f32>], rng: &mut impl rand::Rng) -> f64 {
     let mut s = 0.0;
     let mut n = 0usize;
     for (_, (same, total)) in together {
-        if total < 5 { continue }
+        if total < 5 {
+            continue;
+        }
         let f = same as f64 / total as f64;
         s += f.max(1.0 - f);
         n += 1;
     }
-    if n == 0 { 0.0 } else { s / n as f64 }
+    if n == 0 {
+        0.0
+    } else {
+        s / n as f64
+    }
 }
 
 #[cfg(feature = "embed-onnx")]
@@ -331,7 +384,9 @@ fn centroid(idx: &[usize], emb: &[Vec<f32>]) -> Vec<f32> {
     let d = emb[idx[0]].len();
     let mut c = vec![0.0f32; d];
     for &i in idx {
-        for k in 0..d { c[k] += emb[i][k] }
+        for k in 0..d {
+            c[k] += emb[i][k]
+        }
     }
     normalize(&c)
 }
@@ -344,5 +399,9 @@ fn cos(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(feature = "embed-onnx")]
 fn normalize(v: &[f32]) -> Vec<f32> {
     let n = v.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if n > 1e-12 { v.iter().map(|x| x / n).collect() } else { v.to_vec() }
+    if n > 1e-12 {
+        v.iter().map(|x| x / n).collect()
+    } else {
+        v.to_vec()
+    }
 }

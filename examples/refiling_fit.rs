@@ -34,8 +34,12 @@ fn run() {
     use std::collections::HashMap;
 
     let mut args = std::env::args().skip(1);
-    let anchors_path = args.next().expect("usage: refiling_fit <anchors.json> <assignments.tsv>");
-    let assign_path = args.next().expect("usage: refiling_fit <anchors.json> <assignments.tsv>");
+    let anchors_path = args
+        .next()
+        .expect("usage: refiling_fit <anchors.json> <assignments.tsv>");
+    let assign_path = args
+        .next()
+        .expect("usage: refiling_fit <anchors.json> <assignments.tsv>");
 
     let dirs = ["models", "../models", "physis-core/models"];
     let model_dir = dirs
@@ -54,7 +58,8 @@ fn run() {
 
     // ---- anchors ----
     let doc: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(&anchors_path).expect("anchors")).expect("parse");
+        serde_json::from_str(&std::fs::read_to_string(&anchors_path).expect("anchors"))
+            .expect("parse");
     let mut cell_name = Vec::new();
     let mut cell_emb = Vec::new();
     for e in doc["domains"].as_array().expect("domains") {
@@ -70,8 +75,11 @@ fn run() {
         ));
         cell_emb.push(normalize(&embedder.embed(&t)));
     }
-    let index: HashMap<&str, usize> =
-        cell_name.iter().enumerate().map(|(i, c)| (c.as_str(), i)).collect();
+    let index: HashMap<&str, usize> = cell_name
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.as_str(), i))
+        .collect();
 
     // ---- entries ----
     let raw = std::fs::read_to_string(&assign_path).expect("assignments");
@@ -92,7 +100,10 @@ fn run() {
         emb.push(normalize(&embedder.embed(&format!("{name} {hints}"))));
     }
     let n = emb.len();
-    println!("{anchors_path}\n{assign_path}\n{n} entries, {} anchors\n", cell_emb.len());
+    println!(
+        "{anchors_path}\n{assign_path}\n{n} entries, {} anchors\n",
+        cell_emb.len()
+    );
 
     // ---- fit of each entry to the cell it was put in ----
     let mut fit_sum = 0.0f64;
@@ -106,26 +117,59 @@ fn run() {
         let rank = 1 + sims.iter().filter(|&&s| s > mine).count();
         fit_sum += mine as f64;
         rank_sum += rank as f64;
-        if rank == 1 { top1 += 1; }
-        if rank <= 3 { top3 += 1; }
-        if rank <= 5 { top5 += 1; }
-        if rank > cell_emb.len() / 2 { bottom_half += 1; }
+        if rank == 1 {
+            top1 += 1;
+        }
+        if rank <= 3 {
+            top3 += 1;
+        }
+        if rank <= 5 {
+            top5 += 1;
+        }
+        if rank > cell_emb.len() / 2 {
+            bottom_half += 1;
+        }
         let best = sims.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        worst.push((mine - best, i, sims.iter().position(|s| *s == best).unwrap()));
+        worst.push((
+            mine - best,
+            i,
+            sims.iter().position(|s| *s == best).unwrap(),
+        ));
     }
     let p = |k: usize| 100.0 * k as f64 / n as f64;
     println!("fit of each entry to the cell it was filed in:");
-    println!("  mean cosine to its own anchor      {:.4}", fit_sum / n as f64);
-    println!("  its anchor is the NEAREST of 70    {top1:>4}  {:.1}%", p(top1));
-    println!("  within the nearest 3               {top3:>4}  {:.1}%", p(top3));
-    println!("  within the nearest 5               {top5:>4}  {:.1}%", p(top5));
-    println!("  in the WORSE HALF of all 70 cells  {bottom_half:>4}  {:.1}%   <- the misfiling proxy", p(bottom_half));
-    println!("  mean rank of its own anchor        {:.1} of 70", rank_sum / n as f64);
+    println!(
+        "  mean cosine to its own anchor      {:.4}",
+        fit_sum / n as f64
+    );
+    println!(
+        "  its anchor is the NEAREST of 70    {top1:>4}  {:.1}%",
+        p(top1)
+    );
+    println!(
+        "  within the nearest 3               {top3:>4}  {:.1}%",
+        p(top3)
+    );
+    println!(
+        "  within the nearest 5               {top5:>4}  {:.1}%",
+        p(top5)
+    );
+    println!(
+        "  in the WORSE HALF of all 70 cells  {bottom_half:>4}  {:.1}%   <- the misfiling proxy",
+        p(bottom_half)
+    );
+    println!(
+        "  mean rank of its own anchor        {:.1} of 70",
+        rank_sum / n as f64
+    );
 
     worst.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     println!("\nten worst-fitting entries (filed cell -> the anchor it is actually nearest):");
     for (gap, i, best) in worst.iter().take(10) {
-        println!("  {:>7.3}  {:<34} {:<20} -> {}", gap, names[*i], cell_name[assigned[*i]], cell_name[*best]);
+        println!(
+            "  {:>7.3}  {:<34} {:<20} -> {}",
+            gap, names[*i], cell_name[assigned[*i]], cell_name[*best]
+        );
     }
 }
 
@@ -137,5 +181,9 @@ fn cos(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(feature = "embed-onnx")]
 fn normalize(v: &[f32]) -> Vec<f32> {
     let n = v.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if n > 1e-12 { v.iter().map(|x| x / n).collect() } else { v.to_vec() }
+    if n > 1e-12 {
+        v.iter().map(|x| x / n).collect()
+    } else {
+        v.to_vec()
+    }
 }

@@ -116,7 +116,10 @@ fn kmeans(embeddings: &[Vec<f32>], k: usize, seed: u64, iters: usize) -> Vec<usi
             }
         }
         for (c, centre) in centres.iter_mut().enumerate() {
-            let members: Vec<&Vec<f32>> = (0..n).filter(|&i| assign[i] == c).map(|i| &embeddings[i]).collect();
+            let members: Vec<&Vec<f32>> = (0..n)
+                .filter(|&i| assign[i] == c)
+                .map(|i| &embeddings[i])
+                .collect();
             if !members.is_empty() {
                 *centre = centroid(&members);
             }
@@ -186,7 +189,11 @@ fn nmi(a: &[usize], b: &[usize]) -> f64 {
 fn purity(pred: &[usize], truth: &[usize]) -> f64 {
     let mut per_cluster: HashMap<usize, HashMap<usize, usize>> = HashMap::new();
     for i in 0..pred.len() {
-        *per_cluster.entry(pred[i]).or_default().entry(truth[i]).or_default() += 1;
+        *per_cluster
+            .entry(pred[i])
+            .or_default()
+            .entry(truth[i])
+            .or_default() += 1;
     }
     let correct: usize = per_cluster
         .values()
@@ -240,7 +247,10 @@ fn silhouette(embeddings: &[Vec<f32>], assign: &[usize], k: usize) -> f64 {
 fn inertia(embeddings: &[Vec<f32>], assign: &[usize], k: usize) -> f64 {
     let mut total = 0.0;
     for c in 0..k {
-        let members: Vec<&Vec<f32>> = (0..embeddings.len()).filter(|&i| assign[i] == c).map(|i| &embeddings[i]).collect();
+        let members: Vec<&Vec<f32>> = (0..embeddings.len())
+            .filter(|&i| assign[i] == c)
+            .map(|i| &embeddings[i])
+            .collect();
         if members.is_empty() {
             continue;
         }
@@ -291,7 +301,9 @@ fn main() {
         let mut texts = Vec::new();
         let mut domains = Vec::new();
         for def in ontology.classification_domains() {
-            let (Some(d), Some(_m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(_m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut t = def.name.clone();
             for h in &def.hints {
                 t.push(' ');
@@ -301,7 +313,10 @@ fn main() {
             domains.push(d.clone());
         }
         println!("Loaded {} real entries, embedding...", texts.len());
-        let embeddings: Vec<Vec<f32>> = texts.iter().map(|t| normalize(&embedder.embed(t))).collect();
+        let embeddings: Vec<Vec<f32>> = texts
+            .iter()
+            .map(|t| normalize(&embedder.embed(t)))
+            .collect();
 
         // Ground truth = the 5 coarse domains, mapped to stable indices by
         // sorted name so the labelling itself carries no ordering surprise.
@@ -312,7 +327,11 @@ fn main() {
             v
         };
         names.sort();
-        let idx: HashMap<&str, usize> = names.iter().enumerate().map(|(i, s)| (s.as_str(), i)).collect();
+        let idx: HashMap<&str, usize> = names
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.as_str(), i))
+            .collect();
         let truth: Vec<usize> = domains.iter().map(|d| idx[d.as_str()]).collect();
         let true_k = names.len();
         println!("Ground truth: {true_k} domains {names:?}\n");
@@ -324,8 +343,8 @@ fn main() {
         // clustering or a property of the real corpus.
         println!("=== PART 0 — control: Dataset A, the kind of set the claim came from ===\n");
         let ds_a = [
-            "dog", "cat", "horse", "sheep", "lion", "wolf", "bear", "tiger",
-            "eagle", "sparrow", "owl", "swan", "penguin", "ostrich", "kiwi",
+            "dog", "cat", "horse", "sheep", "lion", "wolf", "bear", "tiger", "eagle", "sparrow",
+            "owl", "swan", "penguin", "ostrich", "kiwi",
         ];
         let ds_a_truth: Vec<usize> = (0..15).map(|i| usize::from(i >= 8)).collect();
         let ds_a_emb: Vec<Vec<f32>> = ds_a.iter().map(|t| normalize(&embedder.embed(t))).collect();
@@ -347,7 +366,17 @@ fn main() {
         }
         szs.sort_unstable();
         println!("  cluster sizes: {szs:?}   (true split is 8/7)");
-        println!("  members: {:?}", (0..2).map(|c| ds_a.iter().enumerate().filter(|(i, _)| ds_a_assign[*i] == c).map(|(_, t)| *t).collect::<Vec<_>>()).collect::<Vec<_>>());
+        println!(
+            "  members: {:?}",
+            (0..2)
+                .map(|c| ds_a
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| ds_a_assign[*i] == c)
+                    .map(|(_, t)| *t)
+                    .collect::<Vec<_>>())
+                .collect::<Vec<_>>()
+        );
         println!("  (mammal/bird, 15 items — this is where 'never loses' was established)\n");
 
         // ---------- Part A: ORACLE k ----------
@@ -411,35 +440,71 @@ fn main() {
                 elbow = w[1];
             }
         }
-        let best_ari = rows.iter().fold(rows[0], |b, &r| if r.1 > b.1 { r } else { b });
+        let best_ari = rows
+            .iter()
+            .fold(rows[0], |b, &r| if r.1 > b.1 { r } else { b });
 
         println!("\n  true k                        = {true_k}");
-        println!("  silhouette picks k            = {}  (ARI there = {:.3})", sil_pick.0, sil_pick.1);
-        println!("  elbow (knee in inertia) picks = {}  (ARI there = {:.3})", elbow.0, elbow.1);
-        println!("  best ARI in the whole sweep   = {:.3} at k={}", best_ari.1, best_ari.0);
+        println!(
+            "  silhouette picks k            = {}  (ARI there = {:.3})",
+            sil_pick.0, sil_pick.1
+        );
+        println!(
+            "  elbow (knee in inertia) picks = {}  (ARI there = {:.3})",
+            elbow.0, elbow.1
+        );
+        println!(
+            "  best ARI in the whole sweep   = {:.3} at k={}",
+            best_ari.1, best_ari.0
+        );
 
         // ---------- Part C: the arithmetic ----------
         println!("\n=== PART C — how much of Part A's win was the oracle? ===\n");
         let sil_loss = a_ari - sil_pick.1;
         let elbow_loss = a_ari - elbow.1;
         println!("  ARI with oracle k          : {a_ari:.3}");
-        println!("  ARI with silhouette-chosen k: {:.3}   (lost {:.3}, {:.0}% of the oracle result)", sil_pick.1, sil_loss, 100.0 * sil_loss / a_ari.max(1e-9));
-        println!("  ARI with elbow-chosen k     : {:.3}   (lost {:.3}, {:.0}% of the oracle result)", elbow.1, elbow_loss, 100.0 * elbow_loss / a_ari.max(1e-9));
+        println!(
+            "  ARI with silhouette-chosen k: {:.3}   (lost {:.3}, {:.0}% of the oracle result)",
+            sil_pick.1,
+            sil_loss,
+            100.0 * sil_loss / a_ari.max(1e-9)
+        );
+        println!(
+            "  ARI with elbow-chosen k     : {:.3}   (lost {:.3}, {:.0}% of the oracle result)",
+            elbow.1,
+            elbow_loss,
+            100.0 * elbow_loss / a_ari.max(1e-9)
+        );
         println!("  random-partition floor      : {r_ari:.3}");
 
         // Reported per-criterion: a single boolean would hide that the two
         // internal criteria disagree sharply, which is itself the finding.
-        println!("\n  silhouette-chosen k beats the random floor: {}", sil_pick.1 > r_ari);
-        println!("  elbow-chosen k beats the random floor     : {}", elbow.1 > r_ari);
-        println!("  silhouette recovers the true k            : {}", sil_pick.0 == true_k);
-        println!("  elbow recovers the true k                 : {}", elbow.0 == true_k);
+        println!(
+            "\n  silhouette-chosen k beats the random floor: {}",
+            sil_pick.1 > r_ari
+        );
+        println!(
+            "  elbow-chosen k beats the random floor     : {}",
+            elbow.1 > r_ari
+        );
+        println!(
+            "  silhouette recovers the true k            : {}",
+            sil_pick.0 == true_k
+        );
+        println!(
+            "  elbow recovers the true k                 : {}",
+            elbow.0 == true_k
+        );
 
         // The headline is not the k-selection loss — it is the size of the
         // oracle result in the first place. Say so numerically rather than
         // letting a "beats random: true" carry an implication it can't bear.
         let oracle_over_floor = a_ari - r_ari;
         println!("\n  === the number that actually matters ===");
-        println!("  oracle-k ARI minus random floor = {:.3} - {:.3} = {:.3}", a_ari, r_ari, oracle_over_floor);
+        println!(
+            "  oracle-k ARI minus random floor = {:.3} - {:.3} = {:.3}",
+            a_ari, r_ari, oracle_over_floor
+        );
         println!("  purity: oracle {:.3} vs single-cluster {:.3} (i.e. {:+.1} points over labelling everything one class)",
                  a_pur, purity(&one, &truth), 100.0 * (a_pur - purity(&one, &truth)));
         println!("  best ARI anywhere in k=2..20    = {:.3}", best_ari.1);

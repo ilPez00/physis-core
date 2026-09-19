@@ -124,16 +124,51 @@ fn tokenize(text: &str) -> Vec<String> {
 /// because nobody reads the tail of a list. Full 45 now, verbs included, since
 /// `mode_inventory` needs 29–43.
 pub const LEXNAMES: [&str; 45] = [
-    "adj.all", "adj.pert", "adv.all", "noun.Tops", "noun.act", "noun.animal",
-    "noun.artifact", "noun.attribute", "noun.body", "noun.cognition",
-    "noun.communication", "noun.event", "noun.feeling", "noun.food", "noun.group",
-    "noun.location", "noun.motive", "noun.object", "noun.person", "noun.phenomenon",
-    "noun.plant", "noun.possession", "noun.process", "noun.quantity",
-    "noun.relation", "noun.shape", "noun.state", "noun.substance", "noun.time",
-    "verb.body", "verb.change", "verb.cognition", "verb.communication",
-    "verb.competition", "verb.consumption", "verb.contact", "verb.creation",
-    "verb.emotion", "verb.motion", "verb.perception", "verb.possession",
-    "verb.social", "verb.stative", "verb.weather", "adj.ppl",
+    "adj.all",
+    "adj.pert",
+    "adv.all",
+    "noun.Tops",
+    "noun.act",
+    "noun.animal",
+    "noun.artifact",
+    "noun.attribute",
+    "noun.body",
+    "noun.cognition",
+    "noun.communication",
+    "noun.event",
+    "noun.feeling",
+    "noun.food",
+    "noun.group",
+    "noun.location",
+    "noun.motive",
+    "noun.object",
+    "noun.person",
+    "noun.phenomenon",
+    "noun.plant",
+    "noun.possession",
+    "noun.process",
+    "noun.quantity",
+    "noun.relation",
+    "noun.shape",
+    "noun.state",
+    "noun.substance",
+    "noun.time",
+    "verb.body",
+    "verb.change",
+    "verb.cognition",
+    "verb.communication",
+    "verb.competition",
+    "verb.consumption",
+    "verb.contact",
+    "verb.creation",
+    "verb.emotion",
+    "verb.motion",
+    "verb.perception",
+    "verb.possession",
+    "verb.social",
+    "verb.stative",
+    "verb.weather",
+    "adj.ppl",
 ];
 
 fn supersense(wn: &WordNet, id: SynsetId) -> Option<String> {
@@ -171,14 +206,19 @@ fn main() {
     let mut cell_texts: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut fitness_input: Vec<(String, Vec<f32>)> = Vec::new();
     for def in ontology.classification_domains() {
-        let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+        let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+            continue;
+        };
         let mut text = def.name.clone();
         for hint in &def.hints {
             text.push(' ');
             text.push_str(hint);
         }
         let cell = format!("{d}/{m}");
-        cell_texts.entry(cell.clone()).or_default().push(text.clone());
+        cell_texts
+            .entry(cell.clone())
+            .or_default()
+            .push(text.clone());
         fitness_input.push((cell, embedder.embed(&text)));
     }
 
@@ -206,7 +246,9 @@ fn main() {
                     continue;
                 }
                 let offsets = wn.synsets_for_lemma(Pos::Noun, &w);
-                let Some(first) = offsets.first().copied() else { continue };
+                let Some(first) = offsets.first().copied() else {
+                    continue;
+                };
                 if let Some(p) = supersense(&wn, first) {
                     out.push(p);
                 }
@@ -216,7 +258,14 @@ fn main() {
     };
     let per_entry: BTreeMap<String, Vec<Vec<String>>> = cell_texts
         .iter()
-        .map(|(c, ts)| (c.clone(), ts.iter().map(|t| parents_of(std::slice::from_ref(t))).collect()))
+        .map(|(c, ts)| {
+            (
+                c.clone(),
+                ts.iter()
+                    .map(|t| parents_of(std::slice::from_ref(t)))
+                    .collect(),
+            )
+        })
         .collect();
 
     // Concentration is the share of a cell's anchored words held by its most
@@ -245,13 +294,19 @@ fn main() {
             .max_by_key(|(k, v)| (**v, std::cmp::Reverse(**k)))
             .map(|(k, v)| ((*k).to_string(), *v))
             .unwrap_or_else(|| ("—".to_string(), 0));
-        let conc = if anchored == 0 { f32::NAN } else { n as f32 / anchored as f32 };
+        let conc = if anchored == 0 {
+            f32::NAN
+        } else {
+            n as f32 / anchored as f32
+        };
         (top, conc, counts.len(), anchored)
     };
 
     let flat: Vec<&Vec<String>> = per_entry.values().flatten().collect();
-    let sizes: Vec<(String, usize)> =
-        per_entry.iter().map(|(c, v)| (c.clone(), v.len())).collect();
+    let sizes: Vec<(String, usize)> = per_entry
+        .iter()
+        .map(|(c, v)| (c.clone(), v.len()))
+        .collect();
 
     use rand::rngs::StdRng;
     use rand::seq::SliceRandom;
@@ -280,13 +335,18 @@ fn main() {
         let refs: Vec<&Vec<String>> = groups.iter().collect();
         let (top, conc, nparents, anchored) = concentration(&refs);
         let ns = null.get(cell).cloned().unwrap_or_default();
-        let nmean = if ns.is_empty() { f32::NAN } else { ns.iter().sum::<f32>() / ns.len() as f32 };
+        let nmean = if ns.is_empty() {
+            f32::NAN
+        } else {
+            ns.iter().sum::<f32>() / ns.len() as f32
+        };
         let nsd = if ns.len() < 2 {
             0.0
         } else {
             (ns.iter().map(|x| (x - nmean) * (x - nmean)).sum::<f32>() / ns.len() as f32).sqrt()
         };
-        let above_anchor = conc.is_finite() && nmean.is_finite() && nsd > 0.0 && (conc - nmean) / nsd >= 2.0;
+        let above_anchor =
+            conc.is_finite() && nmean.is_finite() && nsd > 0.0 && (conc - nmean) / nsd >= 2.0;
 
         let state = if anchored == 0 {
             unanchored += 1;
@@ -303,7 +363,15 @@ fn main() {
             disputed += 1;
             "DISPUTED"
         };
-        rows.push((cell.clone(), groups.len(), nparents, top, conc, nmean, state));
+        rows.push((
+            cell.clone(),
+            groups.len(),
+            nparents,
+            top,
+            conc,
+            nmean,
+            state,
+        ));
     }
 
     println!("── D1: THE GRID AGAINST A TOP-DOWN ANCHOR (WordNet supersenses) ──");
@@ -311,11 +379,11 @@ fn main() {
         "{} cells · concentration vs a {PERMS}-permutation null · coherence from the D4 null\n",
         rows.len()
     );
-    println!("  cell                          n  parents  top parent            conc   null  state");
+    println!(
+        "  cell                          n  parents  top parent            conc   null  state"
+    );
     let mut sorted = rows.clone();
-    sorted.sort_by(|a, b| {
-        a.6.cmp(b.6).then(b.1.cmp(&a.1))
-    });
+    sorted.sort_by(|a, b| a.6.cmp(b.6).then(b.1.cmp(&a.1)));
     for (cell, n, np, top, conc, nmean, state) in &sorted {
         println!(
             "  {:<28} {:>3}  {:>7}  {:<20} {:>5}  {:>5}  {}",
@@ -323,8 +391,16 @@ fn main() {
             n,
             np,
             top.chars().take(20).collect::<String>(),
-            if conc.is_nan() { "  —".to_string() } else { format!("{conc:.2}") },
-            if nmean.is_nan() { "  —".to_string() } else { format!("{nmean:.2}") },
+            if conc.is_nan() {
+                "  —".to_string()
+            } else {
+                format!("{conc:.2}")
+            },
+            if nmean.is_nan() {
+                "  —".to_string()
+            } else {
+                format!("{nmean:.2}")
+            },
             state
         );
     }

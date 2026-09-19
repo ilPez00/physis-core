@@ -111,11 +111,15 @@ impl BackoffTable {
         let mut branching = BTreeMap::new();
         for (n, map) in counts.iter().enumerate().skip(1) {
             #[allow(clippy::for_kv_map)]
-for ((ctx, _), _) in map {
+            for ((ctx, _), _) in map {
                 *branching.entry((ctx.clone(), n)).or_insert(0) += 1;
             }
         }
-        Ok(Self { manifest, counts, branching })
+        Ok(Self {
+            manifest,
+            counts,
+            branching,
+        })
     }
 
     /// Order-n counts live at `counts[n]` (index 0 is unused padding, so
@@ -210,10 +214,7 @@ impl NGramTable for BackoffTable {
         }
         // unigram with add-k smoothing over observed vocabulary
         let k = self.manifest.smoothing_addk.max(0.0);
-        let total: u64 = self
-            .order_count(1)
-            .values()
-            .sum();
+        let total: u64 = self.order_count(1).values().sum();
         let c = self
             .order_count(1)
             .get(&(Vec::new(), next.to_string()))
@@ -222,7 +223,8 @@ impl NGramTable for BackoffTable {
         if total == 0 {
             0.0
         } else {
-            penalty * ((c as f32 + k) / (total as f32 + k * self.manifest.entry_count.max(1) as f32))
+            penalty
+                * ((c as f32 + k) / (total as f32 + k * self.manifest.entry_count.max(1) as f32))
         }
     }
 
@@ -241,11 +243,7 @@ impl NGramTable for BackoffTable {
                 if n == 1 {
                     unique_contexts += 1;
                 }
-                let b = self
-                    .branching
-                    .get(&(ctx.clone(), n))
-                    .copied()
-                    .unwrap_or(0);
+                let b = self.branching.get(&(ctx.clone(), n)).copied().unwrap_or(0);
                 max_branching = max_branching.max(b);
             }
         }
@@ -359,7 +357,11 @@ impl TableBuilder {
 
     /// Finish: prune, drop empty high orders, compute manifest, return table
     /// plus the exact bytes written (for checksum + determinism tests).
-    pub fn finish(mut self, tokenizer: &dyn Tokenizer, corpus_hash: &str) -> (BackoffTable, Vec<u8>) {
+    pub fn finish(
+        mut self,
+        tokenizer: &dyn Tokenizer,
+        corpus_hash: &str,
+    ) -> (BackoffTable, Vec<u8>) {
         self.prune_min_count();
         self.prune_vocabulary();
         // Drop trailing empty orders so max_order reflects reality.
@@ -387,8 +389,8 @@ impl TableBuilder {
             checksum: String::new(), // stamped by `serialize` below
             license: self.cfg.license.clone(),
         };
-        let table = BackoffTable::from_counts(manifest, self.counts)
-            .expect("builder invariants hold");
+        let table =
+            BackoffTable::from_counts(manifest, self.counts).expect("builder invariants hold");
         let bytes = serialize(&table);
         (table, bytes)
     }
@@ -471,7 +473,9 @@ pub fn serialize(table: &BackoffTable) -> Vec<u8> {
     let hex = format!("{:x}", digest);
     let manifest_len_pos = MAGIC.len() + 4;
     let mj_len = u32::from_le_bytes(
-        out[manifest_len_pos..manifest_len_pos + 4].try_into().unwrap(),
+        out[manifest_len_pos..manifest_len_pos + 4]
+            .try_into()
+            .unwrap(),
     ) as usize;
     let mut final_manifest = table.manifest().clone();
     final_manifest.checksum = hex;
@@ -495,9 +499,7 @@ pub fn deserialize(bytes: &[u8]) -> anyhow::Result<BackoffTable> {
     let mut r = Reader { b: bytes, i: 8 };
     let version = r.u32();
     if version != FORMAT_VERSION {
-        anyhow::bail!(
-            "table format v{version} unsupported — this build reads v{FORMAT_VERSION}"
-        );
+        anyhow::bail!("table format v{version} unsupported — this build reads v{FORMAT_VERSION}");
     }
     let mj_len = r.u32() as usize;
     let manifest: TableManifest = serde_json::from_slice(&bytes[r.i..r.i + mj_len])?;
@@ -655,7 +657,10 @@ pub fn build_cell_tables(
     sequences: &[Vec<String>],
     cfg: TableConfig,
 ) -> anyhow::Result<CellTables> {
-    anyhow::ensure!(!sequences.is_empty(), "no sequences to build cell tables from");
+    anyhow::ensure!(
+        !sequences.is_empty(),
+        "no sequences to build cell tables from"
+    );
     let tok = crate::tokenizer::StructuralTokenizer::default();
 
     // The control, over the identical input.
@@ -698,7 +703,11 @@ pub fn build_cell_tables(
         tables.insert(cell, t);
     }
 
-    Ok(CellTables { tables, flat, support })
+    Ok(CellTables {
+        tables,
+        flat,
+        support,
+    })
 }
 
 #[cfg(test)]
@@ -706,7 +715,12 @@ mod cell_table_tests {
     use super::*;
 
     fn cfg() -> TableConfig {
-        TableConfig { kind: TableKind::Structural, max_order: 3, min_count: 1, ..Default::default() }
+        TableConfig {
+            kind: TableKind::Structural,
+            max_order: 3,
+            min_count: 1,
+            ..Default::default()
+        }
     }
 
     /// The family must actually condition: a continuation that is RARE overall
@@ -733,8 +747,14 @@ mod cell_table_tests {
         // Both tables see B -> Q; the point is that B's own table ranks it
         // against a smaller, more homogeneous pool.
         let b = &fam.tables["B"];
-        assert!(b.count(&["B".into()], "Q") > 0, "B's table must retain B->Q");
-        assert!(b.count(&["B".into()], "C") > 0, "B's table must retain B->C");
+        assert!(
+            b.count(&["B".into()], "Q") > 0,
+            "B's table must retain B->Q"
+        );
+        assert!(
+            b.count(&["B".into()], "C") > 0,
+            "B's table must retain B->C"
+        );
     }
 
     /// Under-supported cells must fall back to the pooled table rather than be
@@ -752,7 +772,10 @@ mod cell_table_tests {
         let ctx = vec!["RARE".to_string()];
         let picked = fam.top_next(&ctx, 3, 10);
         let flat = fam.flat.top_next(&ctx, 3);
-        assert_eq!(picked, flat, "support 1 < min_support 10 must use the control");
+        assert_eq!(
+            picked, flat,
+            "support 1 < min_support 10 must use the control"
+        );
     }
 
     /// The control is built from the SAME sequences in the SAME pass. If it
@@ -800,14 +823,14 @@ impl TableRegistry {
     pub fn default_root() -> PathBuf {
         std::env::var_os("PHYSIS_HOME")
             .map(PathBuf::from)
-            .unwrap_or_else(|| {
-                dirs_home().join(".physis-core")
-            })
+            .unwrap_or_else(|| dirs_home().join(".physis-core"))
             .join("ngram")
     }
 
     fn table_dir(&self, id: &str) -> PathBuf {
-        self.root.join(sanitize(id)).join(format!("{}.physisng", sanitize(id)))
+        self.root
+            .join(sanitize(id))
+            .join(format!("{}.physisng", sanitize(id)))
     }
 
     /// Install a built table under `id` (copy of verified bytes + manifest).
@@ -850,7 +873,8 @@ impl TableRegistry {
     pub fn load(&self, id: &str, model_tokenizer: Option<&str>) -> anyhow::Result<BackoffTable> {
         let table = load(&self.table_dir(id))?;
         if let Some(expected) = model_tokenizer {
-            check_compatible(expected, &table.manifest().tokenizer.id).map_err(anyhow::Error::from)?;
+            check_compatible(expected, &table.manifest().tokenizer.id)
+                .map_err(anyhow::Error::from)?;
         }
         Ok(table)
     }
@@ -878,12 +902,20 @@ impl TableRegistry {
 
 fn sanitize(id: &str) -> String {
     id.chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
 fn dirs_home() -> PathBuf {
-    std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."))
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
 }
 
 #[cfg(test)]
@@ -906,18 +938,25 @@ mod tests {
 
     #[test]
     fn lookup_and_backoff_work() {
-        let cfg = TableConfig { table_id: "t".into(), max_order: 3, ..Default::default() };
+        let cfg = TableConfig {
+            table_id: "t".into(),
+            max_order: 3,
+            ..Default::default()
+        };
         let (t, _) = build("t", CORPUS, cfg);
         // Direct trigram hit.
-        assert_eq!(
-            t.count(&["the".into(), "pump".into()], "failed"),
-            2
-        );
+        assert_eq!(t.count(&["the".into(), "pump".into()], "failed"), 2);
         // Backoff: unseen trigram context falls back to lower orders.
         let p_high = t.probability(&["the".into(), "pump".into()], "failed");
         let p_low = t.probability(&["completely".into(), "unseen".into()], "the");
-        assert!(p_high > 0.5, "observed bigram continuation is likely: {p_high}");
-        assert!(p_low > 0.0 && p_low < 1.0, "unigram fallback is a real probability");
+        assert!(
+            p_high > 0.5,
+            "observed bigram continuation is likely: {p_high}"
+        );
+        assert!(
+            p_low > 0.0 && p_low < 1.0,
+            "unigram fallback is a real probability"
+        );
         // top_next returns deterministic, count-ordered candidates.
         let tops = t.top_next(&["the".into(), "pump".into()], 3);
         assert_eq!(tops.first().map(|(w, _)| w.as_str()), Some("failed"));
@@ -928,7 +967,11 @@ mod tests {
         // Same sequences, pushed in a different order, same config ⇒ the
         // serialized table is byte-identical (§24). Cross-sentence bridges
         // are part of the corpus definition, so both arms use sentences.
-        let cfg = TableConfig { table_id: "d".into(), max_order: 3, ..Default::default() };
+        let cfg = TableConfig {
+            table_id: "d".into(),
+            max_order: 3,
+            ..Default::default()
+        };
         let t = tok();
         let sentences: Vec<String> = CORPUS
             .split('.')
@@ -954,7 +997,10 @@ mod tests {
 
     #[test]
     fn checksum_rejects_corruption() {
-        let cfg = TableConfig { table_id: "c".into(), ..Default::default() };
+        let cfg = TableConfig {
+            table_id: "c".into(),
+            ..Default::default()
+        };
         let (_, mut bytes) = build("c", CORPUS, cfg);
         let n = bytes.len();
         bytes[n - 3] ^= 0xFF; // flip bits in the tail (a record)
@@ -977,7 +1023,10 @@ mod tests {
     fn registry_roundtrip_and_compatibility() {
         let tmp = tempfile::tempdir().unwrap();
         let reg = TableRegistry::new(tmp.path());
-        let cfg = TableConfig { table_id: "wiki".into(), ..Default::default() };
+        let cfg = TableConfig {
+            table_id: "wiki".into(),
+            ..Default::default()
+        };
         let (_, bytes) = build("wiki", CORPUS, cfg);
         let m = reg.install_bytes("wiki-en-5gram", &bytes).unwrap();
         assert_eq!(m.table_id, "wiki");
@@ -985,14 +1034,13 @@ mod tests {
         // load with matching tokenizer: ok
         assert!(reg.load("wiki-en-5gram", Some("whitespace-v1")).is_ok());
         // load with a model that expects a different tokenizer: refused loudly
-        let err = reg
-            .load("wiki-en-5gram", Some("smollm2-bpe"))
-            .unwrap_err();
+        let err = reg.load("wiki-en-5gram", Some("smollm2-bpe")).unwrap_err();
         assert!(err.to_string().contains("rebuild"), "useful error: {err}");
         // export / import roundtrip
         let exp = tmp.path().join("export.bin");
         reg.export("wiki-en-5gram", &exp).unwrap();
-        reg.install_bytes("copy", &std::fs::read(&exp).unwrap()).unwrap();
+        reg.install_bytes("copy", &std::fs::read(&exp).unwrap())
+            .unwrap();
         assert_eq!(reg.list().len(), 2);
         reg.remove("copy").unwrap();
         reg.remove("wiki-en-5gram").unwrap();

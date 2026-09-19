@@ -215,8 +215,8 @@ impl ShapeKind {
             "toml" | "yaml" | "yml" | "json" | "ini" | "conf" | "properties" | "xml" => {
                 ShapeKind::Config
             }
-            "rs" | "ts" | "tsx" | "js" | "jsx" | "java" | "kt" | "py" | "go" | "rb" | "c"
-            | "h" | "cpp" | "hpp" | "swift" | "php" | "cs" => ShapeKind::Source,
+            "rs" | "ts" | "tsx" | "js" | "jsx" | "java" | "kt" | "py" | "go" | "rb" | "c" | "h"
+            | "cpp" | "hpp" | "swift" | "php" | "cs" => ShapeKind::Source,
             _ => ShapeKind::Other,
         }
     }
@@ -329,7 +329,10 @@ pub fn matcher_evidence(a: &ShapeNode, b: &ShapeNode) -> (f32, Vec<(MatcherTag, 
         let fused = fused / (WEIGHT_PATH_SHAPE + WEIGHT_NAME_TOKENS);
         (
             fused,
-            vec![(MatcherTag::PathShape, path), (MatcherTag::NameTokens, tokens)],
+            vec![
+                (MatcherTag::PathShape, path),
+                (MatcherTag::NameTokens, tokens),
+            ],
         )
     } else {
         let fused = WEIGHT_PATH_SHAPE * path
@@ -418,9 +421,7 @@ pub fn propose_correspondences(
             ranked.push((b.rel_path.clone(), score, evidence));
         }
         // Best score first; ties break by recipient path ascending.
-        ranked.sort_by(|x, y| {
-            y.1.partial_cmp(&x.1).unwrap_or(std::cmp::Ordering::Equal)
-        });
+        ranked.sort_by(|x, y| y.1.partial_cmp(&x.1).unwrap_or(std::cmp::Ordering::Equal));
         if ranked.is_empty() {
             break;
         }
@@ -428,7 +429,8 @@ pub fn propose_correspondences(
         if best_score < TRANSPLANT_FLOOR {
             continue;
         }
-        let ambiguous = ranked.len() > 1 && best_score < 1.0 && (best_score - ranked[1].1).abs() < 1e-3;
+        let ambiguous =
+            ranked.len() > 1 && best_score < 1.0 && (best_score - ranked[1].1).abs() < 1e-3;
         let b_node = recipient
             .node(&best_path)
             .expect("ranked candidate comes from the recipient shape");
@@ -510,8 +512,7 @@ pub fn build_transplant_plan(
         }
     }
 
-    let aligned_donor: HashSet<String> =
-        correspondences.iter().map(|p| p.donor.clone()).collect();
+    let aligned_donor: HashSet<String> = correspondences.iter().map(|p| p.donor.clone()).collect();
     let aligned_recipient: HashSet<String> = correspondences
         .iter()
         .map(|p| p.recipient.clone())
@@ -608,11 +609,17 @@ mod tests {
         for c in &corr {
             assert_eq!(c.donor, c.recipient, "identical shapes align identically");
             assert!(c.score >= TRANSPLANT_FLOOR);
-            assert_eq!(c.contradictions.len(), 0, "clean alignment records no contradiction");
+            assert_eq!(
+                c.contradictions.len(),
+                0,
+                "clean alignment records no contradiction"
+            );
         }
         let plan = build_transplant_plan(&donor, &recipient, &corr);
         assert!(
-            plan.ops.iter().all(|op| matches!(op, TransplantOp::Keep { .. })),
+            plan.ops
+                .iter()
+                .all(|op| matches!(op, TransplantOp::Keep { .. })),
             "identical shapes need only Keep: {:?}",
             plan.ops
         );
@@ -623,80 +630,80 @@ mod tests {
     /// The shape-heavy weighting claim: a module that was renamed but kept
     /// its place still aligns — and the plan names the token drift as the
     /// adaptation the rewrite must carry.
-#[test]
-fn renamed_module_still_aligns_and_names_adaptations() {
-    let donor = shape(
-        "/tmp/alpha",
-        vec![
-            node("src", ShapeKind::Directory),
-            node("src/pipeline_stage.rs", ShapeKind::Source),
-        ],
-    );
-    let recipient = shape(
-        "/tmp/beta",
-        vec![
-            node("src", ShapeKind::Directory),
-            node("src/worker.rs", ShapeKind::Source),
-        ],
-    );
-    let corr = propose_correspondences(&donor, &recipient);
-    // Two correspondences: directory alignment + renamed file alignment
-    assert_eq!(corr.len(), 2, "both directory and renamed module align");
-    // Check both correspondences exist
-    let dir_correspondence = corr.iter().find(|c| c.recipient == "src");
-    let file_correspondence = corr.iter().find(|c| c.recipient == "src/worker.rs");
-    assert!(dir_correspondence.is_some(), "directory should align");
-    assert!(file_correspondence.is_some(), "renamed file should align");
-    // The file correspondence should have "src/worker.rs" as recipient
-    let file_corr = file_correspondence.unwrap();
-    assert_eq!(file_corr.recipient, "src/worker.rs");
-    // The name disagreement should be recorded
-    assert!(
-        file_corr
-            .contradictions
-            .iter()
-            .any(|c| c.contains("shape beats name")),
-        "the name disagreement is recorded, not hidden: {:?}",
-        file_corr.contradictions
-    );
+    #[test]
+    fn renamed_module_still_aligns_and_names_adaptations() {
+        let donor = shape(
+            "/tmp/alpha",
+            vec![
+                node("src", ShapeKind::Directory),
+                node("src/pipeline_stage.rs", ShapeKind::Source),
+            ],
+        );
+        let recipient = shape(
+            "/tmp/beta",
+            vec![
+                node("src", ShapeKind::Directory),
+                node("src/worker.rs", ShapeKind::Source),
+            ],
+        );
+        let corr = propose_correspondences(&donor, &recipient);
+        // Two correspondences: directory alignment + renamed file alignment
+        assert_eq!(corr.len(), 2, "both directory and renamed module align");
+        // Check both correspondences exist
+        let dir_correspondence = corr.iter().find(|c| c.recipient == "src");
+        let file_correspondence = corr.iter().find(|c| c.recipient == "src/worker.rs");
+        assert!(dir_correspondence.is_some(), "directory should align");
+        assert!(file_correspondence.is_some(), "renamed file should align");
+        // The file correspondence should have "src/worker.rs" as recipient
+        let file_corr = file_correspondence.unwrap();
+        assert_eq!(file_corr.recipient, "src/worker.rs");
+        // The name disagreement should be recorded
+        assert!(
+            file_corr
+                .contradictions
+                .iter()
+                .any(|c| c.contains("shape beats name")),
+            "the name disagreement is recorded, not hidden: {:?}",
+            file_corr.contradictions
+        );
 
-    let plan = build_transplant_plan(&donor, &recipient, &corr);
-    // Both the directory Keep and the file Rewrite should be present
-    let keeps: Vec<&TransplantOp> = plan
-        .ops
-        .iter()
-        .filter(|op| matches!(op, TransplantOp::Keep { .. }))
-        .collect();
-    let rewrites: Vec<&TransplantOp> = plan
-        .ops
-        .iter()
-        .filter(|op| matches!(op, TransplantOp::Rewrite { .. }))
-        .collect();
-    // Directory gets Keep, file gets Rewrite
-    assert_eq!(keeps.len(), 1, "directory should propose Keep");
-    assert_eq!(rewrites.len(), 1, "renamed file should propose Rewrite");
-    match &plan.ops[1] {
-        TransplantOp::Rewrite {
-            target,
-            adaptations,
-            ..
-        } => {
-            assert_eq!(target, "src/worker.rs");
-            assert!(
-                adaptations.contains(&"pipeline".to_string())
-                    && adaptations.contains(&"stage".to_string()),
-                "the adaptation names the donor tokens the recipient lacks: {:?}",
-                adaptations
-            );
+        let plan = build_transplant_plan(&donor, &recipient, &corr);
+        // Both the directory Keep and the file Rewrite should be present
+        let keeps: Vec<&TransplantOp> = plan
+            .ops
+            .iter()
+            .filter(|op| matches!(op, TransplantOp::Keep { .. }))
+            .collect();
+        let rewrites: Vec<&TransplantOp> = plan
+            .ops
+            .iter()
+            .filter(|op| matches!(op, TransplantOp::Rewrite { .. }))
+            .collect();
+        // Directory gets Keep, file gets Rewrite
+        assert_eq!(keeps.len(), 1, "directory should propose Keep");
+        assert_eq!(rewrites.len(), 1, "renamed file should propose Rewrite");
+        match &plan.ops[1] {
+            TransplantOp::Rewrite {
+                target,
+                adaptations,
+                ..
+            } => {
+                assert_eq!(target, "src/worker.rs");
+                assert!(
+                    adaptations.contains(&"pipeline".to_string())
+                        && adaptations.contains(&"stage".to_string()),
+                    "the adaptation names the donor tokens the recipient lacks: {:?}",
+                    adaptations
+                );
+            }
+            other => panic!("expected Rewrite at index 1, got {:?}", other),
         }
-        other => panic!("expected Rewrite at index 1, got {:?}", other),
+        // The first operation should be Keep for the directory
+        match &plan.ops[0] {
+            TransplantOp::Keep { .. } => {}
+            other => panic!("expected Keep at index 0, got {:?}", other),
+        }
     }
-    // The first operation should be Keep for the directory
-    match &plan.ops[0] {
-        TransplantOp::Keep { .. } => {}
-        other => panic!("expected Keep at index 0, got {:?}", other),
-    }
-}
 
     /// Invalidate-don't-delete applies to transplant too: recipient paths
     /// with no donor counterpart are listed for a human, never proposed for
@@ -704,10 +711,7 @@ fn renamed_module_still_aligns_and_names_adaptations() {
     /// identical plan (pure proposal, no hidden state).
     #[test]
     fn transplant_plan_never_deletes_and_is_pure() {
-        let donor = shape(
-            "/tmp/alpha",
-            vec![node("src/lib.rs", ShapeKind::Source)],
-        );
+        let donor = shape("/tmp/alpha", vec![node("src/lib.rs", ShapeKind::Source)]);
         let recipient = shape(
             "/tmp/beta",
             vec![
@@ -722,7 +726,10 @@ fn renamed_module_still_aligns_and_names_adaptations() {
         assert_eq!(plan1, plan2, "the same shapes give the same plan");
 
         assert!(
-            plan1.ops.iter().all(|op| !matches!(op, TransplantOp::Create { .. })),
+            plan1
+                .ops
+                .iter()
+                .all(|op| !matches!(op, TransplantOp::Create { .. })),
             "nothing is proposed for creation here"
         );
         assert!(
@@ -781,7 +788,11 @@ fn renamed_module_still_aligns_and_names_adaptations() {
         let source = s1.node("src/main.rs").expect("source node");
         assert_eq!(source.kind, ShapeKind::Source);
         assert_eq!(source.depth, 1, "src/main.rs sits one level deep");
-        assert_eq!(source.tokens, vec!["main", "rs"], "the extension splits as a token");
+        assert_eq!(
+            source.tokens,
+            vec!["main", "rs"],
+            "the extension splits as a token"
+        );
 
         std::fs::remove_dir_all(&dir).ok();
     }

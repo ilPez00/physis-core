@@ -44,7 +44,7 @@
 //!
 //! Run: cargo run --release --example experiment53_transform_analogy
 
-use physis_core::transform::{PatElem, Predicate, Triple, TriplePattern, find_homomorphisms};
+use physis_core::transform::{find_homomorphisms, PatElem, Predicate, Triple, TriplePattern};
 use std::collections::{BTreeMap, BTreeSet};
 
 // ── Deterministic RNG so the run reproduces bit-for-bit ─────────────────────
@@ -57,7 +57,11 @@ impl Rng {
         self.0
     }
     fn below(&mut self, n: usize) -> usize {
-        if n == 0 { 0 } else { (self.next() % n as u64) as usize }
+        if n == 0 {
+            0
+        } else {
+            (self.next() % n as u64) as usize
+        }
     }
 }
 
@@ -68,7 +72,9 @@ fn extract(dir: &std::path::Path) -> Vec<Triple> {
     let mut out: BTreeSet<(String, String)> = BTreeSet::new();
     let mut stack = vec![dir.to_path_buf()];
     while let Some(d) = stack.pop() {
-        let Ok(rd) = std::fs::read_dir(&d) else { continue };
+        let Ok(rd) = std::fs::read_dir(&d) else {
+            continue;
+        };
         for e in rd.flatten() {
             let p = e.path();
             if p.is_dir() {
@@ -78,11 +84,15 @@ fn extract(dir: &std::path::Path) -> Vec<Triple> {
             if p.extension().and_then(|s| s.to_str()) != Some("rs") {
                 continue;
             }
-            let Some(m) = p.file_stem().and_then(|s| s.to_str()) else { continue };
+            let Some(m) = p.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
             if m == "lib" || m == "main" {
                 continue;
             }
-            let Ok(body) = std::fs::read_to_string(&p) else { continue };
+            let Ok(body) = std::fs::read_to_string(&p) else {
+                continue;
+            };
             for (i, _) in body.match_indices("crate::") {
                 let rest = &body[i + 7..];
                 let tgt: String = rest
@@ -151,7 +161,11 @@ fn popularity(edges: &Edges, subj: &str, known: &BTreeSet<String>) -> Vec<(Strin
     rank(votes)
 }
 
-fn random_rank(all: &BTreeSet<String>, known: &BTreeSet<String>, rng: &mut Rng) -> Vec<(String, f32)> {
+fn random_rank(
+    all: &BTreeSet<String>,
+    known: &BTreeSet<String>,
+    rng: &mut Rng,
+) -> Vec<(String, f32)> {
     let mut c: Vec<String> = all.difference(known).cloned().collect();
     for i in (1..c.len()).rev() {
         c.swap(i, rng.below(i + 1));
@@ -184,7 +198,9 @@ fn permute(ts: &[Triple], rng: &mut Rng) -> Vec<Triple> {
         pairs[j] = (b.0, a.1);
     }
     let set: BTreeSet<(String, String)> = pairs.into_iter().collect();
-    set.into_iter().map(|(s, o)| Triple::new(&s, Predicate::Requires, &o)).collect()
+    set.into_iter()
+        .map(|(s, o)| Triple::new(&s, Predicate::Requires, &o))
+        .collect()
 }
 
 #[derive(Default, Clone, Copy)]
@@ -199,14 +215,26 @@ impl Hits {
         self.n += 1;
         let pos = ranked.iter().position(|(c, _)| c == truth);
         if let Some(p) = pos {
-            if p < 1 { self.t1 += 1 }
-            if p < 3 { self.t3 += 1 }
-            if p < 5 { self.t5 += 1 }
+            if p < 1 {
+                self.t1 += 1
+            }
+            if p < 3 {
+                self.t3 += 1
+            }
+            if p < 5 {
+                self.t5 += 1
+            }
         }
     }
     fn row(&self, name: &str) -> String {
         let f = |x: usize| x as f32 / self.n.max(1) as f32;
-        format!("  {name:<12} top1 {:.3}  top3 {:.3}  top5 {:.3}   (n={})", f(self.t1), f(self.t3), f(self.t5), self.n)
+        format!(
+            "  {name:<12} top1 {:.3}  top3 {:.3}  top5 {:.3}   (n={})",
+            f(self.t1),
+            f(self.t3),
+            f(self.t5),
+            self.n
+        )
     }
 }
 
@@ -243,8 +271,12 @@ fn main() {
 
     println!("EXPERIMENT 53 — symbolic analogy vs a construction-matched null");
     println!("corpus root: {}", dir.display());
-    println!("corpus: {} modules, {} Requires edges, {} distinct targets",
-             edges.len(), triples.len(), all.len());
+    println!(
+        "corpus: {} modules, {} Requires edges, {} distinct targets",
+        edges.len(),
+        triples.len(),
+        all.len()
+    );
 
     // Sanity: the engine's own matcher must see these facts. If
     // find_homomorphisms cannot bind a pattern over the extracted triples, the
@@ -256,7 +288,10 @@ fn main() {
         o: PatElem::Var("t".into()),
     };
     let binds = find_homomorphisms(&[pat], &triples);
-    println!("transform::find_homomorphisms binds {} facts (must be > 0)\n", binds.len());
+    println!(
+        "transform::find_homomorphisms binds {} facts (must be > 0)\n",
+        binds.len()
+    );
     assert!(!binds.is_empty(), "the engine cannot read its own corpus");
 
     let mut rng = Rng(0x5EED_1234_9ABC_DEF0);
@@ -282,8 +317,14 @@ fn main() {
     let popt = f(pop.t3, pop.n);
     println!("\nVERDICT (top-3)");
     println!("  ANALOGY real          {real:.3}");
-    println!("  ANALOGY permuted null {null:.3}   delta {:+.3}", real - null);
-    println!("  POPULARITY baseline   {popt:.3}   delta {:+.3}", real - popt);
+    println!(
+        "  ANALOGY permuted null {null:.3}   delta {:+.3}",
+        real - null
+    );
+    println!(
+        "  POPULARITY baseline   {popt:.3}   delta {:+.3}",
+        real - popt
+    );
     println!();
     if real - null > 0.05 && real - popt > 0.05 {
         println!("  SUPPORTED: analogy reads structure, not degree, and beats the");

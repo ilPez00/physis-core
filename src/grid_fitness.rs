@@ -159,8 +159,11 @@ impl GridFitness {
         if self.embedder == "random-projection" {
             o.push_str("  NOTE: random-projection is a lexical hash. This is a floor.\n\n");
         }
-        let mut worst: Vec<&CellFitness> =
-            self.per_cell.iter().filter(|c| !c.above_null && !c.unmeasurable).collect();
+        let mut worst: Vec<&CellFitness> = self
+            .per_cell
+            .iter()
+            .filter(|c| !c.above_null && !c.unmeasurable)
+            .collect();
         worst.sort_by_key(|c| std::cmp::Reverse(c.entries));
         o.push_str("  populated cells that do NOT clear their null, largest first —\n  these have entries and carve nothing with them:\n");
         o.push_str("  cell                            n   fitness    null      z\n");
@@ -187,7 +190,11 @@ impl GridFitness {
             o.push_str(&format!(
                 "\n  unmeasurable ({}): {}\n",
                 singles.len(),
-                singles.iter().map(|c| c.cell.as_str()).collect::<Vec<_>>().join(", ")
+                singles
+                    .iter()
+                    .map(|c| c.cell.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
         }
         o
@@ -233,7 +240,11 @@ pub fn run(entries: &[(String, Vec<f32>)], seed: u64, embedder_kind: &str) -> Gr
     for (cell, fitness) in &real.per_cell {
         let nulls = per_cell_null.get(cell).cloned().unwrap_or_default();
         let (null_mean, null_sd) = mean_sd(&nulls);
-        let z = if null_sd > 0.0 { Some((fitness - null_mean) / null_sd) } else { None };
+        let z = if null_sd > 0.0 {
+            Some((fitness - null_mean) / null_sd)
+        } else {
+            None
+        };
         let above_null = match z {
             Some(z) => z >= 2.0,
             // No spread in the null: the real value clears it only by being
@@ -259,7 +270,10 @@ pub fn run(entries: &[(String, Vec<f32>)], seed: u64, embedder_kind: &str) -> Gr
     per_cell.sort_by(|a, b| a.cell.cmp(&b.cell));
 
     let cells_unmeasurable = per_cell.iter().filter(|c| c.unmeasurable).count();
-    let cells_failing = per_cell.iter().filter(|c| !c.unmeasurable && !c.above_null).count();
+    let cells_failing = per_cell
+        .iter()
+        .filter(|c| !c.unmeasurable && !c.above_null)
+        .count();
 
     let (overall_null_mean, _) = mean_sd(&overall_null);
     GridFitness {

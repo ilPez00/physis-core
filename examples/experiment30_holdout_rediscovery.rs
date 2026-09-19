@@ -97,7 +97,9 @@ fn main() {
         let mut texts = Vec::new();
         let mut cells = Vec::new();
         for def in ontology.classification_domains() {
-            let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+            let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+                continue;
+            };
             let mut t = def.name.clone();
             for h in &def.hints {
                 t.push(' ');
@@ -107,7 +109,10 @@ fn main() {
             cells.push((d.clone(), m.clone()));
         }
         println!("Loaded {} entries, embedding...", texts.len());
-        let emb: Vec<Vec<f32>> = texts.iter().map(|t| normalize(&embedder.embed(t))).collect();
+        let emb: Vec<Vec<f32>> = texts
+            .iter()
+            .map(|t| normalize(&embedder.embed(t)))
+            .collect();
 
         // ---- stratified hold-out: ~10% per cell, never emptying a cell ----
         let mut by_cell: HashMap<(String, String), Vec<usize>> = HashMap::new();
@@ -121,7 +126,8 @@ fn main() {
         for k in &cell_keys {
             let members = &by_cell[*k];
             // Keep at least 2 per cell so the cell still exists in the model.
-            let n_hold = ((members.len() as f64 * 0.10).round() as usize).min(members.len().saturating_sub(2));
+            let n_hold = ((members.len() as f64 * 0.10).round() as usize)
+                .min(members.len().saturating_sub(2));
             // Deterministic stride pick — no RNG, so the split is identical
             // across runs and reviewers can reproduce the exact partition.
             for j in 0..n_hold {
@@ -169,7 +175,10 @@ fn main() {
                 .then_with(|| a.2.cmp(&b.2))
                 .then_with(|| a.3.cmp(&b.3))
         });
-        println!("Generated {} near-neighbour midpoint proposals.\n", proposals.len());
+        println!(
+            "Generated {} near-neighbour midpoint proposals.\n",
+            proposals.len()
+        );
 
         // ---- generators, compared head to head ----
         // A midpoint between two VERY close entries sits on top of both, so it
@@ -245,13 +254,32 @@ fn main() {
 
         let chance = held.len() as f64 / texts.len() as f64;
         println!("=== Does a proposal point at a MISSING concept more often than chance? ===\n");
-        println!("  (nearest entry among all {} is a held-out one; chance = {:.3})\n", texts.len(), chance);
+        println!(
+            "  (nearest entry among all {} is a held-out one; chance = {:.3})\n",
+            texts.len(),
+            chance
+        );
         let n_near = points_at_held(&near);
         let n_mid = points_at_held(&mid);
         let n_ctl = points_at_held(&controls);
-        println!("  near-neighbour midpoints (ranks 1-5)    n={:5}   {:.3}   lift {:.2}x", near.len(), n_near, n_near / chance);
-        println!("  medium-distance midpoints (ranks 20-40) n={:5}   {:.3}   lift {:.2}x", mid.len(), n_mid, n_mid / chance);
-        println!("  random-pair midpoints (control)         n={:5}   {:.3}   lift {:.2}x", controls.len(), n_ctl, n_ctl / chance);
+        println!(
+            "  near-neighbour midpoints (ranks 1-5)    n={:5}   {:.3}   lift {:.2}x",
+            near.len(),
+            n_near,
+            n_near / chance
+        );
+        println!(
+            "  medium-distance midpoints (ranks 20-40) n={:5}   {:.3}   lift {:.2}x",
+            mid.len(),
+            n_mid,
+            n_mid / chance
+        );
+        println!(
+            "  random-pair midpoints (control)         n={:5}   {:.3}   lift {:.2}x",
+            controls.len(),
+            n_ctl,
+            n_ctl / chance
+        );
 
         // ---- recall view: how many held-out concepts get pointed at at all? ----
         let recall = |points: &[(Vec<f32>, usize, usize)]| -> f64 {
@@ -264,7 +292,10 @@ fn main() {
             }
             found.len() as f64 / held.len() as f64
         };
-        println!("\n=== How many of the {} missing concepts get pointed at at all? ===\n", held.len());
+        println!(
+            "\n=== How many of the {} missing concepts get pointed at at all? ===\n",
+            held.len()
+        );
         println!("  near-neighbour   {:.3}", recall(&near));
         println!("  medium-distance  {:.3}", recall(&mid));
         println!("  random control   {:.3}", recall(&controls));
@@ -282,7 +313,11 @@ fn main() {
             if held_set.contains(&best.1) {
                 println!("  between {:?}", short(&texts[*i]));
                 println!("      and {:?}", short(&texts[*j]));
-                println!("   -> MISSING {:?}  (cos {:.3})\n", short(&texts[best.1]), best.0);
+                println!(
+                    "   -> MISSING {:?}  (cos {:.3})\n",
+                    short(&texts[best.1]),
+                    best.0
+                );
                 shown += 1;
             }
         }
@@ -313,8 +348,16 @@ fn main() {
         println!("\n=== Verdict ===\n");
         if z_near > 3.29 {
             println!("  SUPPORTED, with a small effect. Near-neighbour midpoints point at a");
-            println!("  genuinely-missing concept {:.1}% of the time vs {:.1}% for", 100.0 * n_near, 100.0 * n_ctl);
-            println!("  manifold-matched random pairs — {:.2}x the control, z = {:.2}.", n_near / n_ctl.max(1e-9), z_near);
+            println!(
+                "  genuinely-missing concept {:.1}% of the time vs {:.1}% for",
+                100.0 * n_near,
+                100.0 * n_ctl
+            );
+            println!(
+                "  manifold-matched random pairs — {:.2}x the control, z = {:.2}.",
+                n_near / n_ctl.max(1e-9),
+                z_near
+            );
             println!();
             println!("  So proximity DOES carry information about where concepts are absent.");
             println!("  This is the first positive result in this track, and it is the premise");

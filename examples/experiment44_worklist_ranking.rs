@@ -63,12 +63,20 @@ fn run() {
     use rand::SeedableRng;
     use std::collections::{HashMap, HashSet};
 
-    let dirs = ["physis-core", ".", "..", "../physis-core", "/home/gio/dev/physis-pro/physis-core"];
+    let dirs = [
+        "physis-core",
+        ".",
+        "..",
+        "../physis-core",
+        "/home/gio/dev/physis-pro/physis-core",
+    ];
     let model_dir = dirs
         .iter()
         .find_map(|d| {
             let m = std::path::Path::new(d).join("models");
-            m.join("model.onnx").exists().then(|| m.to_string_lossy().into_owned())
+            m.join("model.onnx")
+                .exists()
+                .then(|| m.to_string_lossy().into_owned())
         })
         .expect("models/model.onnx not found");
     let embedder = OnnxEmbedder::with_config(&OnnxConfig {
@@ -87,7 +95,9 @@ fn run() {
     let mut names = Vec::new();
     let mut cells = Vec::new();
     for def in ontology.classification_domains() {
-        let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+        let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+            continue;
+        };
         let mut t = def.name.clone();
         for h in &def.hints {
             t.push(' ');
@@ -98,7 +108,10 @@ fn run() {
         cells.push((d.clone(), m.clone()));
     }
     println!("physis: {} entries, embedding...", texts.len());
-    let emb: Vec<Vec<f32>> = texts.iter().map(|t| normalize(&embedder.embed(t))).collect();
+    let emb: Vec<Vec<f32>> = texts
+        .iter()
+        .map(|t| normalize(&embedder.embed(t)))
+        .collect();
 
     // Stratified hold-out, identical construction to Iterations 30/31.
     let mut by_cell: HashMap<(String, String), Vec<usize>> = HashMap::new();
@@ -138,7 +151,10 @@ fn run() {
             }
         }
     }
-    println!("proposals: {} near-neighbour midpoints (ranks 1-{NN})\n", proposals.len());
+    println!(
+        "proposals: {} near-neighbour midpoints (ranks 1-{NN})\n",
+        proposals.len()
+    );
 
     // ---------- the operational records ----------
     #[derive(serde::Deserialize)]
@@ -153,25 +169,42 @@ fn run() {
         .expect("operational_corpus.json not found (run from the physis-pro root)");
     let mut events: Vec<Event> = serde_json::from_slice(&raw).expect("corpus parse");
     // Chronological order, tie-broken on the key — same as Experiment 39.
-    events.sort_by(|a, b| a.observed_at.cmp(&b.observed_at).then(a.event_key.cmp(&b.event_key)));
+    events.sort_by(|a, b| {
+        a.observed_at
+            .cmp(&b.observed_at)
+            .then(a.event_key.cmp(&b.event_key))
+    });
     let rec_texts: Vec<String> = events
         .iter()
         .map(|e| format!("{} {}", e.subject, e.evidence.join(" ")).to_lowercase())
         .collect();
-    println!("records: {} operational events, embedding...", rec_texts.len());
-    let rec_emb: Vec<Vec<f32>> = rec_texts.iter().map(|t| normalize(&embedder.embed(t))).collect();
+    println!(
+        "records: {} operational events, embedding...",
+        rec_texts.len()
+    );
+    let rec_emb: Vec<Vec<f32>> = rec_texts
+        .iter()
+        .map(|t| normalize(&embedder.embed(t)))
+        .collect();
 
     // ---------- live coverage over records ----------
     // Raw best-entry cosine against the live (90%) ontology, following
     // discovery.rs and Experiment 33 ("undiluted by the blended classifier").
     let live: Vec<f32> = rec_emb
         .iter()
-        .map(|r| known.iter().map(|&k| cosine_sim(r, &emb[k])).fold(f32::NEG_INFINITY, f32::max))
+        .map(|r| {
+            known
+                .iter()
+                .map(|&k| cosine_sim(r, &emb[k]))
+                .fold(f32::NEG_INFINITY, f32::max)
+        })
         .collect();
     let mut sorted = live.clone();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let threshold = quantile(&sorted, 0.50);
-    let uncovered: Vec<usize> = (0..rec_emb.len()).filter(|&i| live[i] < threshold).collect();
+    let uncovered: Vec<usize> = (0..rec_emb.len())
+        .filter(|&i| live[i] < threshold)
+        .collect();
     println!(
         "coverage: threshold {:.3} (median) — {}/{} records uncovered ({:.0}%)\n",
         threshold,
@@ -216,13 +249,19 @@ fn run() {
                 gain_p50[pi] += 1;
             }
         }
-        geo[pi] = known.iter().map(|&k| cosine_sim(p, &emb[k])).fold(f32::NEG_INFINITY, f32::max);
+        geo[pi] = known
+            .iter()
+            .map(|&k| cosine_sim(p, &emb[k]))
+            .fold(f32::NEG_INFINITY, f32::max);
         pair[pi] = cosine_sim(&emb[*i], &emb[*j]);
 
         // Hit ground truth (Iterations 30/31): nearest held-out concept beats
         // the nearest NON-PARENT known entry. Parents are adjacent to their
         // own midpoint by construction and must be excluded.
-        let best_held = held.iter().map(|&h| cosine_sim(p, &emb[h])).fold(f32::NEG_INFINITY, f32::max);
+        let best_held = held
+            .iter()
+            .map(|&h| cosine_sim(p, &emb[h]))
+            .fold(f32::NEG_INFINITY, f32::max);
         let rival = known
             .iter()
             .filter(|&&k| k != *i && k != *j)
@@ -255,13 +294,19 @@ fn run() {
         .map(|(pi, (_, i, j))| ((*i, *j), pi))
         .collect();
     for &r in [0, rec_emb.len() / 4, rec_emb.len() / 2, rec_emb.len() - 1].iter() {
-        let mut top: Vec<(f32, usize)> = known.iter().map(|&k| (cosine_sim(&rec_emb[r], &emb[k]), k)).collect();
+        let mut top: Vec<(f32, usize)> = known
+            .iter()
+            .map(|&k| (cosine_sim(&rec_emb[r], &emb[k]), k))
+            .collect();
         top.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
         let (l1, e1) = top[0];
         let (l2, e2) = top[1];
         let key = (e1.min(e2), e1.max(e2));
         let mp = proposal_of_pair.get(&key).copied();
-        let best_p = proposals.iter().map(|(p, _, _)| cosine_sim(p, &rec_emb[r])).fold(f32::NEG_INFINITY, f32::max);
+        let best_p = proposals
+            .iter()
+            .map(|(p, _, _)| cosine_sim(p, &rec_emb[r]))
+            .fold(f32::NEG_INFINITY, f32::max);
         let pmid = mp.map(|_| cosine_sim(&proposals[proposal_of_pair[&key]].0, &rec_emb[r]));
         println!(
             "  record {r}: live {l1:.3} (e{}) / {:.3} (e{}), mutual {:.3}, midpoint-in-set {:?} -> its score {:?}; best proposal {:.3}",
@@ -329,8 +374,11 @@ fn run() {
                 embeddings: vec![p.clone()],
             })
             .collect();
-        let recs: Vec<(String, Vec<f32>)> =
-            rec_emb.iter().enumerate().map(|(i, e)| (i.to_string(), e.clone())).collect();
+        let recs: Vec<(String, Vec<f32>)> = rec_emb
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (i.to_string(), e.clone()))
+            .collect();
 
         let ranked = rank_candidates(&classifier, &cand_cells, &recs, threshold);
         let max_diff = ranked
@@ -350,12 +398,36 @@ fn run() {
     };
 
     let arms: [(&str, Vec<usize>, &str); 8] = [
-        ("LIFT     ", order_by(&lift_key), "operational: total score lift over the record pile"),
-        ("SHIPPED  ", shipped_order, "the same, through coverage::rank_candidates"),
-        ("ISOLATION", order_by(&isol_key), "ontology-only emptiness — the construction-matched control"),
-        ("TRAFFIC  ", order_by(&traffic_key), "max cosine to any record — popularity control"),
-        ("P25-GAIN ", order_by(&p25_key), "planner rule at the p25 threshold"),
-        ("GEOMETRY ", order_by(&geo_key), "max cosine to known — the proposer's own preference"),
+        (
+            "LIFT     ",
+            order_by(&lift_key),
+            "operational: total score lift over the record pile",
+        ),
+        (
+            "SHIPPED  ",
+            shipped_order,
+            "the same, through coverage::rank_candidates",
+        ),
+        (
+            "ISOLATION",
+            order_by(&isol_key),
+            "ontology-only emptiness — the construction-matched control",
+        ),
+        (
+            "TRAFFIC  ",
+            order_by(&traffic_key),
+            "max cosine to any record — popularity control",
+        ),
+        (
+            "P25-GAIN ",
+            order_by(&p25_key),
+            "planner rule at the p25 threshold",
+        ),
+        (
+            "GEOMETRY ",
+            order_by(&geo_key),
+            "max cosine to known — the proposer's own preference",
+        ),
         ("PAIR-SIM ", order_by(&pair_key), "parents' mutual cosine"),
         ("RANDOM   ", rand_idx, "seeded shuffle — the floor"),
     ];
@@ -377,7 +449,12 @@ fn run() {
         let p25 = hypergeom_sf(top25, 25, hits, n);
         println!(
             "  {name}   {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>10.2e}   {note}",
-            at(25), at(50), at(100), at(200), at(400), p25
+            at(25),
+            at(50),
+            at(100),
+            at(200),
+            at(400),
+            p25
         );
     }
 
@@ -411,10 +488,10 @@ fn run() {
         let cond_base = hits_in as f64 / worklist.len() as f64;
         println!("  within that worklist: {hits_in} hits, conditional base rate {cond_base:.3}");
         let lift_order: Vec<usize> = {
-                let mut t: Vec<usize> = worklist.clone();
-                t.sort_by(|&a, &b| lift[b].partial_cmp(&lift[a]).unwrap().then(a.cmp(&b)));
-                t
-            };
+            let mut t: Vec<usize> = worklist.clone();
+            t.sort_by(|&a, &b| lift[b].partial_cmp(&lift[a]).unwrap().then(a.cmp(&b)));
+            t
+        };
         let k = 50.min(lift_order.len());
         let top = lift_order.iter().take(k).filter(|&&i| hit[i]).count();
         println!("  top {k} of the worklist by lift: {top} hits ({:.3} vs {cond_base:.3} conditional, {base:.3} overall)", top as f64 / k as f64);
@@ -423,7 +500,12 @@ fn run() {
     // Where do the hits live? Corpus traffic per held-out concept.
     let held_traffic: Vec<f32> = held
         .iter()
-        .map(|&h| rec_emb.iter().map(|r| cosine_sim(r, &emb[h])).fold(f32::NEG_INFINITY, f32::max))
+        .map(|&h| {
+            rec_emb
+                .iter()
+                .map(|r| cosine_sim(r, &emb[h]))
+                .fold(f32::NEG_INFINITY, f32::max)
+        })
         .collect();
     let mut ht = held_traffic.clone();
     ht.sort_by(|a, b| a.partial_cmp(b).unwrap());

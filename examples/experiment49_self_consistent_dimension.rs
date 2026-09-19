@@ -29,9 +29,14 @@ fn sieve_lambda(n: usize) -> Vec<f64> {
     let mut spf = vec![0usize; n + 1];
     let mut primes = Vec::new();
     for i in 2..=n {
-        if spf[i] == 0 { spf[i] = i; primes.push(i); }
+        if spf[i] == 0 {
+            spf[i] = i;
+            primes.push(i);
+        }
         for &p in &primes {
-            if p > spf[i] || i * p > n { break; }
+            if p > spf[i] || i * p > n {
+                break;
+            }
             spf[i * p] = p;
         }
     }
@@ -41,10 +46,15 @@ fn sieve_lambda(n: usize) -> Vec<f64> {
         let mut m = n;
         let mut all_same = true;
         while m > 1 {
-            if spf[m] != p { all_same = false; break; }
+            if spf[m] != p {
+                all_same = false;
+                break;
+            }
             m /= p;
         }
-        if all_same { out[n] = (p as f64).ln(); }
+        if all_same {
+            out[n] = (p as f64).ln();
+        }
     }
     out
 }
@@ -57,7 +67,10 @@ fn psi_series(n_max: usize, n_samples: usize) -> (Vec<f64>, Vec<f64>) {
     let lam = sieve_lambda(n_max);
     let mut prefix = vec![0.0f64; n_max + 1];
     let mut acc = 0.0f64;
-    for n in 1..=n_max { acc += lam[n]; prefix[n] = acc; }
+    for n in 1..=n_max {
+        acc += lam[n];
+        prefix[n] = acc;
+    }
     let u0 = (10.0f64).ln();
     let u1 = (n_max as f64).ln();
     let du = (u1 - u0) / (n_samples - 1) as f64;
@@ -77,16 +90,22 @@ fn theta_series(n_max: usize, n_samples: usize) -> (Vec<f64>, Vec<f64>) {
     let mut spf = vec![0usize; n_max + 1];
     let mut primes = Vec::new();
     for i in 2..=n_max {
-        if spf[i] == 0 { spf[i] = i; primes.push(i); }
+        if spf[i] == 0 {
+            spf[i] = i;
+            primes.push(i);
+        }
         let mut j = 0;
         while j < primes.len() && primes[j] <= spf[i] && i * primes[j] <= n_max {
-            spf[i * primes[j]] = primes[j]; j += 1;
+            spf[i * primes[j]] = primes[j];
+            j += 1;
         }
     }
     let mut theta_prefix = vec![0.0f64; n_max + 1];
     let mut running = 0.0f64;
     for n in 2..=n_max {
-        if spf[n] == n { running += (n as f64).ln(); }
+        if spf[n] == n {
+            running += (n as f64).ln();
+        }
         theta_prefix[n] = running;
     }
     let u0 = (10.0f64).ln();
@@ -109,11 +128,17 @@ fn theta_series(n_max: usize, n_samples: usize) -> (Vec<f64>, Vec<f64>) {
 // for a self-similar signal with Hurst exponent H, the graph dimension is
 // d = 2 - H. Each estimator measures H by a different route.
 
-fn mean(v: &[f64]) -> f64 { v.iter().sum::<f64>() / v.len().max(1) as f64 }
+fn mean(v: &[f64]) -> f64 {
+    v.iter().sum::<f64>() / v.len().max(1) as f64
+}
 
 fn linfit(pts: &[(f64, f64)]) -> f64 {
     let n = pts.len() as f64;
-    let (sx, sy, sxx, sxy) = pts.iter().fold((0.0, 0.0, 0.0, 0.0), |(a, b, c, d), &(x, y)| (a + x, b + y, c + x * x, d + x * y));
+    let (sx, sy, sxx, sxy) = pts
+        .iter()
+        .fold((0.0, 0.0, 0.0, 0.0), |(a, b, c, d), &(x, y)| {
+            (a + x, b + y, c + x * x, d + x * y)
+        });
     (n * sxy - sx * sy) / (n * sxx - sx * sx).max(1e-12)
 }
 
@@ -122,7 +147,10 @@ fn hurst_dfa(y: &[f64]) -> f64 {
     let n = y.len();
     let m = mean(y);
     let profile: Vec<f64> = std::iter::once(0.0)
-        .chain(y.iter().scan(0.0f64, |a, &v| { *a += v - m; Some(*a) }))
+        .chain(y.iter().scan(0.0f64, |a, &v| {
+            *a += v - m;
+            Some(*a)
+        }))
         .collect();
     let mut pts = Vec::new();
     let mut w = 4usize;
@@ -136,11 +164,17 @@ fn hurst_dfa(y: &[f64]) -> f64 {
             let ys: Vec<f64> = (s..s + w).map(|k| profile[k]).collect();
             let xm = w as f64 * 0.5 * (w as f64 - 1.0) / w as f64;
             let ym = mean(&ys);
-            let mut sxy = 0.0; let mut sxx = 0.0;
-            for k in 0..w { sxy += (k as f64 - xm) * (ys[k] - ym); sxx += (k as f64 - xm).powi(2); }
+            let mut sxy = 0.0;
+            let mut sxx = 0.0;
+            for k in 0..w {
+                sxy += (k as f64 - xm) * (ys[k] - ym);
+                sxx += (k as f64 - xm).powi(2);
+            }
             let b = sxy / sxx.max(1e-12);
             let a = ym - b * xm;
-            for k in 0..w { f2 += (profile[s + k] - (a + b * k as f64)).powi(2); }
+            for k in 0..w {
+                f2 += (profile[s + k] - (a + b * k as f64)).powi(2);
+            }
         }
         f2 /= (n_win * w) as f64;
         pts.push(((w as f64).ln(), (f2.sqrt().max(1e-300)).ln()));
@@ -164,11 +198,18 @@ fn hurst_rs(y: &[f64]) -> f64 {
             let sm = mean(&seg);
             let dev: Vec<f64> = seg.iter().map(|v| v - sm).collect();
             let cum: Vec<f64> = std::iter::once(0.0)
-                .chain(dev.iter().scan(0.0f64, |a, &v| { *a += v; Some(*a) }))
+                .chain(dev.iter().scan(0.0f64, |a, &v| {
+                    *a += v;
+                    Some(*a)
+                }))
                 .collect();
-            let r = cum.iter().cloned().fold(f64::NEG_INFINITY, f64::max) - cum.iter().cloned().fold(f64::INFINITY, f64::min);
-            let s = (dev.iter().map(|v| v * v).sum::<f64>() / tau as f64).sqrt().max(1e-12);
-            rs_sum += r / s; cnt += 1;
+            let r = cum.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+                - cum.iter().cloned().fold(f64::INFINITY, f64::min);
+            let s = (dev.iter().map(|v| v * v).sum::<f64>() / tau as f64)
+                .sqrt()
+                .max(1e-12);
+            rs_sum += r / s;
+            cnt += 1;
         }
         pts.push(((tau as f64).ln(), (rs_sum / cnt as f64).ln()));
         tau *= 2;
@@ -185,7 +226,9 @@ fn hurst_structure(y: &[f64]) -> f64 {
         let vals: Vec<f64> = (0..n - tau).map(|i| (y[i + tau] - y[i]).abs()).collect();
         let s2 = vals.iter().map(|v| v * v).sum::<f64>() / vals.len() as f64;
         pts.push(((tau as f64).ln(), (s2.max(1e-300)).ln() / 2.0)); // ln S2 /2 = ln E|Dy|
-        if tau == 0 { break; }
+        if tau == 0 {
+            break;
+        }
         tau *= 2;
     }
     // E|Delta| ~ tau^H  =>  slope of ln(E|Dy|) vs ln tau is H (monofractal fGn)
@@ -195,19 +238,34 @@ fn hurst_structure(y: &[f64]) -> f64 {
 /// E4: information dimension of the point cloud (u, y/sigma_y) — a genuinely
 /// different route (entropy of occupation measures, not fluctuation scaling).
 fn information_dimension(us: &[f64], ys: &[f64]) -> f64 {
-    let (umin, umax) = (us.iter().cloned().fold(f64::INFINITY, f64::min), us.iter().cloned().fold(f64::NEG_INFINITY, f64::max));
-    let (ymin, ymax) = (ys.iter().cloned().fold(f64::INFINITY, f64::min), ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max));
+    let (umin, umax) = (
+        us.iter().cloned().fold(f64::INFINITY, f64::min),
+        us.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+    );
+    let (ymin, ymax) = (
+        ys.iter().cloned().fold(f64::INFINITY, f64::min),
+        ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+    );
     let mut pts = Vec::new();
     let mut g = 4usize;
     while g <= 256 {
         let mut p = vec![0.0f64; g * g];
         for i in 0..us.len() {
-            let bx = (((us[i] - umin) / (umax - umin + 1e-12)) * g as f64).min((g - 1) as f64) as usize;
-            let by = (((ys[i] - ymin) / (ymax - ymin + 1e-12)) * g as f64).min((g - 1) as f64) as usize;
+            let bx =
+                (((us[i] - umin) / (umax - umin + 1e-12)) * g as f64).min((g - 1) as f64) as usize;
+            let by =
+                (((ys[i] - ymin) / (ymax - ymin + 1e-12)) * g as f64).min((g - 1) as f64) as usize;
             p[by * g + bx] += 1.0;
         }
         let total = p.iter().sum::<f64>().max(1.0);
-        let h: f64 = p.iter().filter(|&&c| c > 0.0).map(|&c| { let q = c / total; -q * q.ln() }).sum();
+        let h: f64 = p
+            .iter()
+            .filter(|&&c| c > 0.0)
+            .map(|&c| {
+                let q = c / total;
+                -q * q.ln()
+            })
+            .sum();
         pts.push(((g as f64).ln(), h)); // H(g) ~ d ln g
         g *= 2;
     }
@@ -224,9 +282,23 @@ fn information_dimension(us: &[f64], ys: &[f64]) -> f64 {
 ///   R/S H:     only valid for H<1 (known R/S bias above); d = 2 - H
 ///   structure: measures the increment Hurst H_inc; d = 2 - H_inc
 ///   information: direct measurement of the point cloud; d = slope
-fn d_from_dfa(a: f64) -> f64 { if a <= 1.0 { 2.0 - a } else { 3.0 - a } }
-fn d_from_rs(h: f64) -> f64 { if h < 1.0 { 2.0 - h } else { f64::NAN } } // R/S invalid for H>=1
-fn d_from_struct(h_inc: f64) -> f64 { 2.0 - h_inc }
+fn d_from_dfa(a: f64) -> f64 {
+    if a <= 1.0 {
+        2.0 - a
+    } else {
+        3.0 - a
+    }
+}
+fn d_from_rs(h: f64) -> f64 {
+    if h < 1.0 {
+        2.0 - h
+    } else {
+        f64::NAN
+    }
+} // R/S invalid for H>=1
+fn d_from_struct(h_inc: f64) -> f64 {
+    2.0 - h_inc
+}
 
 fn all_estimators(us: &[f64], ys: &[f64]) -> Vec<f64> {
     vec![
@@ -247,9 +319,15 @@ fn bootstrap_delta(ys: &[f64], n_boot: usize, seed: u64) -> f64 {
     for _b in 0..n_boot {
         let mut sample = Vec::with_capacity(n);
         while sample.len() < n {
-            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let start = ((rng >> 33) as usize) % (n - 64).max(1);
-            for k in 0..64 { if sample.len() < n { sample.push(ys[(start + k) % n]); } }
+            for k in 0..64 {
+                if sample.len() < n {
+                    sample.push(ys[(start + k) % n]);
+                }
+            }
         }
         let us: Vec<f64> = (0..n).map(|k| k as f64).collect();
         let d = all_estimators(&us, &sample);
@@ -277,11 +355,15 @@ fn fbm(h: f64, n: usize, seed: u64) -> Vec<f64> {
     let mut re = vec![0.0f64; n];
     let mut im = vec![0.0f64; n];
     for k in 1..n / 2 {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let phi = (rng as f64) / (u64::MAX as f64) * 2.0 * std::f64::consts::PI;
         let amp = (k as f64 / n as f64).powf(-(h + 0.5));
-        re[k] = amp * phi.cos(); re[n - k] = re[k];
-        im[k] = amp * phi.sin(); im[n - k] = -im[n - k];
+        re[k] = amp * phi.cos();
+        re[n - k] = re[k];
+        im[k] = amp * phi.sin();
+        im[n - k] = -im[n - k];
     }
     let mut out = vec![0.0f64; n];
     for i in 0..n {
@@ -297,20 +379,32 @@ fn fbm(h: f64, n: usize, seed: u64) -> Vec<f64> {
 
 fn white_noise(n: usize, seed: u64) -> Vec<f64> {
     let mut rng = seed;
-    (0..n).map(|_| {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-        (rng as f64) / (u64::MAX as f64) * 2.0 - 1.0
-    }).collect()
+    (0..n)
+        .map(|_| {
+            rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (rng as f64) / (u64::MAX as f64) * 2.0 - 1.0
+        })
+        .collect()
 }
 
 fn sinusoid(n: usize) -> Vec<f64> {
-    (0..n).map(|i| (2.0 * std::f64::consts::PI * i as f64 / n as f64 * 7.0).sin()).collect()
+    (0..n)
+        .map(|i| (2.0 * std::f64::consts::PI * i as f64 / n as f64 * 7.0).sin())
+        .collect()
 }
 
 // ───────────────────────── output ─────────────────────────
 
 #[derive(Serialize, Clone)]
-struct ControlResult { name: String, expected: f64, estimates: Vec<f64>, spread: f64, valid: bool }
+struct ControlResult {
+    name: String,
+    expected: f64,
+    estimates: Vec<f64>,
+    spread: f64,
+    valid: bool,
+}
 
 #[derive(Serialize, Clone)]
 struct SeriesResult {
@@ -336,8 +430,11 @@ struct Output49 {
 }
 
 fn write_file(path: &std::path::Path, content: &str) {
-    if let Some(p) = path.parent() { let _ = std::fs::create_dir_all(p); }
-    std::fs::write(path, content).unwrap_or_else(|e| eprintln!("warning: could not write {}: {e}", path.display()));
+    if let Some(p) = path.parent() {
+        let _ = std::fs::create_dir_all(p);
+    }
+    std::fs::write(path, content)
+        .unwrap_or_else(|e| eprintln!("warning: could not write {}: {e}", path.display()));
 }
 
 fn main() {
@@ -348,10 +445,26 @@ fn main() {
     // ── positive controls: certify estimators BEFORE primes ──
     let control_specs: Vec<(&str, Vec<f64>, Vec<f64>)> = vec![
         // (name, series, per-estimator expected d; NaN = estimator not valid for this control)
-        ("sinusoid (smooth, d=1)", sinusoid(n), vec![1.0, 1.0, 1.0, 1.0]),
-        ("fBm H=0.7 (d=1.3)", fbm(0.7, n, 11), vec![1.3, f64::NAN, 1.3, 1.3]),
-        ("Brownian H=0.5 (d=1.5)", fbm(0.5, n, 22), vec![1.5, f64::NAN, 1.5, 1.5]),
-        ("white noise (fGn conv d=1.5; dust d=2)", white_noise(n, 33), vec![1.5, 1.5, 2.0, f64::NAN]),
+        (
+            "sinusoid (smooth, d=1)",
+            sinusoid(n),
+            vec![1.0, 1.0, 1.0, 1.0],
+        ),
+        (
+            "fBm H=0.7 (d=1.3)",
+            fbm(0.7, n, 11),
+            vec![1.3, f64::NAN, 1.3, 1.3],
+        ),
+        (
+            "Brownian H=0.5 (d=1.5)",
+            fbm(0.5, n, 22),
+            vec![1.5, f64::NAN, 1.5, 1.5],
+        ),
+        (
+            "white noise (fGn conv d=1.5; dust d=2)",
+            white_noise(n, 33),
+            vec![1.5, 1.5, 2.0, f64::NAN],
+        ),
     ];
     let mut controls = Vec::new();
     let mut machinery_valid = true;
@@ -364,15 +477,44 @@ fn main() {
         let mut bad = 0usize;
         for k in 0..4 {
             if expected[k].is_finite() {
-                if (est2[k] - expected[k]).abs() < 0.3 { hits += 1; }
-                if (est2[k] - expected[k]).abs() > 0.6 { bad += 1; }
+                if (est2[k] - expected[k]).abs() < 0.3 {
+                    hits += 1;
+                }
+                if (est2[k] - expected[k]).abs() > 0.6 {
+                    bad += 1;
+                }
             }
         }
         let ok = hits >= 2 && bad == 0;
-        if !ok { machinery_valid = false; }
-        println!("  control {name}: dfa={:.3} rs={:.3} struct={:.3} info={:.3} (spread {:.3}) {}",
-            est2[0], est2[1], est2[2], est2[3], sp, if ok { "VALID" } else { "INVALID" });
-        controls.push(ControlResult { name: name.into(), expected: expected.iter().cloned().filter(|v| v.is_finite()).sum::<f64>() / expected.iter().cloned().filter(|v| v.is_finite()).count().max(1) as f64, estimates: est2.clone(), spread: sp, valid: ok });
+        if !ok {
+            machinery_valid = false;
+        }
+        println!(
+            "  control {name}: dfa={:.3} rs={:.3} struct={:.3} info={:.3} (spread {:.3}) {}",
+            est2[0],
+            est2[1],
+            est2[2],
+            est2[3],
+            sp,
+            if ok { "VALID" } else { "INVALID" }
+        );
+        controls.push(ControlResult {
+            name: name.into(),
+            expected: expected
+                .iter()
+                .cloned()
+                .filter(|v| v.is_finite())
+                .sum::<f64>()
+                / expected
+                    .iter()
+                    .cloned()
+                    .filter(|v| v.is_finite())
+                    .count()
+                    .max(1) as f64,
+            estimates: est2.clone(),
+            spread: sp,
+            valid: ok,
+        });
     }
 
     // ── the prime field: geometry FIRST (no zeta, no 1/2 anywhere) ──
@@ -384,7 +526,9 @@ fn main() {
     // normalize: y/sigma_y (recorded transformation, applied to every series)
     let normalize = |ys: &[f64]| -> Vec<f64> {
         let m = mean(ys);
-        let sd = (ys.iter().map(|v| (v - m).powi(2)).sum::<f64>() / ys.len() as f64).sqrt().max(1e-12);
+        let sd = (ys.iter().map(|v| (v - m).powi(2)).sum::<f64>() / ys.len() as f64)
+            .sqrt()
+            .max(1e-12);
         ys.iter().map(|v| (v - m) / sd).collect()
     };
     let ys_psi = normalize(&es_psi);
@@ -396,10 +540,29 @@ fn main() {
         let sp = spread(&est);
         let dl = bootstrap_delta(ys2, 24, 777);
         let conv = sp <= dl;
-        let consensus = if conv { Some(est.iter().sum::<f64>() / est.len() as f64) } else { None };
-        println!("  {name}: dfa={:.3} rs={:.3} struct={:.3} info={:.3} spread={:.3} delta={:.3} {}",
-            est[0], est[1], est[2], est[3], sp, dl, if conv { "CONVERGED" } else { "no convergence" });
-        SeriesResult { name: name.into(), estimates: est, spread: sp, delta: dl, converged: conv, d_consensus: consensus }
+        let consensus = if conv {
+            Some(est.iter().sum::<f64>() / est.len() as f64)
+        } else {
+            None
+        };
+        println!(
+            "  {name}: dfa={:.3} rs={:.3} struct={:.3} info={:.3} spread={:.3} delta={:.3} {}",
+            est[0],
+            est[1],
+            est[2],
+            est[3],
+            sp,
+            dl,
+            if conv { "CONVERGED" } else { "no convergence" }
+        );
+        SeriesResult {
+            name: name.into(),
+            estimates: est,
+            spread: sp,
+            delta: dl,
+            converged: conv,
+            d_consensus: consensus,
+        }
     };
 
     println!("\\n  measuring (self-consistency required for a dimension to be REPORTED):");
@@ -411,11 +574,16 @@ fn main() {
     let mut rng0 = 424242u64;
     let mut shuffled = ys_psi.clone();
     for i in (1..shuffled.len()).rev() {
-        rng0 = rng0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng0 = rng0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let j = ((rng0 >> 33) as usize) % (i + 1);
         shuffled.swap(i, j);
     }
-    series.push(measure("null: shuffled E_psi (correlations destroyed)", &shuffled));
+    series.push(measure(
+        "null: shuffled E_psi (correlations destroyed)",
+        &shuffled,
+    ));
     // null: Cramer random primes — same pipeline, random prime indicator with p=1/ln x
     let (us_c, es_c) = cramer_series(1_000_000, n, 999);
     let ys_c = normalize(&es_c);
@@ -436,9 +604,28 @@ fn main() {
         let sp = spread(&est);
         let dl = bootstrap_delta(&win, 12, (100 + i) as u64);
         let conv = sp <= dl;
-        let marker = if conv { est.iter().sum::<f64>() / est.len() as f64 } else { sp * -1.0 - 1.0 };
-        window_profile.push((format!("window {}", i + 1), marker, conv as i32 as f64, conv));
-        println!("    window {}: spread {:.3} delta {:.3} {}", i + 1, sp, dl, if conv { format!("CONVERGED d={:.3}", marker) } else { "no".into() });
+        let marker = if conv {
+            est.iter().sum::<f64>() / est.len() as f64
+        } else {
+            sp * -1.0 - 1.0
+        };
+        window_profile.push((
+            format!("window {}", i + 1),
+            marker,
+            conv as i32 as f64,
+            conv,
+        ));
+        println!(
+            "    window {}: spread {:.3} delta {:.3} {}",
+            i + 1,
+            sp,
+            dl,
+            if conv {
+                format!("CONVERGED d={:.3}", marker)
+            } else {
+                "no".into()
+            }
+        );
     }
 
     // ── outcome classification (pre-registered vocabulary) ──
@@ -446,7 +633,11 @@ fn main() {
     let th = &series[1];
     let mut outcome: usize = 0;
     let mut outcome_text = String::new();
-    let machinery_note = if machinery_valid { "" } else { " [MACHINERY INVALID: positive controls failed — no claim possible]" };
+    let machinery_note = if machinery_valid {
+        ""
+    } else {
+        " [MACHINERY INVALID: positive controls failed — no claim possible]"
+    };
     if !machinery_valid {
         outcome = 0;
         outcome_text = "MACHINERY INVALID — estimators do not recover known dimensions on synthetic controls; nothing about primes can be claimed".into();
@@ -476,7 +667,11 @@ fn main() {
     }
 
     // ── candidate spectral laws (frozen geometry FIRST, laws compared AFTER) ──
-    let d_reported = if let Some(d) = psi.d_consensus { d } else { f64::NAN };
+    let d_reported = if let Some(d) = psi.d_consensus {
+        d
+    } else {
+        f64::NAN
+    };
     let candidate_laws: Vec<(String, f64)> = if d_reported.is_finite() {
         vec![
             (format!("sigma = 1/d"), 1.0 / d_reported),
@@ -485,7 +680,9 @@ fn main() {
             (format!("sigma = 1/(2d)"), 1.0 / (2.0 * d_reported)),
             (format!("sigma = |1 - d/2|"), (1.0 - d_reported / 2.0).abs()),
         ]
-    } else { vec![("no consensus dimension — no law defined".into(), f64::NAN)] };
+    } else {
+        vec![("no consensus dimension — no law defined".into(), f64::NAN)]
+    };
 
     // ── final adversarial answer ──
     let outcome_text_final = outcome_text.clone();
@@ -497,8 +694,10 @@ fn main() {
         estimator_convention: "d = 2 - H; four estimators: DFA, R/S, structure functions, information dimension; convergence tolerance delta = 95th percentile moving-block bootstrap spread (data-driven, not chosen)",
         controls, machinery_valid, series, window_profile, outcome, outcome_text: outcome_text.clone(), candidate_laws, final_question_answer,
     };
-    write_file(std::path::Path::new("research/impossible_machine/experiments/experiment49_results.json"),
-        &serde_json::to_string_pretty(&output).unwrap());
+    write_file(
+        std::path::Path::new("research/impossible_machine/experiments/experiment49_results.json"),
+        &serde_json::to_string_pretty(&output).unwrap(),
+    );
     println!("\\n{outcome_text}{machinery_note}");
     println!("results: research/impossible_machine/experiments/experiment49_results.json");
 }
@@ -509,9 +708,13 @@ fn cramer_series(n_max: usize, n_samples: usize, seed: u64) -> (Vec<f64>, Vec<f6
     let mut psi = 0.0f64;
     let mut prefix = vec![0.0f64; n_max + 1];
     for x in 2..=n_max {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let u = (rng as f64) / (u64::MAX as f64);
-        if u < 1.0 / (x as f64).ln() { psi += (x as f64).ln(); }
+        if u < 1.0 / (x as f64).ln() {
+            psi += (x as f64).ln();
+        }
         prefix[x] = psi;
     }
     let u0 = (10.0f64).ln();

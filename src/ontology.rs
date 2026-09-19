@@ -50,42 +50,141 @@ pub const HUMAN_ONTOLOGY_NAME: &str = "praxis_ontology";
 ///
 /// Names are the canonical `<x>_ontology` form both crates resolve by.
 pub static ONTOLOGY_SOURCES: &[(&str, &str)] = &[
-    ("praxis_ontology", include_str!("../config/praxis_ontology.json")),
-    ("machine_ontology", include_str!("../config/machine_ontology.json")),
-    ("semiotic_ontology", include_str!("../config/semiotic_ontology.json")),
-    ("category_ontology", include_str!("../config/category_ontology.json")),
-    ("agent_ontology", include_str!("../config/agent_ontology.json")),
-    ("natural_ontology", include_str!("../config/natural_ontology.json")),
-    ("social_ontology", include_str!("../config/social_ontology.json")),
-    ("abstract_ontology", include_str!("../config/abstract_ontology.json")),
-    ("engineering_ontology", include_str!("../config/engineering_ontology.json")),
-    ("office_ontology", include_str!("../config/office_ontology.json")),
-    ("space_ontology", include_str!("../config/space_ontology.json")),
-    ("time_ontology", include_str!("../config/time_ontology.json")),
-    ("software_dev", include_str!("../config/software_dev_ontology.json")),
+    (
+        "praxis_ontology",
+        include_str!("../config/praxis_ontology.json"),
+    ),
+    (
+        "machine_ontology",
+        include_str!("../config/machine_ontology.json"),
+    ),
+    (
+        "semiotic_ontology",
+        include_str!("../config/semiotic_ontology.json"),
+    ),
+    (
+        "category_ontology",
+        include_str!("../config/category_ontology.json"),
+    ),
+    (
+        "agent_ontology",
+        include_str!("../config/agent_ontology.json"),
+    ),
+    (
+        "natural_ontology",
+        include_str!("../config/natural_ontology.json"),
+    ),
+    (
+        "social_ontology",
+        include_str!("../config/social_ontology.json"),
+    ),
+    (
+        "abstract_ontology",
+        include_str!("../config/abstract_ontology.json"),
+    ),
+    (
+        "engineering_ontology",
+        include_str!("../config/engineering_ontology.json"),
+    ),
+    (
+        "office_ontology",
+        include_str!("../config/office_ontology.json"),
+    ),
+    (
+        "space_ontology",
+        include_str!("../config/space_ontology.json"),
+    ),
+    (
+        "time_ontology",
+        include_str!("../config/time_ontology.json"),
+    ),
+    (
+        "software_dev",
+        include_str!("../config/software_dev_ontology.json"),
+    ),
     ("devops", include_str!("../config/devops_ontology.json")),
-    ("data_science", include_str!("../config/data_science_ontology.json")),
-    ("cybersecurity", include_str!("../config/cybersecurity_ontology.json")),
-    ("health_fitness", include_str!("../config/health_fitness_ontology.json")),
-    ("nutrition_cooking", include_str!("../config/nutrition_cooking_ontology.json")),
-    ("personal_finance", include_str!("../config/personal_finance_ontology.json")),
-    ("learning_education", include_str!("../config/learning_education_ontology.json")),
-    ("creative_writing", include_str!("../config/creative_writing_ontology.json")),
+    (
+        "data_science",
+        include_str!("../config/data_science_ontology.json"),
+    ),
+    (
+        "cybersecurity",
+        include_str!("../config/cybersecurity_ontology.json"),
+    ),
+    (
+        "health_fitness",
+        include_str!("../config/health_fitness_ontology.json"),
+    ),
+    (
+        "nutrition_cooking",
+        include_str!("../config/nutrition_cooking_ontology.json"),
+    ),
+    (
+        "personal_finance",
+        include_str!("../config/personal_finance_ontology.json"),
+    ),
+    (
+        "learning_education",
+        include_str!("../config/learning_education_ontology.json"),
+    ),
+    (
+        "creative_writing",
+        include_str!("../config/creative_writing_ontology.json"),
+    ),
     ("music", include_str!("../config/music_ontology.json")),
-    ("visual_arts", include_str!("../config/visual_arts_ontology.json")),
-    ("relationships", include_str!("../config/relationships_ontology.json")),
-    ("productivity", include_str!("../config/productivity_ontology.json")),
+    (
+        "visual_arts",
+        include_str!("../config/visual_arts_ontology.json"),
+    ),
+    (
+        "relationships",
+        include_str!("../config/relationships_ontology.json"),
+    ),
+    (
+        "productivity",
+        include_str!("../config/productivity_ontology.json"),
+    ),
     ("travel", include_str!("../config/travel_ontology.json")),
-    ("home_maintenance", include_str!("../config/home_maintenance_ontology.json")),
-    ("mindfulness_spirituality", include_str!("../config/mindfulness_spirituality_ontology.json")),
-    ("science_research", include_str!("../config/science_research_ontology.json")),
-    ("business_entrepreneurship", include_str!("../config/business_entrepreneurship_ontology.json")),
-    ("language_learning", include_str!("../config/language_learning_ontology.json")),
-    ("outdoors_sports", include_str!("../config/outdoors_sports_ontology.json")),
-    ("grid_fill", include_str!("../config/grid_fill_ontology.json")),
-    ("mode_anchors", include_str!("../config/mode_anchors_ontology.json")),
-    ("italian_industrial", include_str!("../config/italian_industrial_ontology.json")),
-    ("industrial_semiconductor", include_str!("../config/industrial_semiconductor_ontology.json")),
+    (
+        "home_maintenance",
+        include_str!("../config/home_maintenance_ontology.json"),
+    ),
+    (
+        "mindfulness_spirituality",
+        include_str!("../config/mindfulness_spirituality_ontology.json"),
+    ),
+    (
+        "science_research",
+        include_str!("../config/science_research_ontology.json"),
+    ),
+    (
+        "business_entrepreneurship",
+        include_str!("../config/business_entrepreneurship_ontology.json"),
+    ),
+    (
+        "language_learning",
+        include_str!("../config/language_learning_ontology.json"),
+    ),
+    (
+        "outdoors_sports",
+        include_str!("../config/outdoors_sports_ontology.json"),
+    ),
+    (
+        "grid_fill",
+        include_str!("../config/grid_fill_ontology.json"),
+    ),
+    (
+        "mode_anchors",
+        include_str!("../config/mode_anchors_ontology.json"),
+    ),
+    (
+        "italian_industrial",
+        include_str!("../config/italian_industrial_ontology.json"),
+    ),
+    (
+        "industrial_semiconductor",
+        include_str!("../config/industrial_semiconductor_ontology.json"),
+    ),
 ];
 
 /// Look up one ontology's JSON by its canonical name.
@@ -546,6 +645,9 @@ mod tests {
         let keys: Vec<_> = all.iter().map(|d| OntologyLoader::order_key(d)).collect();
         let mut sorted = keys.clone();
         sorted.sort();
-        assert_eq!(keys, sorted, "classification_domains must yield sorted order");
+        assert_eq!(
+            keys, sorted,
+            "classification_domains must yield sorted order"
+        );
     }
 }

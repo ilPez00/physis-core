@@ -27,7 +27,9 @@ fn run() {
     use physis_core::embed::VectorEmbed;
     use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
 
-    let path = std::env::args().nth(1).unwrap_or_else(|| "config/mode_anchors_ontology.json".into());
+    let path = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "config/mode_anchors_ontology.json".into());
     let raw = std::fs::read_to_string(&path).expect("anchor file");
     let doc: serde_json::Value = serde_json::from_str(&raw).expect("parse");
     let entries = doc["domains"].as_array().expect("domains array");
@@ -76,9 +78,18 @@ fn run() {
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let q = |f: f64| sorted[(((sorted.len() - 1) as f64) * f).round() as usize];
     println!("off-diagonal cosine over {} pairs:", pairs.len());
-    println!("  mean {mean:.4}   p50 {:.4}   p90 {:.4}   p99 {:.4}   max {:.4}", q(0.5), q(0.9), q(0.99), q(1.0));
+    println!(
+        "  mean {mean:.4}   p50 {:.4}   p90 {:.4}   p99 {:.4}   max {:.4}",
+        q(0.5),
+        q(0.9),
+        q(0.99),
+        q(1.0)
+    );
     for t in [0.85f32, 0.90, 0.95] {
-        println!("  pairs above {t:.2}: {}", pairs.iter().filter(|p| p.0 > t).count());
+        println!(
+            "  pairs above {t:.2}: {}",
+            pairs.iter().filter(|p| p.0 > t).count()
+        );
     }
 
     // Nearest neighbour per anchor: the cell it is most confusable with.
@@ -103,7 +114,8 @@ fn run() {
     // Does the domain or the mode dominate the geometry? If same-mode pairs are
     // much closer than same-domain pairs the grid is really a mode axis with a
     // decorative second dimension (or vice versa).
-    let (mut sd, mut sdn, mut sm, mut smn, mut ot, mut otn) = (0.0f64, 0u32, 0.0f64, 0u32, 0.0f64, 0u32);
+    let (mut sd, mut sdn, mut sm, mut smn, mut ot, mut otn) =
+        (0.0f64, 0u32, 0.0f64, 0u32, 0.0f64, 0u32);
     for (s, i, j) in &pairs {
         let (di, mi) = cells[*i].split_once('/').unwrap();
         let (dj, mj) = cells[*j].split_once('/').unwrap();
@@ -119,9 +131,18 @@ fn run() {
         }
     }
     println!("\nstructure of the similarity:");
-    println!("  same domain, different mode: {:.4}  (n={sdn})", sd / sdn as f64);
-    println!("  same mode, different domain: {:.4}  (n={smn})", sm / smn as f64);
-    println!("  neither shared:              {:.4}  (n={otn})", ot / otn as f64);
+    println!(
+        "  same domain, different mode: {:.4}  (n={sdn})",
+        sd / sdn as f64
+    );
+    println!(
+        "  same mode, different domain: {:.4}  (n={smn})",
+        sm / smn as f64
+    );
+    println!(
+        "  neither shared:              {:.4}  (n={otn})",
+        ot / otn as f64
+    );
 }
 
 #[cfg(feature = "embed-onnx")]
@@ -132,5 +153,9 @@ fn cos(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(feature = "embed-onnx")]
 fn normalize(v: &[f32]) -> Vec<f32> {
     let n = v.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if n > 1e-12 { v.iter().map(|x| x / n).collect() } else { v.to_vec() }
+    if n > 1e-12 {
+        v.iter().map(|x| x / n).collect()
+    } else {
+        v.to_vec()
+    }
 }

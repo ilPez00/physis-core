@@ -264,10 +264,12 @@ mod tests {
         let r = Observation::refusal("euclid", "offline-visibility", "no witness either way");
         assert_eq!(r.status, ProofStatus::InsufficientData);
         assert!(!r.certifies());
-        let round: Observation =
-            serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
+        let round: Observation = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
         assert_eq!(round.status, ProofStatus::InsufficientData);
-        assert!(!round.certifies(), "a refusal must not survive a round-trip as a measurement");
+        assert!(
+            !round.certifies(),
+            "a refusal must not survive a round-trip as a measurement"
+        );
     }
 
     #[test]

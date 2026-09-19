@@ -30,7 +30,9 @@ fn main() {
     let mut dom: Vec<(String, Vec<f32>)> = Vec::new();
     let mut mode: Vec<(String, Vec<f32>)> = Vec::new();
     for def in ontology.classification_domains() {
-        let (Some(d), Some(m)) = (&def.domain, &def.mode) else { continue };
+        let (Some(d), Some(m)) = (&def.domain, &def.mode) else {
+            continue;
+        };
         let mut text = def.name.clone();
         for hint in &def.hints {
             text.push(' ');
@@ -54,7 +56,10 @@ fn main() {
         };
         println!(
             "{label:<8} {:<8} {:.3}    {:.3}   {ratio:.1}x   {:<11} {}",
-            run.cells, run.overall_fitness, run.overall_null_mean, run.cells_above_null,
+            run.cells,
+            run.overall_fitness,
+            run.overall_null_mean,
+            run.cells_above_null,
             run.cells_failing
         );
         rows.push(serde_json::json!({

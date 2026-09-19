@@ -156,7 +156,12 @@ fn main() {
         ws::score_antecedents("shared word + cos", &gold, shared_word, 20260914),
     ];
 
-    println!("corpus {} (GENERATED, {} sentences)  embedder={}", &sha[..12], n, kind);
+    println!(
+        "corpus {} (GENERATED, {} sentences)  embedder={}",
+        &sha[..12],
+        n,
+        kind
+    );
     println!(
         "{} queries, gold = the superseded sentence, distractors between\n",
         gold.iter().filter(|g| g.is_some()).count()
@@ -183,7 +188,10 @@ fn main() {
     gaps.sort();
     println!("\nentity+pos+cos by distance to gold:");
     for (gap, (hit, tot)) in &gaps {
-        println!("  gap {gap:>3}  {hit}/{tot}  = {:.3}", *hit as f64 / *tot as f64);
+        println!(
+            "  gap {gap:>3}  {hit}/{tot}  = {:.3}",
+            *hit as f64 / *tot as f64
+        );
     }
 
     let out = Path::new("benchmarks/results");

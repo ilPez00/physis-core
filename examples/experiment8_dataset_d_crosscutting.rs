@@ -45,27 +45,111 @@ use physis_core::models::cosine_sim;
 
 /// The 21 single-field CAR items (Iteration 5's contextual sentences).
 const PURE: &[(&str, &str, &str)] = &[
-    ("engine", "The engine converts fuel into motion through repeated combustion cycles.", "mechanical"),
-    ("piston", "Each piston slides within its cylinder, driven by the pressure of combustion.", "mechanical"),
-    ("camshaft", "The camshaft rotates in time with the crankshaft, opening and closing the valves.", "mechanical"),
-    ("torque", "Torque measures the twisting force the crankshaft delivers to the wheels.", "mechanical"),
-    ("transmission", "The transmission shifts gears to match engine speed with road speed.", "mechanical"),
-    ("fuel injection", "Fuel injection sprays a precise mist of gasoline into each cylinder.", "mechanical"),
-    ("cooling system", "The cooling system circulates coolant to keep the engine block from overheating.", "mechanical"),
-    ("steering wheel", "The driver turns the steering wheel to change the car's direction.", "driver"),
-    ("brake pedal", "Pressing the brake pedal squeezes the pads against the rotors to slow down.", "driver"),
-    ("accelerator pedal", "The accelerator pedal opens the throttle to increase speed.", "driver"),
-    ("turn signal", "Flicking the turn signal alerts other drivers before changing lanes.", "driver"),
-    ("rearview mirror", "Glancing at the rearview mirror shows traffic approaching from behind.", "driver"),
-    ("seat belt", "Buckling the seat belt keeps the passenger secured during a sudden stop.", "driver"),
-    ("dashboard display", "The dashboard display shows speed, fuel level, and warning lights.", "driver"),
-    ("resale value", "A well-maintained car keeps a higher resale value after years of use.", "economic"),
-    ("depreciation rate", "New cars lose a large share of their value in the first year, a steep drop.", "economic"),
-    ("trade-in value", "The dealer offered a trade-in based on mileage and condition.", "economic"),
-    ("insurance premium", "Younger drivers usually pay a higher monthly amount for coverage.", "economic"),
-    ("fuel cost", "Long commutes add up at the pump over a year.", "economic"),
-    ("loan interest", "Financing a car means paying extra on top of the sticker price over time.", "economic"),
-    ("purchase price", "The sticker price is negotiated before taxes and fees are added.", "economic"),
+    (
+        "engine",
+        "The engine converts fuel into motion through repeated combustion cycles.",
+        "mechanical",
+    ),
+    (
+        "piston",
+        "Each piston slides within its cylinder, driven by the pressure of combustion.",
+        "mechanical",
+    ),
+    (
+        "camshaft",
+        "The camshaft rotates in time with the crankshaft, opening and closing the valves.",
+        "mechanical",
+    ),
+    (
+        "torque",
+        "Torque measures the twisting force the crankshaft delivers to the wheels.",
+        "mechanical",
+    ),
+    (
+        "transmission",
+        "The transmission shifts gears to match engine speed with road speed.",
+        "mechanical",
+    ),
+    (
+        "fuel injection",
+        "Fuel injection sprays a precise mist of gasoline into each cylinder.",
+        "mechanical",
+    ),
+    (
+        "cooling system",
+        "The cooling system circulates coolant to keep the engine block from overheating.",
+        "mechanical",
+    ),
+    (
+        "steering wheel",
+        "The driver turns the steering wheel to change the car's direction.",
+        "driver",
+    ),
+    (
+        "brake pedal",
+        "Pressing the brake pedal squeezes the pads against the rotors to slow down.",
+        "driver",
+    ),
+    (
+        "accelerator pedal",
+        "The accelerator pedal opens the throttle to increase speed.",
+        "driver",
+    ),
+    (
+        "turn signal",
+        "Flicking the turn signal alerts other drivers before changing lanes.",
+        "driver",
+    ),
+    (
+        "rearview mirror",
+        "Glancing at the rearview mirror shows traffic approaching from behind.",
+        "driver",
+    ),
+    (
+        "seat belt",
+        "Buckling the seat belt keeps the passenger secured during a sudden stop.",
+        "driver",
+    ),
+    (
+        "dashboard display",
+        "The dashboard display shows speed, fuel level, and warning lights.",
+        "driver",
+    ),
+    (
+        "resale value",
+        "A well-maintained car keeps a higher resale value after years of use.",
+        "economic",
+    ),
+    (
+        "depreciation rate",
+        "New cars lose a large share of their value in the first year, a steep drop.",
+        "economic",
+    ),
+    (
+        "trade-in value",
+        "The dealer offered a trade-in based on mileage and condition.",
+        "economic",
+    ),
+    (
+        "insurance premium",
+        "Younger drivers usually pay a higher monthly amount for coverage.",
+        "economic",
+    ),
+    (
+        "fuel cost",
+        "Long commutes add up at the pump over a year.",
+        "economic",
+    ),
+    (
+        "loan interest",
+        "Financing a car means paying extra on top of the sticker price over time.",
+        "economic",
+    ),
+    (
+        "purchase price",
+        "The sticker price is negotiated before taxes and fees are added.",
+        "economic",
+    ),
 ];
 
 /// 4 cross-cutting items, each genuinely spanning two fields, with no
@@ -102,28 +186,49 @@ fn kmeans(embeddings: &[Vec<f32>], k: usize, iterations: usize) -> Vec<usize> {
     let dim = embeddings[0].len();
     let mut centroid_idx = vec![0usize];
     while centroid_idx.len() < k {
-        let next = (0..n).max_by(|&a, &b| {
-            let da = centroid_idx.iter().map(|&c| 1.0 - cosine_sim(&embeddings[a], &embeddings[c])).fold(f32::INFINITY, f32::min);
-            let db = centroid_idx.iter().map(|&c| 1.0 - cosine_sim(&embeddings[b], &embeddings[c])).fold(f32::INFINITY, f32::min);
-            da.partial_cmp(&db).unwrap()
-        }).unwrap();
+        let next = (0..n)
+            .max_by(|&a, &b| {
+                let da = centroid_idx
+                    .iter()
+                    .map(|&c| 1.0 - cosine_sim(&embeddings[a], &embeddings[c]))
+                    .fold(f32::INFINITY, f32::min);
+                let db = centroid_idx
+                    .iter()
+                    .map(|&c| 1.0 - cosine_sim(&embeddings[b], &embeddings[c]))
+                    .fold(f32::INFINITY, f32::min);
+                da.partial_cmp(&db).unwrap()
+            })
+            .unwrap();
         centroid_idx.push(next);
     }
-    let mut centroids: Vec<Vec<f32>> = centroid_idx.iter().map(|&i| embeddings[i].clone()).collect();
+    let mut centroids: Vec<Vec<f32>> = centroid_idx
+        .iter()
+        .map(|&i| embeddings[i].clone())
+        .collect();
     let mut assignment = vec![0usize; n];
     for _ in 0..iterations {
         for i in 0..n {
-            assignment[i] = (0..k).max_by(|&a, &b| cosine_sim(&embeddings[i], &centroids[a]).partial_cmp(&cosine_sim(&embeddings[i], &centroids[b])).unwrap()).unwrap();
+            assignment[i] = (0..k)
+                .max_by(|&a, &b| {
+                    cosine_sim(&embeddings[i], &centroids[a])
+                        .partial_cmp(&cosine_sim(&embeddings[i], &centroids[b]))
+                        .unwrap()
+                })
+                .unwrap();
         }
         let mut sums = vec![vec![0.0f32; dim]; k];
         let mut counts = vec![0usize; k];
         for i in 0..n {
             let c = assignment[i];
             counts[c] += 1;
-            for d in 0..dim { sums[c][d] += embeddings[i][d]; }
+            for d in 0..dim {
+                sums[c][d] += embeddings[i][d];
+            }
         }
         for c in 0..k {
-            if counts[c] == 0 { continue; }
+            if counts[c] == 0 {
+                continue;
+            }
             let norm: f32 = sums[c].iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
             centroids[c] = sums[c].iter().map(|x| x / norm).collect();
         }
@@ -135,7 +240,9 @@ fn centroid(embeddings: &[&Vec<f32>]) -> Vec<f32> {
     let dim = embeddings[0].len();
     let mut sum = vec![0.0f32; dim];
     for e in embeddings {
-        for d in 0..dim { sum[d] += e[d]; }
+        for d in 0..dim {
+            sum[d] += e[d];
+        }
     }
     let norm: f32 = sum.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
     sum.iter().map(|x| x / norm).collect()
@@ -150,8 +257,14 @@ fn main() {
         let mut embedder = None;
         for dir in ["models", "../models"] {
             let p = std::path::Path::new(dir);
-            if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) { continue; }
-            let cfg = OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), ..OnnxConfig::default() };
+            if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) {
+                continue;
+            }
+            let cfg = OnnxConfig {
+                dim: 384,
+                model_dir: Some(dir.to_string()),
+                ..OnnxConfig::default()
+            };
             let e = OnnxEmbedder::with_config(&cfg);
             if e.is_available() {
                 println!("Using real semantic embedder: {dir}/model.onnx\n");
@@ -159,10 +272,20 @@ fn main() {
                 break;
             }
         }
-        let embedder = match embedder { Some(e) => e, None => { println!("WARNING: no ONNX model — aborting."); return; } };
+        let embedder = match embedder {
+            Some(e) => e,
+            None => {
+                println!("WARNING: no ONNX model — aborting.");
+                return;
+            }
+        };
 
-        let pure_embeddings: Vec<Vec<f32>> = PURE.iter().map(|(_, s, _)| embedder.embed(s)).collect();
-        let cross_embeddings: Vec<Vec<f32>> = CROSSCUTTING.iter().map(|(_, s, ..)| embedder.embed(s)).collect();
+        let pure_embeddings: Vec<Vec<f32>> =
+            PURE.iter().map(|(_, s, _)| embedder.embed(s)).collect();
+        let cross_embeddings: Vec<Vec<f32>> = CROSSCUTTING
+            .iter()
+            .map(|(_, s, ..)| embedder.embed(s))
+            .collect();
 
         // ── Test 1: hard clustering, all 25 items together ──
         println!("=== Test 1: hard k-means (k=3) clustering, all 25 items ===");
@@ -175,7 +298,9 @@ fn main() {
         for (c, slot) in cluster_label.iter_mut().enumerate() {
             let mut counts = std::collections::HashMap::new();
             for i in 0..PURE.len() {
-                if assignment[i] == c { *counts.entry(PURE[i].2).or_insert(0usize) += 1; }
+                if assignment[i] == c {
+                    *counts.entry(PURE[i].2).or_insert(0usize) += 1;
+                }
             }
             if let Some((label, _)) = counts.into_iter().max_by_key(|(_, n)| *n) {
                 *slot = label;
@@ -189,7 +314,9 @@ fn main() {
             let assigned_cluster = assignment[global_idx];
             let assigned_label = cluster_label[assigned_cluster];
             let matches_either = assigned_label == *l1 || assigned_label == *l2;
-            if matches_either { best_case_hits += 1; }
+            if matches_either {
+                best_case_hits += 1;
+            }
             println!(
                 "  {name:<28} true=({l1}, {l2})  hard-assigned to cluster labeled '{assigned_label}'  (captures ONE of its TWO true fields: {matches_either}; the other is structurally lost)"
             );
@@ -201,14 +328,25 @@ fn main() {
 
         // ── Test 2: per-field-centroid dual-signal test ──
         println!("=== Test 2: does the embedding itself carry dual-membership signal? ===");
-        let mechanical: Vec<&Vec<f32>> = (0..PURE.len()).filter(|&i| PURE[i].2 == "mechanical").map(|i| &pure_embeddings[i]).collect();
-        let driver: Vec<&Vec<f32>> = (0..PURE.len()).filter(|&i| PURE[i].2 == "driver").map(|i| &pure_embeddings[i]).collect();
-        let economic: Vec<&Vec<f32>> = (0..PURE.len()).filter(|&i| PURE[i].2 == "economic").map(|i| &pure_embeddings[i]).collect();
+        let mechanical: Vec<&Vec<f32>> = (0..PURE.len())
+            .filter(|&i| PURE[i].2 == "mechanical")
+            .map(|i| &pure_embeddings[i])
+            .collect();
+        let driver: Vec<&Vec<f32>> = (0..PURE.len())
+            .filter(|&i| PURE[i].2 == "driver")
+            .map(|i| &pure_embeddings[i])
+            .collect();
+        let economic: Vec<&Vec<f32>> = (0..PURE.len())
+            .filter(|&i| PURE[i].2 == "economic")
+            .map(|i| &pure_embeddings[i])
+            .collect();
         let centroids: std::collections::HashMap<&str, Vec<f32>> = [
             ("mechanical", centroid(&mechanical)),
             ("driver", centroid(&driver)),
             ("economic", centroid(&economic)),
-        ].into_iter().collect();
+        ]
+        .into_iter()
+        .collect();
         let all_fields = ["mechanical", "driver", "economic"];
 
         let mut positive_margins = 0;
@@ -219,7 +357,9 @@ fn main() {
             let other_field = all_fields.iter().find(|f| *f != l1 && *f != l2).unwrap();
             let sim_other = cosine_sim(e, &centroids[other_field]);
             let margin = sim1.min(sim2) - sim_other;
-            if margin > 0.0 { positive_margins += 1; }
+            if margin > 0.0 {
+                positive_margins += 1;
+            }
             println!(
                 "  {name:<28} sim({l1})={sim1:.3}  sim({l2})={sim2:.3}  sim({other_field}, unrelated)={sim_other:.3}  dual_margin={margin:+.3}"
             );

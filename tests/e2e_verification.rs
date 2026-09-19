@@ -183,7 +183,6 @@ fn test_epistemic_thesis_end_to_end() {
     // (Section 5, quality feedback, moved to the product repo together with the
     //  tracker - see MOVED_TO_PRODUCT.md.)
 
-
     println!("=================================================================");
     let chunk_texts = vec![
         "Emergency Stop procedure: Press red button to halt spindle immediately.".to_string(),

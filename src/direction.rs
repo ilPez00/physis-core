@@ -378,7 +378,11 @@ fn worst_covered(
             .fold(f32::NEG_INFINITY, f32::max);
         worst = worst.min(best);
     }
-    if worst.is_finite() { worst } else { 0.0 }
+    if worst.is_finite() {
+        worst
+    } else {
+        0.0
+    }
 }
 
 /// Check `after` against `before` for `direction`, with the null in the same pass.
@@ -430,8 +434,14 @@ one is replaced when vibration rises after bearing wear becomes measurable.";
     /// Direction is a precondition, not a score to be traded off.
     #[test]
     fn not_moving_in_the_requested_direction_fails() {
-        let v = check(LONG, &format!("{LONG} And more besides."), Direction::Shorter, &e(), "rp")
-            .unwrap();
+        let v = check(
+            LONG,
+            &format!("{LONG} And more besides."),
+            Direction::Shorter,
+            &e(),
+            "rp",
+        )
+        .unwrap();
         assert!(!v.moved);
         assert!(!v.holds());
         assert!(v.render().contains("did not move"));
@@ -442,7 +452,11 @@ one is replaced when vibration rises after bearing wear becomes measurable.";
     /// which for truncation IS the null, so the margin is zero by construction.
     #[test]
     fn truncation_gets_shorter_and_still_fails() {
-        let cut: String = LONG.split_whitespace().take(12).collect::<Vec<_>>().join(" ");
+        let cut: String = LONG
+            .split_whitespace()
+            .take(12)
+            .collect::<Vec<_>>()
+            .join(" ");
         let v = check(LONG, &cut, Direction::Shorter, &e(), "rp").unwrap();
         assert!(v.moved, "truncation does shorten");
         assert!(
@@ -460,7 +474,11 @@ one is replaced when vibration rises after bearing wear becomes measurable.";
     #[test]
     fn the_null_matches_the_result_size() {
         for take in [5usize, 12, 25] {
-            let cut: String = LONG.split_whitespace().take(take).collect::<Vec<_>>().join(" ");
+            let cut: String = LONG
+                .split_whitespace()
+                .take(take)
+                .collect::<Vec<_>>()
+                .join(" ");
             let null = Direction::Shorter.null(LONG, take);
             assert_eq!(
                 null.split_whitespace().count(),
@@ -532,7 +550,11 @@ If this assertion ever fails, the fallback became semantic and the warning in \
     /// drifts, the null and the result have stopped being the same computation.
     #[test]
     fn truncation_scores_exactly_zero_margin_against_its_own_null() {
-        let cut: String = LONG.split_whitespace().take(15).collect::<Vec<_>>().join(" ");
+        let cut: String = LONG
+            .split_whitespace()
+            .take(15)
+            .collect::<Vec<_>>()
+            .join(" ");
         let v = check(LONG, &cut, Direction::Shorter, &e(), "rp").unwrap();
         assert_eq!(v.retention, v.null_retention);
         assert_eq!(v.margin(), 0.0);
@@ -551,7 +573,12 @@ If this assertion ever fails, the fallback became semantic and the warning in \
         let original = "The relief valve opens at 2.6 bar. The pump seal is replaced \
 every four hundred hours. The supervisor records each replacement in the log.";
         let sents: Vec<&str> = original.split(". ").collect();
-        let decimate = sents.iter().step_by(2).cloned().collect::<Vec<_>>().join(". ");
+        let decimate = sents
+            .iter()
+            .step_by(2)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(". ");
         let stop = ["the", "at", "is", "in", "each", "every"];
         let destop: String = original
             .split_whitespace()
@@ -581,7 +608,11 @@ every four hundred hours. The supervisor records each replacement in the log.";
     #[test]
     fn an_explicit_metric_decides_the_statistic() {
         let e = e();
-        let cut: String = LONG.split_whitespace().take(12).collect::<Vec<_>>().join(" ");
+        let cut: String = LONG
+            .split_whitespace()
+            .take(12)
+            .collect::<Vec<_>>()
+            .join(" ");
         let shipped = worst_covered(LONG, &cut, &e, RetentionMetric::WorstCovered);
         let broken = worst_covered(LONG, &cut, &e, RetentionMetric::WholeTextCosine);
         assert_ne!(
@@ -613,7 +644,11 @@ every four hundred hours. The supervisor records each replacement in the log.";
     #[test]
     fn the_cosine_escape_produces_a_different_statistic() {
         let e = e();
-        let cut: String = LONG.split_whitespace().take(12).collect::<Vec<_>>().join(" ");
+        let cut: String = LONG
+            .split_whitespace()
+            .take(12)
+            .collect::<Vec<_>>()
+            .join(" ");
         // No process state is touched. The previous version of this test set
         // PHYSIS_DIRECTION_METRIC, measured, and restored it — correct about
         // the value, wrong about the window: every test running concurrently

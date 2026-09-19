@@ -15,7 +15,7 @@ use crate::tokenizer::WhitespaceTokenizer;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,7 +106,11 @@ pub fn git_head() -> String {
     match r {
         Some(x) => {
             let s = String::from_utf8_lossy(&x.stdout).to_string();
-            if s.trim().is_empty() { "unknown".into() } else { s.trim().to_string() }
+            if s.trim().is_empty() {
+                "unknown".into()
+            } else {
+                s.trim().to_string()
+            }
         }
         None => "unknown".into(),
     }
@@ -203,8 +207,7 @@ fn oracle_leg(
     embedder: &dyn crate::embed::VectorEmbed,
     override_model: Option<&str>,
 ) -> anyhow::Result<(String, Vec<crate::oracle::OracleCase>, f32, usize, usize)> {
-    let set =
-        crate::oracle::from_env().ok_or_else(|| anyhow::anyhow!("oracle not configured"))?;
+    let set = crate::oracle::from_env().ok_or_else(|| anyhow::anyhow!("oracle not configured"))?;
     let (mut ocfg, key) = set;
     if let Some(m) = override_model {
         if !m.trim().is_empty() {
@@ -287,10 +290,7 @@ pub fn run(cfg: BenchConfig, embedder: &dyn crate::embed::VectorEmbed) -> anyhow
         let known: Vec<String> = truth.get(&family_key(name)).cloned().unwrap_or(Vec::new());
         let known_set: BTreeSet<String> = known.into_iter().collect();
         let covered = m1.repeats.iter().any(|r| {
-            let inst: BTreeSet<String> = r.instances
-                .iter()
-                .map(|s| s.path.clone())
-                .collect();
+            let inst: BTreeSet<String> = r.instances.iter().map(|s| s.path.clone()).collect();
             known_set.iter().all(|p| inst.contains(&p.to_string()))
         });
         if covered && known_set.len() >= 2 {
@@ -300,19 +300,31 @@ pub fn run(cfg: BenchConfig, embedder: &dyn crate::embed::VectorEmbed) -> anyhow
     let families_known = fams.len();
     let repeat_recovery = families_found as f32 / families_known.max(1) as f32;
 
-    let anoms: Vec<String> = vec!["zz-anomaly-plasma.md".to_string(), "zz-anomaly-quantum.md".to_string()];
+    let anoms: Vec<String> = vec![
+        "zz-anomaly-plasma.md".to_string(),
+        "zz-anomaly-quantum.md".to_string(),
+    ];
     let top_diff: BTreeSet<String> = m1
         .differences
         .iter()
         .take(anoms.len())
         .map(|d| d.path.clone())
         .collect();
-    let anomalies_caught = anoms.iter().filter(|p| top_diff.contains(&p.to_string())).count();
+    let anomalies_caught = anoms
+        .iter()
+        .filter(|p| top_diff.contains(&p.to_string()))
+        .count();
     let anomaly_recall = anomalies_caught as f32 / anoms.len() as f32;
 
     let pairs: Vec<(String, String)> = vec![
-        ("extra-device-spec-A.md".to_string(), "extra-device-spec-B.md".to_string()),
-        ("extra-window-a.md".to_string(), "extra-window-b.md".to_string()),
+        (
+            "extra-device-spec-A.md".to_string(),
+            "extra-device-spec-B.md".to_string(),
+        ),
+        (
+            "extra-window-a.md".to_string(),
+            "extra-window-b.md".to_string(),
+        ),
     ];
     let mut found: BTreeSet<(String, String)> = Default::default();
     for p in &m1.contradictions {
@@ -368,12 +380,20 @@ pub fn run(cfg: BenchConfig, embedder: &dyn crate::embed::VectorEmbed) -> anyhow
     let ngram_ram_estimate_mb = (bytes.len() as u64 * 24 / 1024 / 1024).max(1);
 
     use crate::model_provider::{ModelProvider, NgramDecoderModel};
-    let t2cfg = TableConfig { table_id: "bench2".into(), max_order: 2, ..Default::default() };
+    let t2cfg = TableConfig {
+        table_id: "bench2".into(),
+        max_order: 2,
+        ..Default::default()
+    };
     let mut tb2 = TableBuilder::new(t2cfg);
     tb2.push_text(&tok, "the pump failed because the seal wore out again");
     let (tbl2, _) = tb2.finish(&tok, "other-corpus");
     let m_a = NgramDecoderModel::new("bench-a", std::sync::Arc::new(tbl), Box::new(tok));
-    let m_b = NgramDecoderModel::new("bench-b", std::sync::Arc::new(tbl2), Box::new(WhitespaceTokenizer::new(50_000)));
+    let m_b = NgramDecoderModel::new(
+        "bench-b",
+        std::sync::Arc::new(tbl2),
+        Box::new(WhitespaceTokenizer::new(50_000)),
+    );
     let interchange_ok = !m_a.generate("the pump", 2).unwrap().is_empty()
         && !m_b.generate("the pump", 2).unwrap().is_empty();
     // Held-out: even indices built the table; odd indices are probed.
@@ -477,14 +497,38 @@ pub fn ground_truth() -> (Vec<Doc>, Truth) {
             docs.push((path.clone(), body));
             members.push(path);
         }
-        truth.entry(format!("fam:{name}")).or_default().extend(members);
+        truth
+            .entry(format!("fam:{name}"))
+            .or_default()
+            .extend(members);
     }
-    docs.push(("zz-anomaly-plasma.md".to_string(), "The plasma obelisk hums at a frequency only the seventh lighthouse can hear.".to_string()));
-    docs.push(("zz-anomaly-quantum.md".to_string(), "Quantum origami folds the evening into theorem sixty-four and unfolds it before dawn.".to_string()));
-    docs.push(("extra-device-spec-A.md".to_string(), "The pressure relief valve shall open at 2.6 bar and the machine must stop above it.".to_string()));
-    docs.push(("extra-device-spec-B.md".to_string(), "The pressure relief valve shall open at 4.2 bar and the machine must not stop above it.".to_string()));
-    docs.push(("extra-window-a.md".to_string(), "Operator access window is mandatory from 06:00 and night access is forbidden.".to_string()));
-    docs.push(("extra-window-b.md".to_string(), "Operator access window is forbidden from 06:00 and night access is required.".to_string()));
+    docs.push((
+        "zz-anomaly-plasma.md".to_string(),
+        "The plasma obelisk hums at a frequency only the seventh lighthouse can hear.".to_string(),
+    ));
+    docs.push((
+        "zz-anomaly-quantum.md".to_string(),
+        "Quantum origami folds the evening into theorem sixty-four and unfolds it before dawn."
+            .to_string(),
+    ));
+    docs.push((
+        "extra-device-spec-A.md".to_string(),
+        "The pressure relief valve shall open at 2.6 bar and the machine must stop above it."
+            .to_string(),
+    ));
+    docs.push((
+        "extra-device-spec-B.md".to_string(),
+        "The pressure relief valve shall open at 4.2 bar and the machine must not stop above it."
+            .to_string(),
+    ));
+    docs.push((
+        "extra-window-a.md".to_string(),
+        "Operator access window is mandatory from 06:00 and night access is forbidden.".to_string(),
+    ));
+    docs.push((
+        "extra-window-b.md".to_string(),
+        "Operator access window is forbidden from 06:00 and night access is required.".to_string(),
+    ));
     docs.sort_by(|a, b| a.0.cmp(&b.0));
     (docs, truth)
 }

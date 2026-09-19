@@ -88,15 +88,14 @@ impl DiskTableModel {
     pub fn load(model_id: &str, dir: &Path) -> anyhow::Result<Self> {
         let table_path = first_table_file(dir)?;
         let table = crate::ngram_table::load(&table_path)?; // checksum verified
-        let tok: Box<dyn Tokenizer> =
-            match table.manifest().tokenizer.id.as_str() {
-                "whitespace-v1" => Box::new(crate::tokenizer::WhitespaceTokenizer::new(50_000)),
-                other => {
-                    return Err(anyhow::anyhow!(
+        let tok: Box<dyn Tokenizer> = match table.manifest().tokenizer.id.as_str() {
+            "whitespace-v1" => Box::new(crate::tokenizer::WhitespaceTokenizer::new(50_000)),
+            other => {
+                return Err(anyhow::anyhow!(
                         "model table uses unknown tokenizer '{other}' — rebuild with a supported tokenizer"
                     ));
-                }
-            };
+            }
+        };
         let inner = NgramDecoderModel::new(model_id, Arc::new(table), tok);
         Ok(Self {
             model_id: model_id.to_string(),
@@ -128,7 +127,10 @@ impl fmt::Display for ModelError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ModelError::Unsupported(c) => {
-                write!(f, "model does not support capability {c:?} — no fallback is faked")
+                write!(
+                    f,
+                    "model does not support capability {c:?} — no fallback is faked"
+                )
             }
             ModelError::Backend(e) => write!(f, "model backend error: {e}"),
         }
@@ -177,7 +179,14 @@ impl NgramDecoderModel {
             meta: ModelMetadata {
                 id: id.to_string(),
                 name: format!("ngram decoder over '{}'", m.table_id),
-                architecture: format!("ngram-backoff-{}-order{}", match m.kind { crate::ngram_table::TableKind::Lexical => "lexical", crate::ngram_table::TableKind::Structural => "structural" }, m.max_order),
+                architecture: format!(
+                    "ngram-backoff-{}-order{}",
+                    match m.kind {
+                        crate::ngram_table::TableKind::Lexical => "lexical",
+                        crate::ngram_table::TableKind::Structural => "structural",
+                    },
+                    m.max_order
+                ),
                 parameter_count: Some(m.entry_count),
                 context_length: m.max_order as usize,
                 tokenizer: m.tokenizer.id.clone(),
@@ -222,10 +231,7 @@ impl ModelProvider for NgramDecoderModel {
         let mut sum = 0.0f32;
         for i in 1..toks.len() {
             let ctx_start = i.saturating_sub(self.meta.context_length);
-            sum += self
-                .table
-                .probability(&toks[ctx_start..i], &toks[i])
-                .ln();
+            sum += self.table.probability(&toks[ctx_start..i], &toks[i]).ln();
         }
         Ok(sum / (toks.len().saturating_sub(1) as f32).max(1.0))
     }
@@ -323,7 +329,12 @@ impl ModelRegistry {
 
     /// Install from a local directory: verify every declared file checksum,
     /// then record the manifest. A partial or corrupted copy is refused.
-    pub fn install_local(&self, record: ModelRecord, src: &Path, files: &[String]) -> anyhow::Result<ModelManifest> {
+    pub fn install_local(
+        &self,
+        record: ModelRecord,
+        src: &Path,
+        files: &[String],
+    ) -> anyhow::Result<ModelManifest> {
         let dir = self.dir(&record.id);
         std::fs::create_dir_all(&dir)?;
         let mut verified: Vec<(String, String)> = Vec::new();
@@ -351,7 +362,12 @@ impl ModelRegistry {
     /// network and a registry) and moved to the product repository in the
     /// 2026-09-14 Core/Product split. Core refuses explicitly rather than
     /// pretending the model can be fetched.
-    pub fn install_http(&self, _record: ModelRecord, _url: &str, _files: &[String]) -> anyhow::Result<ModelManifest> {
+    pub fn install_http(
+        &self,
+        _record: ModelRecord,
+        _url: &str,
+        _files: &[String],
+    ) -> anyhow::Result<ModelManifest> {
         anyhow::bail!(
             "model download is not part of Core (offline by design); fetch the \
              weights yourself and point model_dir at them, or use the product"
@@ -366,12 +382,20 @@ impl ModelRegistry {
 
 fn sanitize(id: &str) -> String {
     id.chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
 fn home() -> PathBuf {
-    std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."))
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
 }
 
 use sha2::{Digest, Sha256};
@@ -384,7 +408,10 @@ mod tests {
 
     fn build_table(id: &str, corpus: &str) -> Arc<dyn NGramTable> {
         let tok = WhitespaceTokenizer::new(0);
-        let cfg = TableConfig { table_id: id.into(), ..Default::default() };
+        let cfg = TableConfig {
+            table_id: id.into(),
+            ..Default::default()
+        };
         let mut b = TableBuilder::new(cfg);
         b.push_text(&tok, corpus);
         let (t, _bytes) = b.finish(&tok, "testhash");
@@ -410,10 +437,13 @@ mod tests {
             let g = m.generate("the", 4).unwrap();
             assert!(!g.is_empty());
             assert!(m.score("the pump").is_ok());
-            assert!(matches!(
-                m.stream("x", &mut |_| {}),
-                Err(ModelError::Unsupported(Capability::Streaming))
-            ), "streaming is refused, not faked");
+            assert!(
+                matches!(
+                    m.stream("x", &mut |_| {}),
+                    Err(ModelError::Unsupported(Capability::Streaming))
+                ),
+                "streaming is refused, not faked"
+            );
         }
         // A model trained on A continues A-style: "the pump" → "failed".
         assert!(ma.generate("the pump", 1).unwrap().contains("failed"));
@@ -425,6 +455,9 @@ mod tests {
         let ta = build_table("det", CORPUS_A);
         let tok = Box::new(WhitespaceTokenizer::new(0));
         let m = NgramDecoderModel::new("m", ta, tok as Box<dyn Tokenizer>);
-        assert_eq!(m.generate("the pump", 6).unwrap(), m.generate("the pump", 6).unwrap());
+        assert_eq!(
+            m.generate("the pump", 6).unwrap(),
+            m.generate("the pump", 6).unwrap()
+        );
     }
 }

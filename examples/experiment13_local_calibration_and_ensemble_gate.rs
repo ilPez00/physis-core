@@ -31,34 +31,55 @@ use std::collections::HashMap;
 
 fn kmeans(embeddings: &[Vec<f32>], k: usize, iterations: usize) -> Vec<usize> {
     let n = embeddings.len();
-    if n < k { return (0..n).collect(); }
+    if n < k {
+        return (0..n).collect();
+    }
     let dim = embeddings[0].len();
     let mut centroid_idx = vec![0usize];
     while centroid_idx.len() < k {
         let next = (0..n)
             .max_by(|&a, &b| {
-                let da = centroid_idx.iter().map(|&c| 1.0 - cosine_sim(&embeddings[a], &embeddings[c])).fold(f32::INFINITY, f32::min);
-                let db = centroid_idx.iter().map(|&c| 1.0 - cosine_sim(&embeddings[b], &embeddings[c])).fold(f32::INFINITY, f32::min);
+                let da = centroid_idx
+                    .iter()
+                    .map(|&c| 1.0 - cosine_sim(&embeddings[a], &embeddings[c]))
+                    .fold(f32::INFINITY, f32::min);
+                let db = centroid_idx
+                    .iter()
+                    .map(|&c| 1.0 - cosine_sim(&embeddings[b], &embeddings[c]))
+                    .fold(f32::INFINITY, f32::min);
                 da.partial_cmp(&db).unwrap()
             })
             .unwrap();
         centroid_idx.push(next);
     }
-    let mut centroids: Vec<Vec<f32>> = centroid_idx.iter().map(|&i| embeddings[i].clone()).collect();
+    let mut centroids: Vec<Vec<f32>> = centroid_idx
+        .iter()
+        .map(|&i| embeddings[i].clone())
+        .collect();
     let mut assignment = vec![0usize; n];
     for _ in 0..iterations {
         for i in 0..n {
-            assignment[i] = (0..k).max_by(|&a, &b| cosine_sim(&embeddings[i], &centroids[a]).partial_cmp(&cosine_sim(&embeddings[i], &centroids[b])).unwrap()).unwrap();
+            assignment[i] = (0..k)
+                .max_by(|&a, &b| {
+                    cosine_sim(&embeddings[i], &centroids[a])
+                        .partial_cmp(&cosine_sim(&embeddings[i], &centroids[b]))
+                        .unwrap()
+                })
+                .unwrap();
         }
         let mut sums = vec![vec![0.0f32; dim]; k];
         let mut counts = vec![0usize; k];
         for i in 0..n {
             let c = assignment[i];
             counts[c] += 1;
-            for d in 0..dim { sums[c][d] += embeddings[i][d]; }
+            for d in 0..dim {
+                sums[c][d] += embeddings[i][d];
+            }
         }
         for c in 0..k {
-            if counts[c] == 0 { continue; }
+            if counts[c] == 0 {
+                continue;
+            }
             let norm: f32 = sums[c].iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
             centroids[c] = sums[c].iter().map(|x| x / norm).collect();
         }
@@ -69,7 +90,11 @@ fn kmeans(embeddings: &[Vec<f32>], k: usize, iterations: usize) -> Vec<usize> {
 fn centroid(embeddings: &[&Vec<f32>]) -> Vec<f32> {
     let dim = embeddings[0].len();
     let mut sum = vec![0.0f32; dim];
-    for e in embeddings { for d in 0..dim { sum[d] += e[d]; } }
+    for e in embeddings {
+        for d in 0..dim {
+            sum[d] += e[d];
+        }
+    }
     let norm: f32 = sum.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
     sum.iter().map(|x| x / norm).collect()
 }
@@ -78,7 +103,11 @@ fn balance_ratio(assignment: &[usize]) -> f32 {
     let c0 = assignment.iter().filter(|&&a| a == 0).count();
     let c1 = assignment.iter().filter(|&&a| a == 1).count();
     let (lo, hi) = (c0.min(c1), c0.max(c1));
-    if hi == 0 { 0.0 } else { lo as f32 / hi as f32 }
+    if hi == 0 {
+        0.0
+    } else {
+        lo as f32 / hi as f32
+    }
 }
 
 /// Iteration 11's closest single certification candidate: raw kNN
@@ -98,9 +127,17 @@ fn knn_consistency_adaptive(embeddings: &[Vec<f32>], assignment: &[usize], max_k
             .collect();
         sims.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         let kk = k.min(sims.len());
-        let same = sims.iter().take(kk).filter(|(j, _)| assignment[*j] == assignment[i]).count();
+        let same = sims
+            .iter()
+            .take(kk)
+            .filter(|(j, _)| assignment[*j] == assignment[i])
+            .count();
         let observed = same as f32 / kk as f32;
-        let expected = if n > 1 { (own_size.saturating_sub(1)) as f32 / (n - 1) as f32 } else { 0.0 };
+        let expected = if n > 1 {
+            (own_size.saturating_sub(1)) as f32 / (n - 1) as f32
+        } else {
+            0.0
+        };
         total += observed - expected;
     }
     total / n as f32
@@ -134,7 +171,14 @@ const CROSS: &[(&str, &str, &str, &str, &str, &str)] = &[
     ("warranty_coverage", "warranty coverage", "A multi-year warranty means a sudden breakdown on the road won't leave the owner facing a large repair bill out of pocket.", "driver", "economic", "economic"),
 ];
 
-const FINE_CATS: [&str; 6] = ["propulsion", "energy", "controls", "assistance", "ownership", "acquisition"];
+const FINE_CATS: [&str; 6] = [
+    "propulsion",
+    "energy",
+    "controls",
+    "assistance",
+    "ownership",
+    "acquisition",
+];
 fn fine_to_coarse(fine: &str) -> &'static str {
     match fine {
         "propulsion" | "energy" => "mechanical",
@@ -145,24 +189,42 @@ fn fine_to_coarse(fine: &str) -> &'static str {
 }
 fn sibling_of(fine: &str) -> &'static str {
     match fine {
-        "propulsion" => "energy", "energy" => "propulsion",
-        "controls" => "assistance", "assistance" => "controls",
-        "ownership" => "acquisition", "acquisition" => "ownership",
+        "propulsion" => "energy",
+        "energy" => "propulsion",
+        "controls" => "assistance",
+        "assistance" => "controls",
+        "ownership" => "acquisition",
+        "acquisition" => "ownership",
         _ => unreachable!(),
     }
 }
 
 fn run_calibration_comparison<F: Fn(&str) -> Vec<f32>>(representation: &str, embed: F) {
     let n_pure = PURE.len();
-    let pure_emb: Vec<Vec<f32>> = PURE.iter().map(|(_, bare, ctx, ..)| embed(if representation == "bare" { bare } else { ctx })).collect();
-    let cross_emb: Vec<Vec<f32>> = CROSS.iter().map(|(_, bare, ctx, ..)| embed(if representation == "bare" { bare } else { ctx })).collect();
+    let pure_emb: Vec<Vec<f32>> = PURE
+        .iter()
+        .map(|(_, bare, ctx, ..)| embed(if representation == "bare" { bare } else { ctx }))
+        .collect();
+    let cross_emb: Vec<Vec<f32>> = CROSS
+        .iter()
+        .map(|(_, bare, ctx, ..)| embed(if representation == "bare" { bare } else { ctx }))
+        .collect();
 
-    let fine_centroids: HashMap<&'static str, Vec<f32>> = FINE_CATS.iter().map(|&cat| {
-        let members: Vec<&Vec<f32>> = (0..n_pure).filter(|&i| PURE[i].4 == cat).map(|i| &pure_emb[i]).collect();
-        (cat, centroid(&members))
-    }).collect();
+    let fine_centroids: HashMap<&'static str, Vec<f32>> = FINE_CATS
+        .iter()
+        .map(|&cat| {
+            let members: Vec<&Vec<f32>> = (0..n_pure)
+                .filter(|&i| PURE[i].4 == cat)
+                .map(|i| &pure_emb[i])
+                .collect();
+            (cat, centroid(&members))
+        })
+        .collect();
     let sims_for = |e: &Vec<f32>| -> HashMap<&'static str, f32> {
-        FINE_CATS.iter().map(|&c| (c, cosine_sim(e, &fine_centroids[c]))).collect()
+        FINE_CATS
+            .iter()
+            .map(|&c| (c, cosine_sim(e, &fine_centroids[c])))
+            .collect()
     };
     let pure_sims: Vec<HashMap<&'static str, f32>> = pure_emb.iter().map(sims_for).collect();
     let cross_sims: Vec<HashMap<&'static str, f32>> = cross_emb.iter().map(sims_for).collect();
@@ -175,16 +237,30 @@ fn run_calibration_comparison<F: Fn(&str) -> Vec<f32>>(representation: &str, emb
         };
         pure_sims.iter().filter(|s| membership_set(s) > 1).count() as f32 / n_pure as f32
     };
-    let coarse_covered = |sims: &HashMap<&'static str, f32>, delta: f32, f1: &str, f2: &str| -> bool {
-        let top = sims.values().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let ms: Vec<&str> = FINE_CATS.iter().filter(|c| sims[**c] >= top - delta).copied().collect();
-        let coarses: std::collections::HashSet<&str> = ms.iter().map(|c| fine_to_coarse(c)).collect();
-        coarses.contains(f1) && coarses.contains(f2)
-    };
+    let coarse_covered =
+        |sims: &HashMap<&'static str, f32>, delta: f32, f1: &str, f2: &str| -> bool {
+            let top = sims.values().cloned().fold(f32::NEG_INFINITY, f32::max);
+            let ms: Vec<&str> = FINE_CATS
+                .iter()
+                .filter(|c| sims[**c] >= top - delta)
+                .copied()
+                .collect();
+            let coarses: std::collections::HashSet<&str> =
+                ms.iter().map(|c| fine_to_coarse(c)).collect();
+            coarses.contains(f1) && coarses.contains(f2)
+        };
     let global_recall_at = |delta: f32| -> usize {
-        cross_sims.iter().enumerate().filter(|(i, s)| { let (_, _, _, f1, f2, _) = CROSS[*i]; coarse_covered(s, delta, f1, f2) }).count()
+        cross_sims
+            .iter()
+            .enumerate()
+            .filter(|(i, s)| {
+                let (_, _, _, f1, f2, _) = CROSS[*i];
+                coarse_covered(s, delta, f1, f2)
+            })
+            .count()
     };
-    let global_best = (0..=30).map(|i| i as f32 * 0.01)
+    let global_best = (0..=30)
+        .map(|i| i as f32 * 0.01)
         .map(|d| (d, global_fpr_at(d), global_recall_at(d)))
         .filter(|&(_, _, r)| r == CROSS.len())
         .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
@@ -199,17 +275,23 @@ fn run_calibration_comparison<F: Fn(&str) -> Vec<f32>>(representation: &str, emb
             let own = PURE[i].4;
             let sib = sibling_of(own);
             let margin = pure_sims[i][own] - pure_sims[i][sib];
-            if margin < delta { flagged += 1; }
+            if margin < delta {
+                flagged += 1;
+            }
         }
         flagged as f32 / n_pure as f32
     };
     // No pure item's true second field is a same-branch sibling in this dataset (all 5 cross
     // items span two DIFFERENT coarse branches), so sibling recall has nothing to trade off —
     // the sibling threshold can be pushed as tight as possible without losing any recall.
-    let sibling_best_delta = (0..=30).map(|i| i as f32 * 0.01)
+    let sibling_best_delta = (0..=30)
+        .map(|i| i as f32 * 0.01)
         .map(|d| (d, sibling_fpr_at(d)))
         .find(|&(_, fpr)| fpr == 0.0)
-        .unwrap_or_else(|| { let d = 0.30; (d, sibling_fpr_at(d)) });
+        .unwrap_or_else(|| {
+            let d = 0.30;
+            (d, sibling_fpr_at(d))
+        });
 
     // Cross-branch check: does item i's similarity to some OTHER-branch category exceed its
     // own-category similarity minus delta_cross, considering ONLY other-branch categories
@@ -219,11 +301,14 @@ fn run_calibration_comparison<F: Fn(&str) -> Vec<f32>>(representation: &str, emb
         for i in 0..n_pure {
             let own = PURE[i].4;
             let own_sim = pure_sims[i][own];
-            let other_branch_max = FINE_CATS.iter()
+            let other_branch_max = FINE_CATS
+                .iter()
                 .filter(|c| fine_to_coarse(c) != fine_to_coarse(own))
                 .map(|c| pure_sims[i][*c])
                 .fold(f32::NEG_INFINITY, f32::max);
-            if other_branch_max >= own_sim - delta { flagged += 1; }
+            if other_branch_max >= own_sim - delta {
+                flagged += 1;
+            }
         }
         flagged as f32 / n_pure as f32
     };
@@ -234,24 +319,44 @@ fn run_calibration_comparison<F: Fn(&str) -> Vec<f32>>(representation: &str, emb
     // the actually-true second field rather than "any other branch" (which would be a weaker,
     // wrong test — an irrelevant category being close would wrongly count as a hit).
     let cross_branch_recall_at = |delta: f32| -> usize {
-        cross_sims.iter().enumerate().filter(|(i, s)| {
-            let (_, _, _, f1, f2, _) = CROSS[*i];
-            let (&top_cat, &top_val) = s.iter().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap();
-            let top_coarse = fine_to_coarse(top_cat);
-            let other_field = if top_coarse == f1 { f2 } else { f1 };
-            FINE_CATS.iter().filter(|c| fine_to_coarse(c) == other_field).any(|c| s[*c] >= top_val - delta)
-        }).count()
+        cross_sims
+            .iter()
+            .enumerate()
+            .filter(|(i, s)| {
+                let (_, _, _, f1, f2, _) = CROSS[*i];
+                let (&top_cat, &top_val) = s
+                    .iter()
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                    .unwrap();
+                let top_coarse = fine_to_coarse(top_cat);
+                let other_field = if top_coarse == f1 { f2 } else { f1 };
+                FINE_CATS
+                    .iter()
+                    .filter(|c| fine_to_coarse(c) == other_field)
+                    .any(|c| s[*c] >= top_val - delta)
+            })
+            .count()
     };
-    let cross_branch_best = (0..=30).map(|i| i as f32 * 0.01)
+    let cross_branch_best = (0..=30)
+        .map(|i| i as f32 * 0.01)
         .map(|d| (d, cross_branch_fpr_at(d), cross_branch_recall_at(d)))
         .filter(|&(_, _, r)| r == CROSS.len())
         .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-        .unwrap_or_else(|| { let d = 0.30; (d, cross_branch_fpr_at(d), cross_branch_recall_at(d)) });
+        .unwrap_or_else(|| {
+            let d = 0.30;
+            (d, cross_branch_fpr_at(d), cross_branch_recall_at(d))
+        });
 
     println!("\n--- {representation} ---");
     println!("GLOBAL (Iteration 12, single flat delta over all 6 cells): delta={:.2} FPR={:.3} recall={}/{}", global_best.0, global_best.1, global_best.2, CROSS.len());
     println!("LOCAL/SPLIT sibling-confusion check: delta={:.2} FPR={:.3} (no recall tradeoff exists in this dataset — 0 of 5 cross items are same-branch sibling pairs)", sibling_best_delta.0, sibling_best_delta.1);
-    println!("LOCAL/SPLIT cross-branch check: delta={:.2} FPR={:.3} recall={}/{}", cross_branch_best.0, cross_branch_best.1, cross_branch_best.2, CROSS.len());
+    println!(
+        "LOCAL/SPLIT cross-branch check: delta={:.2} FPR={:.3} recall={}/{}",
+        cross_branch_best.0,
+        cross_branch_best.1,
+        cross_branch_best.2,
+        CROSS.len()
+    );
     let combined_fpr_upper_bound = (sibling_best_delta.1 + cross_branch_best.1).min(1.0); // union bound, honest worst case
     println!("LOCAL/SPLIT combined FPR (union upper bound, an item could be flagged by either check): <= {combined_fpr_upper_bound:.3}, vs GLOBAL's {:.3}", global_best.1);
 }
@@ -259,21 +364,81 @@ fn run_calibration_comparison<F: Fn(&str) -> Vec<f32>>(representation: &str, emb
 // ═══════════════════════════════ Part B: ensemble certification gate ═══════════════════════════════
 
 const DATASET_A: &[(&str, &str, &str)] = &[
-    ("dog", "The dog wagged its tail and waited by the door for its owner to come home.", "mammal"),
-    ("cat", "The cat curled up on the windowsill and purred in the afternoon sun.", "mammal"),
-    ("horse", "The horse trotted around the paddock, its mane flowing in the breeze.", "mammal"),
-    ("sheep", "The sheep grazed quietly in the pasture, following the rest of the flock.", "mammal"),
-    ("lion", "The lion stalked its prey across the savanna before launching a sudden charge.", "mammal"),
-    ("wolf", "The wolf howled at dusk, calling the rest of its pack to the hunt.", "mammal"),
-    ("bear", "The bear caught a salmon in its claws as the fish leapt upstream.", "mammal"),
-    ("tiger", "The tiger prowled silently through the tall grass, stripes blending with the shadows.", "mammal"),
-    ("eagle", "The eagle soared high above the canyon, scanning the ground for movement.", "bird"),
-    ("sparrow", "The sparrow hopped along the branch before darting off between the leaves.", "bird"),
-    ("owl", "The owl turned its head silently, watching for the faintest movement in the dark.", "bird"),
-    ("swan", "The swan glided smoothly across the lake, barely rippling the water.", "bird"),
-    ("penguin", "The penguin waddled across the ice before diving into the frigid water.", "bird"),
-    ("ostrich", "The ostrich sprinted across the plain on powerful legs, kicking up dust.", "bird"),
-    ("kiwi", "The kiwi foraged in the undergrowth at night, sniffing out insects with its long beak.", "bird"),
+    (
+        "dog",
+        "The dog wagged its tail and waited by the door for its owner to come home.",
+        "mammal",
+    ),
+    (
+        "cat",
+        "The cat curled up on the windowsill and purred in the afternoon sun.",
+        "mammal",
+    ),
+    (
+        "horse",
+        "The horse trotted around the paddock, its mane flowing in the breeze.",
+        "mammal",
+    ),
+    (
+        "sheep",
+        "The sheep grazed quietly in the pasture, following the rest of the flock.",
+        "mammal",
+    ),
+    (
+        "lion",
+        "The lion stalked its prey across the savanna before launching a sudden charge.",
+        "mammal",
+    ),
+    (
+        "wolf",
+        "The wolf howled at dusk, calling the rest of its pack to the hunt.",
+        "mammal",
+    ),
+    (
+        "bear",
+        "The bear caught a salmon in its claws as the fish leapt upstream.",
+        "mammal",
+    ),
+    (
+        "tiger",
+        "The tiger prowled silently through the tall grass, stripes blending with the shadows.",
+        "mammal",
+    ),
+    (
+        "eagle",
+        "The eagle soared high above the canyon, scanning the ground for movement.",
+        "bird",
+    ),
+    (
+        "sparrow",
+        "The sparrow hopped along the branch before darting off between the leaves.",
+        "bird",
+    ),
+    (
+        "owl",
+        "The owl turned its head silently, watching for the faintest movement in the dark.",
+        "bird",
+    ),
+    (
+        "swan",
+        "The swan glided smoothly across the lake, barely rippling the water.",
+        "bird",
+    ),
+    (
+        "penguin",
+        "The penguin waddled across the ice before diving into the frigid water.",
+        "bird",
+    ),
+    (
+        "ostrich",
+        "The ostrich sprinted across the plain on powerful legs, kicking up dust.",
+        "bird",
+    ),
+    (
+        "kiwi",
+        "The kiwi foraged in the undergrowth at night, sniffing out insects with its long beak.",
+        "bird",
+    ),
 ];
 
 const BIRD_BRANCH: &[(&str, &str, &str)] = &[
@@ -304,7 +469,12 @@ const VEHICLES: &[(&str, &str, &str)] = &[
     ("golf_cart", "The golf cart puttered along the cart path, carrying clubs and coolers toward the ninth hole.", "many"),
 ];
 
-struct GateCase { name: &'static str, correct: bool, embeddings: Vec<Vec<f32>>, assignment: Vec<usize> }
+struct GateCase {
+    name: &'static str,
+    correct: bool,
+    embeddings: Vec<Vec<f32>>,
+    assignment: Vec<usize>,
+}
 
 fn main() {
     println!("Experiment 13: local calibration + ensemble certification gate\n");
@@ -315,8 +485,14 @@ fn main() {
         let mut embedder = None;
         for dir in ["models", "../models"] {
             let p = std::path::Path::new(dir);
-            if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) { continue; }
-            let cfg = OnnxConfig { dim: 384, model_dir: Some(dir.to_string()), ..OnnxConfig::default() };
+            if !(p.join("model.onnx").exists() || p.join("onnx/model.onnx").exists()) {
+                continue;
+            }
+            let cfg = OnnxConfig {
+                dim: 384,
+                model_dir: Some(dir.to_string()),
+                ..OnnxConfig::default()
+            };
             let e = OnnxEmbedder::with_config(&cfg);
             if e.is_available() {
                 println!("Using real semantic embedder: {dir}/model.onnx");
@@ -324,7 +500,13 @@ fn main() {
                 break;
             }
         }
-        let embedder = match embedder { Some(e) => e, None => { println!("WARNING: no ONNX model — aborting."); return; } };
+        let embedder = match embedder {
+            Some(e) => e,
+            None => {
+                println!("WARNING: no ONNX model — aborting.");
+                return;
+            }
+        };
 
         println!("\n########## Part A: local/split calibration vs Iteration 12's global flat delta ##########");
         run_calibration_comparison("bare", |s| embedder.embed(s));
@@ -332,43 +514,101 @@ fn main() {
 
         println!("\n\n########## Part B: ensemble certification gate across all known real cases ##########");
 
-        let a_emb: Vec<Vec<f32>> = DATASET_A.iter().map(|(_, s, _)| embedder.embed(s)).collect();
+        let a_emb: Vec<Vec<f32>> = DATASET_A
+            .iter()
+            .map(|(_, s, _)| embedder.embed(s))
+            .collect();
         let a_labels: Vec<&str> = DATASET_A.iter().map(|(_, _, l)| *l).collect();
-        let a_true: Vec<usize> = a_labels.iter().map(|&l| if l == "mammal" { 0 } else { 1 }).collect();
+        let a_true: Vec<usize> = a_labels
+            .iter()
+            .map(|&l| if l == "mammal" { 0 } else { 1 })
+            .collect();
         let a_real = kmeans(&a_emb, 2, 30);
 
-        let bird_emb: Vec<Vec<f32>> = BIRD_BRANCH.iter().map(|(_, s, _)| embedder.embed(s)).collect();
+        let bird_emb: Vec<Vec<f32>> = BIRD_BRANCH
+            .iter()
+            .map(|(_, s, _)| embedder.embed(s))
+            .collect();
         let bird_real = kmeans(&bird_emb, 2, 30);
 
-        let veh_emb: Vec<Vec<f32>> = VEHICLES.iter().map(|(_, s, ..)| embedder.embed(s)).collect();
-        let veh_true: Vec<usize> = VEHICLES.iter().map(|v| if v.2 == "two" { 0 } else { 1 }).collect();
+        let veh_emb: Vec<Vec<f32>> = VEHICLES
+            .iter()
+            .map(|(_, s, ..)| embedder.embed(s))
+            .collect();
+        let veh_true: Vec<usize> = VEHICLES
+            .iter()
+            .map(|v| if v.2 == "two" { 0 } else { 1 })
+            .collect();
 
         // Iteration 12's economic branch, real k-means fine split (bare representation), a
         // second independently-discovered "balanced but wrong" instance.
         const ECONOMIC_BRANCH: &[(&str, &str)] = &[
-            ("insurance_premium", "insurance premium"), ("maintenance_cost", "maintenance cost"),
-            ("resale_value", "resale value"), ("purchase_price", "purchase price"),
-            ("trade_in_value", "trade-in value"), ("warranty_coverage", "warranty coverage"),
+            ("insurance_premium", "insurance premium"),
+            ("maintenance_cost", "maintenance cost"),
+            ("resale_value", "resale value"),
+            ("purchase_price", "purchase price"),
+            ("trade_in_value", "trade-in value"),
+            ("warranty_coverage", "warranty coverage"),
         ];
-        let econ_emb: Vec<Vec<f32>> = ECONOMIC_BRANCH.iter().map(|(_, s)| embedder.embed(s)).collect();
+        let econ_emb: Vec<Vec<f32>> = ECONOMIC_BRANCH
+            .iter()
+            .map(|(_, s)| embedder.embed(s))
+            .collect();
         let econ_real = kmeans(&econ_emb, 2, 30);
 
         // Iteration 12's mechanical branch (bare), a known bad-imbalanced sanity check (0.167 balance).
         const MECHANICAL_BRANCH: &[(&str, &str)] = &[
-            ("engine", "engine"), ("transmission", "transmission"), ("turbocharger", "turbocharger"),
-            ("fuel_tank", "fuel tank"), ("spark_plug", "spark plug"),
-            ("hybrid_battery", "hybrid battery"), ("fuel_efficiency", "fuel efficiency"),
+            ("engine", "engine"),
+            ("transmission", "transmission"),
+            ("turbocharger", "turbocharger"),
+            ("fuel_tank", "fuel tank"),
+            ("spark_plug", "spark plug"),
+            ("hybrid_battery", "hybrid battery"),
+            ("fuel_efficiency", "fuel efficiency"),
         ];
-        let mech_emb: Vec<Vec<f32>> = MECHANICAL_BRANCH.iter().map(|(_, s)| embedder.embed(s)).collect();
+        let mech_emb: Vec<Vec<f32>> = MECHANICAL_BRANCH
+            .iter()
+            .map(|(_, s)| embedder.embed(s))
+            .collect();
         let mech_real = kmeans(&mech_emb, 2, 30);
 
         let cases = vec![
-            GateCase { name: "1: GOOD-balanced (Dataset A true mammal/bird, 8v7)", correct: true, embeddings: a_emb.clone(), assignment: a_true.clone() },
-            GateCase { name: "2: BAD-imbalanced (Dataset A real k-means, 13v2)", correct: false, embeddings: a_emb, assignment: a_real },
-            GateCase { name: "3: BAD-balanced (Iter.10 bird branch real, 6v4)", correct: false, embeddings: bird_emb, assignment: bird_real },
-            GateCase { name: "4: GOOD-imbalanced (true wheel count, 2v10)", correct: true, embeddings: veh_emb, assignment: veh_true },
-            GateCase { name: "5: BAD-balanced (Iter.12 economic branch real, bare)", correct: false, embeddings: econ_emb, assignment: econ_real },
-            GateCase { name: "6: BAD-imbalanced (Iter.12 mechanical branch real, bare)", correct: false, embeddings: mech_emb, assignment: mech_real },
+            GateCase {
+                name: "1: GOOD-balanced (Dataset A true mammal/bird, 8v7)",
+                correct: true,
+                embeddings: a_emb.clone(),
+                assignment: a_true.clone(),
+            },
+            GateCase {
+                name: "2: BAD-imbalanced (Dataset A real k-means, 13v2)",
+                correct: false,
+                embeddings: a_emb,
+                assignment: a_real,
+            },
+            GateCase {
+                name: "3: BAD-balanced (Iter.10 bird branch real, 6v4)",
+                correct: false,
+                embeddings: bird_emb,
+                assignment: bird_real,
+            },
+            GateCase {
+                name: "4: GOOD-imbalanced (true wheel count, 2v10)",
+                correct: true,
+                embeddings: veh_emb,
+                assignment: veh_true,
+            },
+            GateCase {
+                name: "5: BAD-balanced (Iter.12 economic branch real, bare)",
+                correct: false,
+                embeddings: econ_emb,
+                assignment: econ_real,
+            },
+            GateCase {
+                name: "6: BAD-imbalanced (Iter.12 mechanical branch real, bare)",
+                correct: false,
+                embeddings: mech_emb,
+                assignment: mech_real,
+            },
         ];
 
         println!("{:<50} {:>10} {:>12}", "case", "balance", "knn-adapt");
@@ -388,13 +628,21 @@ fn main() {
         let mut perfect_found = false;
         for &t_bal in &bal_thresholds {
             for &t_knn in &knn_thresholds {
-                let good_pass = scored.iter().filter(|(c, b, k)| *c && *b >= t_bal && *k >= t_knn).count();
+                let good_pass = scored
+                    .iter()
+                    .filter(|(c, b, k)| *c && *b >= t_bal && *k >= t_knn)
+                    .count();
                 let good_total = scored.iter().filter(|(c, ..)| *c).count();
-                let bad_reject = scored.iter().filter(|(c, b, k)| !*c && !(*b >= t_bal && *k >= t_knn)).count();
+                let bad_reject = scored
+                    .iter()
+                    .filter(|(c, b, k)| !*c && !(*b >= t_bal && *k >= t_knn))
+                    .count();
                 let bad_total = scored.iter().filter(|(c, ..)| !*c).count();
                 if good_pass == good_total && bad_reject == bad_total {
                     perfect_found = true;
-                    if best.is_none() { best = Some((t_bal, t_knn, good_pass, bad_reject)); }
+                    if best.is_none() {
+                        best = Some((t_bal, t_knn, good_pass, bad_reject));
+                    }
                 }
             }
         }
@@ -407,10 +655,19 @@ fn main() {
             let mut best_params = (0.0f32, 0.0f32);
             for &t_bal in &bal_thresholds {
                 for &t_knn in &knn_thresholds {
-                    let good_pass = scored.iter().filter(|(c, b, k)| *c && *b >= t_bal && *k >= t_knn).count();
-                    let bad_reject = scored.iter().filter(|(c, b, k)| !*c && !(*b >= t_bal && *k >= t_knn)).count();
+                    let good_pass = scored
+                        .iter()
+                        .filter(|(c, b, k)| *c && *b >= t_bal && *k >= t_knn)
+                        .count();
+                    let bad_reject = scored
+                        .iter()
+                        .filter(|(c, b, k)| !*c && !(*b >= t_bal && *k >= t_knn))
+                        .count();
                     let score = good_pass + bad_reject;
-                    if score > best_score { best_score = score; best_params = (t_bal, t_knn); }
+                    if score > best_score {
+                        best_score = score;
+                        best_params = (t_bal, t_knn);
+                    }
                 }
             }
             println!(
