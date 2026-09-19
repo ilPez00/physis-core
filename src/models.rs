@@ -639,61 +639,54 @@ impl std::str::FromStr for HumanDomain {
     }
 }
 
-/// The 14 human modes of operation.
+/// The nine human modes of operation.
+///
+/// Reworked 2026-09-19 from fourteen. Each mode is named for the WordNet verb
+/// supersense it owns (D2a): six modes did not clear their null and were
+/// retired (LIFT, SENSE, WALK, BRAINSTORM, DESTROY, and the old CREATE, which
+/// owned `verb.contact` rather than creation); three pairs sharing a dominant
+/// supersense were merged (LEARN+PLAN -> COGNITION, GUIDE+WORK -> COMMUNICATION,
+/// MOVE+PLAY -> MOTION); and four heavy unowned supersenses were given owners
+/// (SOCIAL 12.2% of verb mass, CREATE 7.9%, POSSESS 5.6%, STATIVE 5.3%).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum HumanMode {
-    Lift,
+    Communication,
+    Cognition,
+    Motion,
     Rest,
-    Walk,
-    Work,
-    Create,
-    Learn,
-    Destroy,
-    Sense,
-    Guide,
-    Play,
-    Brainstorm,
     Maintain,
-    Move,
-    Plan,
+    Social,
+    Create,
+    Possess,
+    Stative,
 }
 
 impl HumanMode {
-    pub fn all() -> [HumanMode; 14] {
+    pub fn all() -> [HumanMode; 9] {
         [
-            HumanMode::Lift,
+            HumanMode::Communication,
+            HumanMode::Cognition,
+            HumanMode::Motion,
             HumanMode::Rest,
-            HumanMode::Walk,
-            HumanMode::Work,
-            HumanMode::Create,
-            HumanMode::Learn,
-            HumanMode::Destroy,
-            HumanMode::Sense,
-            HumanMode::Guide,
-            HumanMode::Play,
-            HumanMode::Brainstorm,
             HumanMode::Maintain,
-            HumanMode::Move,
-            HumanMode::Plan,
+            HumanMode::Social,
+            HumanMode::Create,
+            HumanMode::Possess,
+            HumanMode::Stative,
         ]
     }
 
     pub fn as_str(&self) -> &'static str {
         match self {
-            HumanMode::Lift => "LIFT",
+            HumanMode::Communication => "COMMUNICATION",
+            HumanMode::Cognition => "COGNITION",
+            HumanMode::Motion => "MOTION",
             HumanMode::Rest => "REST",
-            HumanMode::Walk => "WALK",
-            HumanMode::Work => "WORK",
-            HumanMode::Create => "CREATE",
-            HumanMode::Learn => "LEARN",
-            HumanMode::Destroy => "DESTROY",
-            HumanMode::Sense => "SENSE",
-            HumanMode::Guide => "GUIDE",
-            HumanMode::Play => "PLAY",
-            HumanMode::Brainstorm => "BRAINSTORM",
             HumanMode::Maintain => "MAINTAIN",
-            HumanMode::Move => "MOVE",
-            HumanMode::Plan => "PLAN",
+            HumanMode::Social => "SOCIAL",
+            HumanMode::Create => "CREATE",
+            HumanMode::Possess => "POSSESS",
+            HumanMode::Stative => "STATIVE",
         }
     }
 }
@@ -703,26 +696,21 @@ impl std::str::FromStr for HumanMode {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
-            "LIFT" => Ok(HumanMode::Lift),
+            "COMMUNICATION" => Ok(HumanMode::Communication),
+            "COGNITION" => Ok(HumanMode::Cognition),
+            "MOTION" => Ok(HumanMode::Motion),
             "REST" => Ok(HumanMode::Rest),
-            "WALK" => Ok(HumanMode::Walk),
-            "WORK" => Ok(HumanMode::Work),
-            "CREATE" => Ok(HumanMode::Create),
-            "LEARN" => Ok(HumanMode::Learn),
-            "DESTROY" => Ok(HumanMode::Destroy),
-            "SENSE" => Ok(HumanMode::Sense),
-            "GUIDE" => Ok(HumanMode::Guide),
-            "PLAY" => Ok(HumanMode::Play),
-            "BRAINSTORM" => Ok(HumanMode::Brainstorm),
             "MAINTAIN" => Ok(HumanMode::Maintain),
-            "MOVE" => Ok(HumanMode::Move),
-            "PLAN" => Ok(HumanMode::Plan),
+            "SOCIAL" => Ok(HumanMode::Social),
+            "CREATE" => Ok(HumanMode::Create),
+            "POSSESS" => Ok(HumanMode::Possess),
+            "STATIVE" => Ok(HumanMode::Stative),
             _ => Err(()),
         }
     }
 }
 
-/// A grid position mapping an ontology entry to one of the 70 cells, plus any
+/// A grid position mapping an ontology entry to one of the 45 cells, plus any
 /// orthogonal facets the entry carries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GridPosition {
@@ -896,11 +884,13 @@ mod tests {
     #[test]
     fn test_grid_places_entry() {
         let mut grid = SemioticGrid::new();
-        grid.classify("running", HumanDomain::Heal, HumanMode::Work);
-        let cell = grid.get_cell(HumanDomain::Heal, HumanMode::Work).unwrap();
+        grid.classify("running", HumanDomain::Heal, HumanMode::Communication);
+        let cell = grid
+            .get_cell(HumanDomain::Heal, HumanMode::Communication)
+            .unwrap();
         assert_eq!(cell.entries, vec!["running"]);
         assert!((cell.activation - 0.1).abs() < 1e-6);
-        assert_eq!(grid.cells.len(), 70);
+        assert_eq!(grid.cells.len(), 45);
     }
 
     #[test]
@@ -909,7 +899,7 @@ mod tests {
             name: "x".into(),
             category: None,
             domain: "HEAL".into(),
-            mode: "WORK".into(),
+            mode: "COMMUNICATION".into(),
             axis_kind: "k".into(),
             axis_name: "n".into(),
             unit: "u".into(),
@@ -918,7 +908,7 @@ mod tests {
         };
         let gp = GridPosition::from_ontology_entry(&e).expect("parses");
         assert_eq!(gp.domain, HumanDomain::Heal);
-        assert_eq!(gp.mode, HumanMode::Work);
+        assert_eq!(gp.mode, HumanMode::Communication);
         let bad = OntologyEntry {
             domain: "NOPE".into(),
             ..e
