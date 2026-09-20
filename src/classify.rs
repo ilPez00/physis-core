@@ -461,10 +461,13 @@ impl CellClassifier {
 
     /// Classify with metadata tracking, returning a `ClassifiedSentence` for the top result.
     /// Uses the top-scoring cell and incorporates metadata for grid slicing.
-    /// The `filter` can restrict which texts/metadata are considered; pass `Default::default()`
-    /// for no filtering.
+    /// `text` is the original input, carried through unchanged so the returned
+    /// `ClassifiedSentence::text` is the text that was classified rather than a
+    /// placeholder. The `filter` can restrict which texts/metadata are
+    /// considered; pass `Default::default()` for no filtering.
     pub fn classify_with_metadata(
         &self,
+        text: &str,
         embedding: &[f32],
         metadata: &ClassificationMetadata,
         filter: &MetadataFilter,
@@ -483,7 +486,7 @@ impl CellClassifier {
         }
 
         Some(ClassifiedSentence {
-            text: "classified text".to_string(), // TODO: pass text in future
+            text: text.to_string(),
             cell: (top.domain.clone(), top.mode.clone()),
             metadata: metadata.clone(),
             confidence: top.score,
@@ -714,6 +717,28 @@ mod tests {
         for w in results.windows(2) {
             assert!(w[0].score >= w[1].score);
         }
+    }
+
+    /// `ClassifiedSentence::text` used to be the literal "classified text", so a
+    /// caller that recorded the sentence lost the input it classified.
+    #[test]
+    fn metadata_classification_keeps_the_input_text() {
+        let clf = CellClassifier {
+            cells: vec![cell("A", "X", vec![basis(4, 0)])],
+        };
+        let sentence = clf
+            .classify_with_metadata(
+                "spindle bearing seizure",
+                &basis(4, 0),
+                &ClassificationMetadata::default(),
+                &MetadataFilter::default(),
+            )
+            .expect("a populated cell must classify");
+        assert_eq!(sentence.text, "spindle bearing seizure");
+        assert_eq!(
+            (sentence.cell.0.as_str(), sentence.cell.1.as_str()),
+            ("A", "X")
+        );
     }
 
     #[test]
