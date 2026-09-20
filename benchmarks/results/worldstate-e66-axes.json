@@ -1,152 +1,98 @@
 [
   {
     "axis": "full",
-    "classes": 70,
-    "classes_above_null": 49,
-    "classes_failing": 8,
-    "fitness": 0.4377565085887909,
-    "null": 0.03795486316084862,
+    "classes": 45,
+    "classes_above_null": 29,
+    "classes_failing": 1,
+    "fitness": 0.4759206771850586,
+    "null": 0.06355524808168411,
     "per_class": [
       {
-        "class": "BOND/BRAINSTORM",
-        "fitness": 0.0,
-        "n": 1,
-        "null": 0.0
+        "class": "BOND/COGNITION",
+        "fitness": 0.4285714328289032,
+        "n": 7,
+        "null": 0.006428571883589029
+      },
+      {
+        "class": "BOND/COMMUNICATION",
+        "fitness": 0.6785714030265808,
+        "n": 28,
+        "null": 0.03357143700122833
       },
       {
         "class": "BOND/CREATE",
-        "fitness": 0.2777777910232544,
+        "fitness": 0.3333333432674408,
         "n": 18,
-        "null": 0.022777777165174484
-      },
-      {
-        "class": "BOND/DESTROY",
-        "fitness": 0.0,
-        "n": 1,
-        "null": 0.0
-      },
-      {
-        "class": "BOND/GUIDE",
-        "fitness": 0.25,
-        "n": 8,
-        "null": 0.013749999925494194
-      },
-      {
-        "class": "BOND/LEARN",
-        "fitness": 0.75,
-        "n": 4,
-        "null": 0.0024999999441206455
-      },
-      {
-        "class": "BOND/LIFT",
-        "fitness": 0.6666666865348816,
-        "n": 3,
-        "null": 0.006666666828095913
+        "null": 0.025555551052093506
       },
       {
         "class": "BOND/MAINTAIN",
-        "fitness": 0.06666667014360428,
+        "fitness": 0.13333334028720856,
         "n": 15,
-        "null": 0.014666668139398098
+        "null": 0.02199999801814556
       },
       {
-        "class": "BOND/MOVE",
-        "fitness": 0.800000011920929,
-        "n": 10,
-        "null": 0.014499999582767487
+        "class": "BOND/MOTION",
+        "fitness": 0.695652186870575,
+        "n": 23,
+        "null": 0.039130453020334244
       },
       {
-        "class": "BOND/PLAN",
-        "fitness": 0.25,
-        "n": 4,
-        "null": 0.008750000037252903
-      },
-      {
-        "class": "BOND/PLAY",
+        "class": "BOND/POSSESS",
         "fitness": 0.0,
-        "n": 3,
-        "null": 0.0016666667070239782
+        "n": 1,
+        "null": 0.0
       },
       {
         "class": "BOND/REST",
         "fitness": 0.800000011920929,
         "n": 5,
-        "null": 0.0020000000949949026
+        "null": 0.009000000543892384
       },
       {
-        "class": "BOND/SENSE",
-        "fitness": 0.0,
-        "n": 3,
-        "null": 0.0
-      },
-      {
-        "class": "BOND/WALK",
-        "fitness": 0.4000000059604645,
-        "n": 10,
-        "null": 0.0075000012293457985
-      },
-      {
-        "class": "BOND/WORK",
-        "fitness": 0.6842105388641357,
-        "n": 19,
-        "null": 0.027631571516394615
-      },
-      {
-        "class": "CONSTRUCT/BRAINSTORM",
+        "class": "BOND/SOCIAL",
         "fitness": 0.0,
         "n": 1,
         "null": 0.0
+      },
+      {
+        "class": "BOND/STATIVE",
+        "fitness": 0.0,
+        "n": 1,
+        "null": 0.0
+      },
+      {
+        "class": "CONSTRUCT/COGNITION",
+        "fitness": 0.550000011920929,
+        "n": 20,
+        "null": 0.02925000712275505
+      },
+      {
+        "class": "CONSTRUCT/COMMUNICATION",
+        "fitness": 0.23529411852359772,
+        "n": 17,
+        "null": 0.025588247925043106
       },
       {
         "class": "CONSTRUCT/CREATE",
-        "fitness": 0.48571428656578064,
+        "fitness": 0.4285714328289032,
         "n": 70,
-        "null": 0.09628575295209885
-      },
-      {
-        "class": "CONSTRUCT/DESTROY",
-        "fitness": 0.0,
-        "n": 1,
-        "null": 0.0
-      },
-      {
-        "class": "CONSTRUCT/GUIDE",
-        "fitness": 0.0,
-        "n": 1,
-        "null": 0.0
-      },
-      {
-        "class": "CONSTRUCT/LEARN",
-        "fitness": 0.4000000059604645,
-        "n": 5,
-        "null": 0.004999999888241291
-      },
-      {
-        "class": "CONSTRUCT/LIFT",
-        "fitness": 1.0,
-        "n": 3,
-        "null": 0.0016666667070239782
+        "null": 0.10085710883140564
       },
       {
         "class": "CONSTRUCT/MAINTAIN",
         "fitness": 0.29629629850387573,
         "n": 27,
-        "null": 0.03370370343327522
+        "null": 0.03759260103106499
       },
       {
-        "class": "CONSTRUCT/MOVE",
-        "fitness": 0.3333333432674408,
-        "n": 3,
-        "null": 0.0016666667070239782
+        "class": "CONSTRUCT/MOTION",
+        "fitness": 0.4000000059604645,
+        "n": 5,
+        "null": 0.009999999776482582
       },
       {
-        "class": "CONSTRUCT/PLAN",
-        "fitness": 0.5625,
-        "n": 16,
-        "null": 0.0234375
-      },
-      {
-        "class": "CONSTRUCT/PLAY",
+        "class": "CONSTRUCT/POSSESS",
         "fitness": 0.0,
         "n": 1,
         "null": 0.0
@@ -155,415 +101,289 @@
         "class": "CONSTRUCT/REST",
         "fitness": 0.5,
         "n": 6,
-        "null": 0.0033333334140479565
+        "null": 0.004999999888241291
       },
       {
-        "class": "CONSTRUCT/SENSE",
-        "fitness": 0.4000000059604645,
-        "n": 10,
-        "null": 0.017000000923871994
-      },
-      {
-        "class": "CONSTRUCT/WALK",
+        "class": "CONSTRUCT/SOCIAL",
         "fitness": 0.0,
         "n": 1,
         "null": 0.0
       },
       {
-        "class": "CONSTRUCT/WORK",
-        "fitness": 0.125,
-        "n": 8,
-        "null": 0.008124999701976776
-      },
-      {
-        "class": "FABRICATE/BRAINSTORM",
+        "class": "CONSTRUCT/STATIVE",
         "fitness": 0.0,
         "n": 1,
         "null": 0.0
+      },
+      {
+        "class": "FABRICATE/COGNITION",
+        "fitness": 0.380952388048172,
+        "n": 21,
+        "null": 0.028333337977528572
+      },
+      {
+        "class": "FABRICATE/COMMUNICATION",
+        "fitness": 0.5,
+        "n": 78,
+        "null": 0.10307694226503372
       },
       {
         "class": "FABRICATE/CREATE",
         "fitness": 0.19230769574642181,
         "n": 26,
-        "null": 0.034807704389095306
-      },
-      {
-        "class": "FABRICATE/DESTROY",
-        "fitness": 0.6666666865348816,
-        "n": 3,
-        "null": 0.0016666667070239782
-      },
-      {
-        "class": "FABRICATE/GUIDE",
-        "fitness": 0.0,
-        "n": 1,
-        "null": 0.0
-      },
-      {
-        "class": "FABRICATE/LEARN",
-        "fitness": 0.75,
-        "n": 8,
-        "null": 0.008124999701976776
-      },
-      {
-        "class": "FABRICATE/LIFT",
-        "fitness": 0.0,
-        "n": 1,
-        "null": 0.0
+        "null": 0.03634615242481232
       },
       {
         "class": "FABRICATE/MAINTAIN",
-        "fitness": 0.4000000059604645,
-        "n": 5,
-        "null": 0.00800000037997961
+        "fitness": 0.4285714328289032,
+        "n": 7,
+        "null": 0.002857143059372902
       },
       {
-        "class": "FABRICATE/MOVE",
-        "fitness": 0.5,
-        "n": 8,
-        "null": 0.0062500000931322575
+        "class": "FABRICATE/MOTION",
+        "fitness": 0.3333333432674408,
+        "n": 18,
+        "null": 0.020833337679505348
       },
       {
-        "class": "FABRICATE/PLAN",
-        "fitness": 0.2142857164144516,
-        "n": 14,
-        "null": 0.015714282169938087
-      },
-      {
-        "class": "FABRICATE/PLAY",
+        "class": "FABRICATE/POSSESS",
         "fitness": 0.0,
-        "n": 3,
-        "null": 0.0016666667070239782
+        "n": 1,
+        "null": 0.0
       },
       {
         "class": "FABRICATE/REST",
         "fitness": 0.4285714328289032,
         "n": 7,
-        "null": 0.012142857536673546
+        "null": 0.012142855674028397
       },
       {
-        "class": "FABRICATE/SENSE",
-        "fitness": 0.4117647111415863,
-        "n": 17,
-        "null": 0.0179411843419075
-      },
-      {
-        "class": "FABRICATE/WALK",
-        "fitness": 0.3333333432674408,
-        "n": 9,
-        "null": 0.008888890035450459
-      },
-      {
-        "class": "FABRICATE/WORK",
-        "fitness": 0.4838709533214569,
-        "n": 62,
-        "null": 0.0840323194861412
-      },
-      {
-        "class": "HEAL/BRAINSTORM",
+        "class": "FABRICATE/SOCIAL",
         "fitness": 0.0,
         "n": 1,
         "null": 0.0
       },
       {
-        "class": "HEAL/CREATE",
-        "fitness": 0.6666666865348816,
-        "n": 3,
-        "null": 0.0033333334140479565
+        "class": "FABRICATE/STATIVE",
+        "fitness": 0.0,
+        "n": 1,
+        "null": 0.0
       },
       {
-        "class": "HEAL/DESTROY",
+        "class": "HEAL/COGNITION",
+        "fitness": 0.875,
+        "n": 8,
+        "null": 0.008750000037252903
+      },
+      {
+        "class": "HEAL/COMMUNICATION",
+        "fitness": 0.48571428656578064,
+        "n": 35,
+        "null": 0.05257145315408707
+      },
+      {
+        "class": "HEAL/CREATE",
         "fitness": 0.0,
         "n": 3,
         "null": 0.0016666667070239782
       },
       {
-        "class": "HEAL/GUIDE",
+        "class": "HEAL/MAINTAIN",
+        "fitness": 0.29629629850387573,
+        "n": 27,
+        "null": 0.03481481596827507
+      },
+      {
+        "class": "HEAL/MOTION",
+        "fitness": 0.6153846383094788,
+        "n": 26,
+        "null": 0.039230767637491226
+      },
+      {
+        "class": "HEAL/POSSESS",
         "fitness": 0.0,
         "n": 1,
         "null": 0.0
       },
       {
-        "class": "HEAL/LEARN",
-        "fitness": 0.8333333134651184,
-        "n": 6,
-        "null": 0.01666666939854622
-      },
-      {
-        "class": "HEAL/LIFT",
-        "fitness": 0.4000000059604645,
-        "n": 5,
-        "null": 0.007000000681728125
-      },
-      {
-        "class": "HEAL/MAINTAIN",
-        "fitness": 0.2800000011920929,
-        "n": 25,
-        "null": 0.03299998119473457
-      },
-      {
-        "class": "HEAL/MOVE",
-        "fitness": 0.2857142984867096,
-        "n": 7,
-        "null": 0.005714286118745804
-      },
-      {
-        "class": "HEAL/PLAN",
-        "fitness": 0.6666666865348816,
-        "n": 3,
-        "null": 0.0
-      },
-      {
-        "class": "HEAL/PLAY",
-        "fitness": 0.5714285969734192,
-        "n": 7,
-        "null": 0.005714286118745804
-      },
-      {
         "class": "HEAL/REST",
-        "fitness": 0.75,
+        "fitness": 0.625,
         "n": 8,
-        "null": 0.012500000186264515
+        "null": 0.005625000223517418
       },
       {
-        "class": "HEAL/SENSE",
-        "fitness": 0.5,
-        "n": 22,
-        "null": 0.033181801438331604
-      },
-      {
-        "class": "HEAL/WALK",
-        "fitness": 0.4000000059604645,
-        "n": 10,
-        "null": 0.010500000789761543
-      },
-      {
-        "class": "HEAL/WORK",
-        "fitness": 0.5,
-        "n": 14,
-        "null": 0.019999995827674866
-      },
-      {
-        "class": "STUDY/BRAINSTORM",
-        "fitness": 0.25,
-        "n": 4,
+        "class": "HEAL/SOCIAL",
+        "fitness": 0.0,
+        "n": 1,
         "null": 0.0
+      },
+      {
+        "class": "HEAL/STATIVE",
+        "fitness": 0.0,
+        "n": 1,
+        "null": 0.0
+      },
+      {
+        "class": "STUDY/COGNITION",
+        "fitness": 0.5128205418586731,
+        "n": 39,
+        "null": 0.053205154836177826
+      },
+      {
+        "class": "STUDY/COMMUNICATION",
+        "fitness": 0.6388888955116272,
+        "n": 108,
+        "null": 0.15138883888721466
       },
       {
         "class": "STUDY/CREATE",
         "fitness": 0.20000000298023224,
         "n": 5,
-        "null": 0.004999999888241291
-      },
-      {
-        "class": "STUDY/DESTROY",
-        "fitness": 0.0,
-        "n": 1,
         "null": 0.0
-      },
-      {
-        "class": "STUDY/GUIDE",
-        "fitness": 0.5,
-        "n": 8,
-        "null": 0.006874999962747097
-      },
-      {
-        "class": "STUDY/LEARN",
-        "fitness": 0.5428571701049805,
-        "n": 35,
-        "null": 0.048285745084285736
-      },
-      {
-        "class": "STUDY/LIFT",
-        "fitness": 0.6666666865348816,
-        "n": 6,
-        "null": 0.004999999888241291
       },
       {
         "class": "STUDY/MAINTAIN",
         "fitness": 0.800000011920929,
         "n": 10,
-        "null": 0.005000000819563866
+        "null": 0.013000000268220901
       },
       {
-        "class": "STUDY/MOVE",
-        "fitness": 0.3333333432674408,
-        "n": 3,
-        "null": 0.0033333334140479565
+        "class": "STUDY/MOTION",
+        "fitness": 0.3076923191547394,
+        "n": 13,
+        "null": 0.021538468077778816
       },
       {
-        "class": "STUDY/PLAN",
+        "class": "STUDY/POSSESS",
         "fitness": 0.0,
-        "n": 5,
-        "null": 0.00800000037997961
-      },
-      {
-        "class": "STUDY/PLAY",
-        "fitness": 0.0,
-        "n": 4,
-        "null": 0.0062500000931322575
+        "n": 1,
+        "null": 0.0
       },
       {
         "class": "STUDY/REST",
         "fitness": 0.8181818127632141,
         "n": 11,
-        "null": 0.016818182542920113
+        "null": 0.014545452781021595
       },
       {
-        "class": "STUDY/SENSE",
-        "fitness": 0.4893617033958435,
-        "n": 47,
-        "null": 0.060744695365428925
-      },
-      {
-        "class": "STUDY/WALK",
+        "class": "STUDY/SOCIAL",
         "fitness": 0.0,
-        "n": 3,
-        "null": 0.0033333334140479565
+        "n": 1,
+        "null": 0.0
       },
       {
-        "class": "STUDY/WORK",
-        "fitness": 0.48076921701431274,
-        "n": 52,
-        "null": 0.0701923817396164
+        "class": "STUDY/STATIVE",
+        "fitness": 0.0,
+        "n": 1,
+        "null": 0.0
       }
     ],
-    "ratio": 11.533607482910156
+    "ratio": 7.488298416137695
   },
   {
     "axis": "domain",
     "classes": 5,
     "classes_above_null": 5,
     "classes_failing": 0,
-    "fitness": 0.6716826558113098,
-    "null": 0.2091381698846817,
+    "fitness": 0.6388102173805237,
+    "null": 0.21039657294750214,
     "per_class": [
       {
         "class": "BOND",
-        "fitness": 0.7307692170143127,
-        "n": 104,
-        "null": 0.13673080503940582
+        "fitness": 0.7070707082748413,
+        "n": 99,
+        "null": 0.1407071053981781
       },
       {
         "class": "CONSTRUCT",
-        "fitness": 0.5424836874008179,
-        "n": 153,
-        "null": 0.20784305036067963
+        "fitness": 0.5067567825317383,
+        "n": 148,
+        "null": 0.20804069936275482
       },
       {
         "class": "FABRICATE",
-        "fitness": 0.6484848260879517,
-        "n": 165,
-        "null": 0.2234850376844406
+        "fitness": 0.612500011920929,
+        "n": 160,
+        "null": 0.2210000604391098
       },
       {
         "class": "HEAL",
-        "fitness": 0.695652186870575,
-        "n": 115,
-        "null": 0.1592608094215393
+        "fitness": 0.6727272868156433,
+        "n": 110,
+        "null": 0.15509092807769775
       },
       {
         "class": "STUDY",
-        "fitness": 0.7474226951599121,
-        "n": 194,
-        "null": 0.2663401961326599
+        "fitness": 0.7089946866035461,
+        "n": 189,
+        "null": 0.27195730805397034
       }
     ],
-    "ratio": 3.211669445037842
+    "ratio": 3.036219596862793
   },
   {
     "axis": "mode",
-    "classes": 14,
-    "classes_above_null": 14,
+    "classes": 9,
+    "classes_above_null": 9,
     "classes_failing": 0,
-    "fitness": 0.5362517237663269,
-    "null": 0.12112171947956085,
+    "fitness": 0.6133144497871399,
+    "null": 0.21778333187103271,
     "per_class": [
       {
-        "class": "BRAINSTORM",
-        "fitness": 0.5,
-        "n": 8,
-        "null": 0.005625000223517418
+        "class": "COGNITION",
+        "fitness": 0.621052622795105,
+        "n": 95,
+        "null": 0.12899993360042572
+      },
+      {
+        "class": "COMMUNICATION",
+        "fitness": 0.6804511547088623,
+        "n": 266,
+        "null": 0.36936065554618835
       },
       {
         "class": "CREATE",
-        "fitness": 0.5081967115402222,
+        "fitness": 0.4836065471172333,
         "n": 122,
-        "null": 0.1665983945131302
-      },
-      {
-        "class": "DESTROY",
-        "fitness": 0.4444444477558136,
-        "n": 9,
-        "null": 0.01055555697530508
-      },
-      {
-        "class": "GUIDE",
-        "fitness": 0.5789473652839661,
-        "n": 19,
-        "null": 0.02315790019929409
-      },
-      {
-        "class": "LEARN",
-        "fitness": 0.6724137663841248,
-        "n": 58,
-        "null": 0.08267241716384888
-      },
-      {
-        "class": "LIFT",
-        "fitness": 0.7222222089767456,
-        "n": 18,
-        "null": 0.022777779027819633
+        "null": 0.1693442463874817
       },
       {
         "class": "MAINTAIN",
-        "fitness": 0.39024388790130615,
-        "n": 82,
-        "null": 0.11152441799640656
+        "fitness": 0.41860464215278625,
+        "n": 86,
+        "null": 0.12052320688962936
       },
       {
-        "class": "MOVE",
-        "fitness": 0.6451612710952759,
-        "n": 31,
-        "null": 0.03887094184756279
+        "class": "MOTION",
+        "fitness": 0.6352941393852234,
+        "n": 85,
+        "null": 0.11958828568458557
       },
       {
-        "class": "PLAN",
-        "fitness": 0.4523809552192688,
-        "n": 42,
-        "null": 0.059642814099788666
-      },
-      {
-        "class": "PLAY",
-        "fitness": 0.4444444477558136,
-        "n": 18,
-        "null": 0.023055559024214745
+        "class": "POSSESS",
+        "fitness": 1.0,
+        "n": 5,
+        "null": 0.00800000037997961
       },
       {
         "class": "REST",
         "fitness": 0.7837837934494019,
         "n": 37,
-        "null": 0.05148652568459511
+        "null": 0.05256761610507965
       },
       {
-        "class": "SENSE",
-        "fitness": 0.5454545617103577,
-        "n": 99,
-        "null": 0.1352020502090454
+        "class": "SOCIAL",
+        "fitness": 1.0,
+        "n": 5,
+        "null": 0.010999999940395355
       },
       {
-        "class": "WALK",
-        "fitness": 0.3636363744735718,
-        "n": 33,
-        "null": 0.04015148803591728
-      },
-      {
-        "class": "WORK",
-        "fitness": 0.5483871102333069,
-        "n": 155,
-        "null": 0.20996788144111633
+        "class": "STATIVE",
+        "fitness": 1.0,
+        "n": 5,
+        "null": 0.004000000189989805
       }
     ],
-    "ratio": 4.4273786544799805
+    "ratio": 2.8161680698394775
   }
 ]
