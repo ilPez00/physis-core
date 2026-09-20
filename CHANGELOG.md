@@ -6,42 +6,26 @@ history.
 
 ## 0.1.26 (unreleased)
 
-### Added — workspace interface (`system`) and its terminal UI
+### Changed — Core is the austere engine
 
-- **`physis system`** (`system.rs`, `system_cli.rs`): one `Workspace` service
-  behind a human CLI, a versioned JSON contract (`physis.system.v1`) and a
-  folder snapshot — `capabilities · inspect · list · find · pack · read ·
-  history · remember · run · export`. Lexical BM25 and the existing observation
-  log; no model, no licence, no inferred intent. Read-only queries do not create
-  a state store.
-- **`pack`**: token-budgeted context assembly. 40-line windows ranked by BM25
-  (files shortlisted first, because BM25 rewards short documents and one-line
-  files otherwise outrank real functions), greedily packed under `--budget`,
-  each chunk carrying `path:start-end`. One-window gaps inside a file are
-  bridged during selection.
-- **`read`** accepts `path:start-end` and any unambiguous file-ID prefix; an
-  ambiguous prefix is an error rather than a silent first match.
-- **`physis-system-tui`** (feature `tui`): the same service with mouse and
-  keyboard navigation, a results list, a line-numbered viewer and a command box.
-  Reader only — `remember`, `run` and `export` are not bound to any key.
+- **Product modules retired from Core.** The workspace service (`system*`), the
+  workspace TUI, the studio web app, the personal importers
+  (`history`/`vault`/`praxis`), the quality feedback tracker, the notebook, the
+  oracle leg, action execution and edition detection moved to `physis-pro` by
+  relocation, not deletion. Core keeps the observation/evidence primitives,
+  retrieval, the structural map, classification and the matched-null harness.
+  See `MOVED_TO_PRODUCT.md` for the destination map and
+  `docs/CORE_AUSTERITY_AUDIT.md` for the rule applied per capability.
+- **Default features are `cli` only** (`embed-onnx` optional). The `studio`
+  feature and its `axum`/`tokio` dependencies are gone: Core ships no HTTP
+  server, no GUI and no TUI. The `physis` front door moved to the product with
+  edition detection.
 
-Measured against the shell commands an agent would otherwise run (cl100k over
-captured output, trees of 147/194/2456 documents): the packed errand costs 6051
-tokens at 5/5 answers-in-context against 14179 at 5/5 for `grep … | head` then
-`cat`, and per-operation totals moved from 7014 (a loss) to 3052 against the
-shell's 4639 after file IDs were abbreviated in displays. Harnesses and results
-live in the Pro workspace under `benchmarks/system-interface/`.
+### Changed — the semiotic grid: nine owned modes
 
-### Fixed
-
-- The `studio` feature gate sat on `ModelCmd` rather than on `run_studio`, so a
-  `--no-default-features --features cli` build failed.
-
-### Added — `physis-world` and the worldstate program
-
-- See the commit history for E55-E66: log-ordered world states, entity-linked
-  retrieval reported beside the order-blind arm, and set-operation transition
-  labels against a shuffled-order null.
+- **The mode axis is reworked to nine owned modes** and the 35 ontology packs
+  are migrated to that axis. The grid contract is `docs/GRID_AXES.md`; grid
+  content is research data, not API.
 
 ## 0.1.24
 
