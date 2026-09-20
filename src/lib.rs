@@ -271,7 +271,7 @@ pub use process::{
     ProcessMeasurement, ProcessOutcome, ProcessPlan, ProcessResource, ProcessState, ProcessTask,
     StateTransition, TaskState,
 };
-pub use provenance::{ProvenanceChain, ProvenanceLink};
+pub use provenance::{ChainIntegrity, ProvenanceChain, ProvenanceLink};
 pub use rag::{count_tokens, RagChunk, RagCorpus, RetrievalResult, TokenFixedRetriever};
 pub use relation::{RelationType, TypedEdge};
 pub use temporal::TemporalValidity;

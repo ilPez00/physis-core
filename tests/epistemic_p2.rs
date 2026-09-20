@@ -157,3 +157,32 @@ fn trail_serialises_with_g3_fields_and_reads_old_json() {
     assert!(legacy.events[0].asserted_at.is_none());
     assert!(legacy.watermarks.is_empty());
 }
+
+/// A4: a tampered provenance link is caught at its sequence coordinate.
+#[test]
+fn ledger_tamper_breaks_chain_at_sequence() {
+    use physis_core::provenance::{ChainIntegrity, ProvenanceChain, ProvenanceLink};
+
+    let mut chain = ProvenanceChain::new();
+    chain.add_link(ProvenanceLink::new("bearing is degrading", "maintenance_log.txt"));
+    chain.add_link(ProvenanceLink::new("vibration rose 12%", "sensor_01"));
+    chain.add_link(ProvenanceLink::new("schedule maintenance", "planner"));
+    assert_eq!(chain.verify(), ChainIntegrity::Sealed);
+
+    // A field edit after sealing breaks at that link, not later.
+    chain.links[1].claim = "vibration fell 12%".to_string();
+    assert_eq!(chain.verify(), ChainIntegrity::Broken { first: 1 });
+
+    // Re-sealing an intended edit restores integrity.
+    chain.seal();
+    assert_eq!(chain.verify(), ChainIntegrity::Sealed);
+
+    // The first link is a coordinate too.
+    chain.links[0].source = "attacker".to_string();
+    assert_eq!(chain.verify(), ChainIntegrity::Broken { first: 0 });
+
+    // A legacy chain with no hashes is unsealed, never reported as tampered.
+    let mut legacy = ProvenanceChain::new();
+    legacy.links.push(ProvenanceLink::new("old claim", "old source"));
+    assert_eq!(legacy.verify(), ChainIntegrity::Unsealed { first: 0 });
+}
