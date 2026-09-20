@@ -56,17 +56,17 @@ the semantic self-test by design, and says so on stderr.
 ### Run it (one command, fully offline)
 
 ```sh
-# Answers from your documents, with citations that cannot be invented:
-physis-core notebook --corpus ./my-docs --query "what changed in the spec" --budget 400
-
-# Let the table draft and spend a model only on the gaps:
-physis-core notebook --corpus ./my-docs --query "..." --draft
+# Fixed-budget structural context over your documents, compression measured:
+physis-core context --corpus ./my-docs --query "what changed in the spec" --budget 400
 
 physis-core demo --dir examples/demo-corpus --query "the pump"
 physis-core context --corpus examples/demo-corpus --query "what maintenance is scheduled" --budget 400
 physis-core benchmark
-physis-core studio --port 3000
 ```
+
+> The interactive notebook, studio UI and personal importers moved to
+> `physis-pro`. See [`MOVED_TO_PRODUCT.md`](MOVED_TO_PRODUCT.md) for the
+> destination of every module that left Core.
 
 ### The three demonstrations
 1. **Difference & Repetition** — a corpus collapses into a structural map:
@@ -125,7 +125,6 @@ Full playbooks in [`DEMO.md`](DEMO.md) and [`SHIP_PLAN.md`](SHIP_PLAN.md).
   - [4. Token-Fixed Budget RAG](#4-token-fixed-budget-rag)
   - [5. Unsupervised Ontology Gap Discovery](#5-unsupervised-ontology-gap-discovery)
 - [CLI Reference](#cli-reference)
-- [Embedded Studio Web Workbench](#embedded-studio-web-workbench)
 - [Publishing to Crates.io & Integration](#publishing-to-cratesio--integration)
 - [License](#license)
 
@@ -156,13 +155,12 @@ Mainstream AI knowledge graphs, retrieval pipelines, and vector databases operat
 | Feature | Description | Implementation |
 |---|---|---|
 | **Competing Hypotheses** | Parallel candidate interpretations with explicit assumption tracking, prediction verification, and Bayes-like survival. | `physis_core::hypothesis` |
-| **Semiotic Grid (5×14)** | 70 canonical axes mapping 5 philosophical domains across 14 operational modes with sub-domain facets. | `physis_core::classify` |
+| **Semiotic Grid (5×9)** | 45 canonical axes in the default pack: 5 domains across 9 operational modes, with sub-domain facets. The domain axis is open and the mode axis was reworked from 14 to 9 on 2026-09-19. | `physis_core::classify` |
 | **Truth Maintenance System** | Explicit conflict modeling between contradictory claims with confidence-weighted tension and contextual override. | `physis_core::contradiction` |
 | **Epistemic Audit & Time Machine** | Cryptographically chained audit stream with point-in-time state reconstruction. | `physis_core::epistemic` |
 | **Structured Explanations** | Generation of structured reports detailing supporting/contradicting evidence, historical precedents, and fitness breakdowns. | `physis_core::explanation` |
 | **Ontology Gap Discovery** | Unsupervised semantic clustering over unclassified text to propose new domain/mode entries automatically. | `physis_core::discovery` |
 | **Fixed-Token Budget RAG** | Strict token-budget bounded recall with Maximal Marginal Relevance (MMR) diversity discounting. | `physis_core::rag` |
-| **Vault & History Ingest** | Extract structured knowledge nodes from Markdown vaults, Git history, Netscape bookmarks, browser history, and OPML feeds. | `physis_core::vault`, `physis_core::history` |
 | **Exchange-Parts Node Editing** | Swap node content while preserving ID, verdict, edges, and provenance (`cell_pin` hybrid semantics). | `physis_core::core` |
 
 ---
@@ -174,14 +172,14 @@ Mainstream AI knowledge graphs, retrieval pipelines, and vector databases operat
 | Dimension | `physis-core` (Open Source Engine) | `physis-pro` (Industrial Suite) |
 |---|---|---|
 | **Primary Focus** | Epistemic truth maintenance, coherence evaluation, competing hypotheses | Industrial shop-floor telemetry, backoffice automation, multi-tenant deployment |
-| **Ontology Engine** | 70 canonical semiotic grid cells (5 Domains × 14 Modes) + 33 domain ontologies | Extended 370+ industrial, machine process, and agent workflow domains |
+| **Ontology Engine** | 45 canonical semiotic grid cells (5 Domains × 9 Modes, default pack) + 33 domain ontologies | Extended 370+ industrial, machine process, and agent workflow domains |
 | **Conflict & Truth** | First-class `Contradiction` tracking, non-destructive polarity, temporal replay | Shop-floor anomaly escalation, quality failure loop, automated arbitration |
 | **State Persistence** | Lean, dependency-light in-memory or single JSON snapshot (`~/.physis-core/`) | High-performance durable Sled DB + Cloud Spanner Graph mirror |
 | **Multi-Tenancy** | Single session / embedded in-process | Isolated per-tenant `RuntimeState` mapped via `X-Physis-User` header |
 | **Hardware & IoT** | Model-agnostic text and vector embeddings | MQTT, Modbus TCP/RTU, Serial, OPC-UA machine adapters |
 | **Multimodal Sensory** | Extensible `VectorEmbed` trait (RandomProjection, ONNX) | Real-time `AuraFrame` sensory bus, Whisper-large voice, CLIP visual features |
 | **LLM Integration** | Token-fixed budget retriever (MMR RAG) | Dynamic LLM Coherence Harness, multi-provider cascade, auto-revision loops |
-| **User Interface** | Lightweight embedded Axum studio (`physis-core studio`) | Full glassmorphic Operations Console, Gantt scheduler, OEE dashboards |
+| **User Interface** | None — Core is a library and a small CLI; the studio moved to `physis-pro` | Full glassmorphic Operations Console, Gantt scheduler, OEE dashboards |
 
 ---
 
@@ -196,8 +194,8 @@ Mainstream AI knowledge graphs, retrieval pipelines, and vector databases operat
                                               │
                                               ▼
 ┌───────────────────────────┐      ┌─────────────────────────────┐      ┌───────────────────────────┐
-│     Semiotic Grid (70)    │ ◄─── │       Cell Classifier       │ ───► │  Unsupervised Discovery   │
-│   5 Domains × 14 Modes    │      │  (Nearest-Centroid Scoring) │      │  (Gap Analysis & Cluster) │
+│     Semiotic Grid (45)    │ ◄─── │       Cell Classifier       │ ───► │  Unsupervised Discovery   │
+│   5 Domains × 9 Modes     │      │  (Nearest-Centroid Scoring) │      │  (Gap Analysis & Cluster) │
 └───────────────────────────┘      └──────────────┬──────────────┘      └───────────────────────────┘
                                                   │
                                                   ▼
@@ -254,17 +252,16 @@ Cross-referenced across **14 Operational Modes**:
 - **`embed_onnx`**: Optional ONNX runtime integration for high-accuracy embedding models (`all-MiniLM-L6-v2`, `bge-small`, etc.).
 - **`epistemic`**: Immutable event sourcing for beliefs, hypothesis states, and temporal replay reconstruction.
 - **`explanation`**: Structured explanatory justifications with supporting/contradicting evidence chains.
-- **`history`**: Multi-format personal history parsers (Netscape HTML bookmarks, Chrome/Firefox JSON history, OPML, chat JSONL).
 - **`hypothesis`**: Competing hypothesis data structures, evidence polarities, and revision histories.
-- **`ontology`**: Embedded loader for 33 built-in domain ontologies (human grid, machine process, AI agents, office operations).
-- **`praxis`**: Behavioral tracking records with success/inert/failure feedback loops.
+- **`ontology`**: Embedded loader for the built-in domain ontologies (human grid, machine process, AI agents, office operations).
 - **`propose`**: Filing **proposal** — learns from filings a person has confirmed and returns the few cells worth looking at first. Top-3 0.712 against a permuted-label null of 0.136. It is triage, not certification; see the status notice.
 - **`process`**: Industrial and operational state machines, task sequences, and cycle tracking; measurements flag their own deviation from a constraint's `[min, max]` band with a normalized 0..1 severity.
 - **`provenance`**: Cryptographic SHA-256 provenance chains connecting source data to final inferences.
-- **`quality`**: Quality feedback tracker with cell-level *and* per-agent penalties/boosts, plus contextual fitness weighting — an agent that keeps producing bad output for a domain gets demoted the same way a cell does.
 - **`rag`**: Fixed-budget token retrievers with BPE-style approximate tokenization and diversity filtering.
-- **`vault`**: Knowledge vault readers for Markdown hierarchies (frontmatter, headings) and Git log streams.
-- **`studio`**: Embedded Axum web server providing an interactive browser UI and RESTful HTTP API.
+
+> The personal importers (`vault`, `history`, `praxis`), the quality feedback
+> tracker, the notebook and the studio UI are not part of Core. They live in
+> `physis-pro`; see [`MOVED_TO_PRODUCT.md`](MOVED_TO_PRODUCT.md).
 
 ---
 
@@ -277,7 +274,7 @@ Add `physis-core` to your `Cargo.toml`:
 # 1. Lean Engine Only (Zero heavy web/ML dependencies)
 physis-core = { version = "0.1", default-features = false }
 
-# 2. Complete Engine + CLI + Embedded Studio UI
+# 2. Complete Engine + CLI
 physis-core = { version = "0.1" }
 
 # 3. Complete Engine + ONNX Real Embeddings Runtime
@@ -289,7 +286,6 @@ physis-core = { version = "0.1", features = ["embed-onnx"] }
 | Feature | Default | Dependencies | Purpose |
 |---|---|---|---|
 | `cli` | **Yes** | `clap` | Standalone CLI binary (`physis-core`) with subcommands. |
-| `studio` | **Yes** | `axum`, `tokio` | Embedded Web GUI workbench and REST API server. |
 | `embed-onnx` | No | `ort`, `tokenizers` | Hardware-accelerated ONNX semantic embeddings. |
 
 ---
@@ -859,11 +855,11 @@ fn main() {
 ### 5. Unsupervised Ontology Gap Discovery
 
 ```rust
-use physis_core::{discover, DiscoveryConfig, RandomProjectionEmbedder, OntologyLoader, PhysisConfig};
+use physis_core::{discover, DiscoveryConfig, RandomProjectionEmbedder, OntologyLoader};
 
 fn main() {
     let embedder = RandomProjectionEmbedder::new(64);
-    let ontology = OntologyLoader::load_all(&PhysisConfig::default());
+    let ontology = OntologyLoader::load_all();
 
     let unmapped_corpus = vec![
         "Quantum qubit decoherence in dilution refrigerator".to_string(),
@@ -914,60 +910,23 @@ fn main() {
 }
 ```
 
-### 7. Per-Agent Quality Tracking
+### 7. Quality feedback (moved to product)
 
-```rust
-use physis_core::{QualityTracker, RandomProjectionEmbedder};
-
-fn main() {
-    let mut quality = QualityTracker::new(Box::new(RandomProjectionEmbedder::new(64)));
-
-    // A cell-level penalty (existing) and an agent-level one (new) are tracked
-    // separately, so a bad agent in an otherwise-healthy domain gets demoted
-    // without punishing every other agent working that cell.
-    quality.report_agent_failure("agent-euclid-worker-3");
-    quality.report_agent_failure("agent-euclid-worker-3");
-    quality.report_agent_success("agent-euclid-worker-3");
-
-    println!(
-        "penalty: {:.2}, boost: {:.2}",
-        quality.agent_penalties.get("agent-euclid-worker-3").copied().unwrap_or(0.0),
-        quality.agent_boosts.get("agent-euclid-worker-3").copied().unwrap_or(0.0),
-    );
-}
-```
+The quality feedback tracker — cell-level and per-agent penalties and boosts —
+is operational learning and lives in `physis-pro`, not Core. See
+[`MOVED_TO_PRODUCT.md`](MOVED_TO_PRODUCT.md). Core keeps the measurement: the
+penalty arithmetic is documented as a research note.
 
 ---
 
 ## CLI Reference
 
-### `physis` — the front door
+### `physis` — the front door (moved to product)
 
-Installing this crate gives you two executables: `physis-core`, the engine CLI,
-and `physis`, a thin front door over whichever Physis edition is present.
-
-```sh
-cargo install physis-core     # installs `physis-core` and `physis`
-physis -h                     # one help screen covering both editions
-```
-
-`physis -h` lists Core's commands and Pro's, marks which side is installed, and
-forwards everything else unchanged — `physis classify …` runs `physis-core`,
-`physis doctor …` runs `physis-pro`. Subcommand `--help`, exit codes and stdio
-are untouched, because the front door `exec`s the target rather than wrapping it.
-Names that exist on both sides (`classify`, `scan`, `discover`, `quality`,
-`facet`) resolve to Core, so they mean the same thing whether or not Pro is
-installed.
-
-```sh
-physis upgrade                # what Pro adds, and where to get it
-physis web                    # serve the Pro dashboards (needs Pro)
-```
-
-Pro is a separate, licensed product. Core does not link it — the two are joined
-at runtime by locating the Pro executable on disk — so Core keeps working, and
-keeps its Apache-2.0 licence, whether or not Pro is there. The studio shows the
-same information under its **Pro / Upgrade** tab, served from `/api/edition`.
+Installing this crate gives you one executable, `physis-core`. The `physis`
+front door — which dispatches between the Core and Pro editions — and the
+edition-detection module behind it moved to `physis-pro` with the rest of the
+product surface. See [`MOVED_TO_PRODUCT.md`](MOVED_TO_PRODUCT.md).
 
 ### `physis-core`
 
@@ -984,7 +943,7 @@ physis-core ontology --search "thermal"
 physis-core facet --lifecycle OPERATE --agency SELF --kind machine
 
 # 4. Corpus Ingestion into Coherence Graph
-physis-core scan /path/to/engineering/vault
+physis-core scan /path/to/engineering/notes
 
 # 5. Coherence Similarity Search
 physis-core search "bearing fatigue" --limit 5
@@ -997,9 +956,6 @@ physis-core dream
 
 # 8. Unsupervised Ontology Gap Discovery
 physis-core discover /path/to/unclassified/notes --min-cluster 3
-
-# 9. Launch the Embedded Studio Web Workbench
-physis-core studio --port 3000 --host 127.0.0.1
 ```
 
 ### `physis-core hypothesis` — the epistemic loop
@@ -1071,24 +1027,15 @@ similarity that means something.
 
 ---
 
-## Embedded Studio Web Workbench
-
-Launch the studio with `physis-core studio --port 3000`:
-
-- **Classify Workbench**: Live multi-cell classification, raw vs quality-penalized score comparisons, nearest entry details, and one-click feedback buttons (`✓ Success` / `✕ Failure`).
-- **Semiotic Heatmap**: Interactive visual grid of the 5 domains × 14 modes with dynamic axis discovery and cell density mapping.
-- **Ontology Editor**: Search, create, and modify domain entries, units, synonyms, and sub-domain facets with instantaneous re-indexing.
-- **Corpus & Coherence Graph**: Browse labeled nodes, examine confidence links, and trigger Dream cycles over dissenting paths.
-- **Gap Discovery Studio**: Run clustering over unmapped document collections and promote discovered domain clusters into first-class ontology nodes with a single click.
-- **Quality & Feedback Matrix**: View active penalties, inspect failure records, and apply boosts to undo historical penalties.
-
-### Environment
+## Environment
 
 | Variable | Default | Effect |
 | --- | --- | --- |
-| `PHYSIS_CORE_DIR` | `$HOME/.physis-core` | State directory for `nodes.json`, `quality.json` and `custom_ontology.json`. The studio and the CLI both resolve the graph through it, which is why `physis-core scan` and the studio see the same nodes; set it to work on a per-project graph, mount a volume in a container, or keep a test run away from your real graph. |
-| `PHYSIS_STUDIO_HOST` | `127.0.0.1` | Bind address. Loopback by default because the ingest and scan routes read arbitrary local paths — only widen it (e.g. `0.0.0.0`) where the port is not publicly reachable. |
+| `PHYSIS_CORE_DIR` | `$HOME/.physis-core` | State directory for the persisted node graph (`nodes.json`) and `custom_ontology.json`. The CLI resolves the graph through it; set it to work on a per-project graph, mount a volume in a container, or keep a test run away from your real graph. |
 | `PHYSIS_EMBEDDER` | auto-detect | `random-projection` selects the deterministic offline embedder: reproducible and coarse, reported as `semantic: false` but *not* as degraded, since it was asked for rather than fallen back to. |
+
+> The embedded studio web workbench moved to `physis-pro`; Core ships no HTTP
+> server. See [`MOVED_TO_PRODUCT.md`](MOVED_TO_PRODUCT.md).
 
 ---
 
@@ -1118,49 +1065,12 @@ cargo publish --package physis-core --dry-run
 
 ## Practical Examples
 
-### Build a Quality Prediction Agent
+### Classify and assert
 
-```rust
-use physis_core::{
-    PhysisCore, RandomProjectionEmbedder, VectorEmbed,
-    quality::QualityTracker,
-    classify::{classify_text, ClassifierConfig},
-    ontology::OntologyLoader,
-    config::PhysisConfig,
-};
-
-fn main() -> anyhow::Result<()> {
-    let embedder = RandomProjectionEmbedder::new(64);
-    let ontology = OntologyLoader::load_all(&PhysisConfig::default());
-    let mut core = PhysisCore::new();
-    core.set_embedder_id("random-projection");
-
-    // Load quality tracker (persisted penalties)
-    let mut quality = QualityTracker::load("~/.physis-core/quality.json")?;
-
-    // Ingest a production defect report
-    let report = "Surface finish degradation on turned parts — chatter marks";
-    let classification = classify_text(report, &ontology, &embedder, &ClassifierConfig::default());
-
-    println!("Top cell: {}×{} ({:.2})", 
-        classification.top_cell.domain, 
-        classification.top_cell.mode, 
-        classification.top_cell.score);
-
-    // Apply quality penalty for this cell (learned from past failures)
-    let penalty = quality.penalty_for_cell(&classification.top_cell.domain, &classification.top_cell.mode);
-    println!("Learned penalty: {:.2}", penalty);
-
-    // Register the defect with asserted failure
-    let node_id = core.register_node_from_text(report, &embedder)?;
-    core.assert_coherence(&node_id, -1.0);
-
-    // Save updated quality tracker
-    quality.save("~/.physis-core/quality.json")?;
-
-    Ok(())
-}
-```
+The runnable examples under [`examples/`](examples/) are the source of truth for
+the current API — `examples/hypothesis_loop.rs` and `examples/linkage_demo.rs`
+both build against the crate this README documents, so a stale snippet cannot
+survive there.
 
 ### Competing Hypotheses for Root Cause Analysis
 
@@ -1269,12 +1179,12 @@ fn main() {
 
 ```rust
 use physis_core::{
-    discover, DiscoveryConfig, RandomProjectionEmbedder, OntologyLoader, PhysisConfig,
+    discover, DiscoveryConfig, RandomProjectionEmbedder, OntologyLoader,
 };
 
 fn main() {
     let embedder = RandomProjectionEmbedder::new(64);
-    let ontology = OntologyLoader::load_all(&PhysisConfig::default());
+    let ontology = OntologyLoader::load_all();
 
     // Unclassified maintenance logs from a new machine type
     let logs = vec![
@@ -1362,7 +1272,7 @@ physis-core ontology --search "seal"
 # Filter by facets (machine process domain)
 physis-core facet --kind machine --lifecycle OPERATE
 
-# Ingest a vault of engineering notes
+# Ingest a folder of engineering notes
 physis-core scan ~/engineering-notes
 
 # Search coherence graph for similar issues
@@ -1377,32 +1287,19 @@ physis-core dream
 # Discover ontology gaps in unclassified logs
 physis-core discover ~/unclassified-logs --min-cluster 3
 
-# Launch embedded studio UI
-physis-core studio --port 3000
-```
-
-### Embedded Studio Web Workbench
-
-```bash
-# Start the studio (feature: studio, enabled by default)
-physis-core studio --port 3000 --host 127.0.0.1
-
-# Open http://127.0.0.1:3000 for:
-# - Classify Workbench: live multi-cell classification with quality penalties
-# - Semiotic Heatmap: interactive 5×14 grid with density mapping
-# - Ontology Editor: create/modify domain entries with instant re-indexing
-# - Corpus & Coherence Graph: browse nodes, examine confidence links
-# - Gap Discovery Studio: cluster unmapped docs → promote to ontology
-# - Quality Matrix: view penalties, inspect failures, apply boosts
+# Inspect the persisted graph
+physis-core snapshot
 ```
 
 ### Environment Variables
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `PHYSIS_CORE_DIR` | `$HOME/.physis-core` | State directory (`nodes.json`, `quality.json`, `custom_ontology.json`) |
-| `PHYSIS_STUDIO_HOST` | `127.0.0.1` | Bind address (loopback by default — scan routes read local paths) |
+| `PHYSIS_CORE_DIR` | `$HOME/.physis-core` | State directory (`nodes.json`, `custom_ontology.json`) |
 | `PHYSIS_EMBEDDER` | auto-detect | `random-projection` for deterministic offline mode |
+
+> The studio UI moved to `physis-pro` — see
+> [`MOVED_TO_PRODUCT.md`](MOVED_TO_PRODUCT.md).
 
 ---
 
