@@ -155,7 +155,7 @@ Mainstream AI knowledge graphs, retrieval pipelines, and vector databases operat
 | Feature | Description | Implementation |
 |---|---|---|
 | **Competing Hypotheses** | Parallel candidate interpretations with explicit assumption tracking, prediction verification, and Bayes-like survival. | `physis_core::hypothesis` |
-| **Semiotic Grid (5×14)** | 70 canonical axes mapping 5 philosophical domains across 14 operational modes with sub-domain facets. | `physis_core::classify` |
+| **Semiotic Grid (5×9)** | 45 canonical axes in the default pack: 5 domains across 9 operational modes, with sub-domain facets. The domain axis is open and the mode axis was reworked from 14 to 9 on 2026-09-19. | `physis_core::classify` |
 | **Truth Maintenance System** | Explicit conflict modeling between contradictory claims with confidence-weighted tension and contextual override. | `physis_core::contradiction` |
 | **Epistemic Audit & Time Machine** | Cryptographically chained audit stream with point-in-time state reconstruction. | `physis_core::epistemic` |
 | **Structured Explanations** | Generation of structured reports detailing supporting/contradicting evidence, historical precedents, and fitness breakdowns. | `physis_core::explanation` |
@@ -172,7 +172,7 @@ Mainstream AI knowledge graphs, retrieval pipelines, and vector databases operat
 | Dimension | `physis-core` (Open Source Engine) | `physis-pro` (Industrial Suite) |
 |---|---|---|
 | **Primary Focus** | Epistemic truth maintenance, coherence evaluation, competing hypotheses | Industrial shop-floor telemetry, backoffice automation, multi-tenant deployment |
-| **Ontology Engine** | 70 canonical semiotic grid cells (5 Domains × 14 Modes) + 33 domain ontologies | Extended 370+ industrial, machine process, and agent workflow domains |
+| **Ontology Engine** | 45 canonical semiotic grid cells (5 Domains × 9 Modes, default pack) + 33 domain ontologies | Extended 370+ industrial, machine process, and agent workflow domains |
 | **Conflict & Truth** | First-class `Contradiction` tracking, non-destructive polarity, temporal replay | Shop-floor anomaly escalation, quality failure loop, automated arbitration |
 | **State Persistence** | Lean, dependency-light in-memory or single JSON snapshot (`~/.physis-core/`) | High-performance durable Sled DB + Cloud Spanner Graph mirror |
 | **Multi-Tenancy** | Single session / embedded in-process | Isolated per-tenant `RuntimeState` mapped via `X-Physis-User` header |
@@ -194,8 +194,8 @@ Mainstream AI knowledge graphs, retrieval pipelines, and vector databases operat
                                               │
                                               ▼
 ┌───────────────────────────┐      ┌─────────────────────────────┐      ┌───────────────────────────┐
-│     Semiotic Grid (70)    │ ◄─── │       Cell Classifier       │ ───► │  Unsupervised Discovery   │
-│   5 Domains × 14 Modes    │      │  (Nearest-Centroid Scoring) │      │  (Gap Analysis & Cluster) │
+│     Semiotic Grid (45)    │ ◄─── │       Cell Classifier       │ ───► │  Unsupervised Discovery   │
+│   5 Domains × 9 Modes     │      │  (Nearest-Centroid Scoring) │      │  (Gap Analysis & Cluster) │
 └───────────────────────────┘      └──────────────┬──────────────┘      └───────────────────────────┘
                                                   │
                                                   ▼

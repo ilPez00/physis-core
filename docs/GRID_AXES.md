@@ -1,5 +1,11 @@
 # The 5 × 14 grid, defined
 
+> **Historical as of 2026-09-19.** The mode axis was reworked from fourteen
+> modes to nine, so the shipping default pack is **5 × 9 = 45 cells** (see
+> `docs/WHAT_PHYSIS_IS.md` §2 and `AGENTS.md`). The **domain axis** below was
+> not reworked and remains current; the fourteen-mode framing is the grid this
+> file was written against.
+
 The classifier is a coordinate system: **5 domains × 14 modes = 70 cells**. The
 mode axis has been documented since it was designed. **The domain axis never
 was** — 730 entries were filed against five words whose meaning was nowhere
