@@ -5,51 +5,96 @@
       "name": "Social Structure",
       "category": "Sociology",
       "domain": "CONSTRUCT",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "hierarchy_index",
-      "unit": "—",
-      "hints": ["class", "hierarchy", "institution", "social position", "role differentiation", "bureaucracy", "status", "social organization"]
+      "unit": "\u2014",
+      "hints": [
+        "class",
+        "hierarchy",
+        "institution",
+        "social position",
+        "role differentiation",
+        "bureaucracy",
+        "status",
+        "social organization"
+      ]
     },
     {
       "name": "Social Stratification",
       "category": "Sociology",
       "domain": "CONSTRUCT",
-      "mode": "LIFT",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "gini_coefficient",
       "unit": "Gini",
-      "hints": ["inequality", "mobility", "caste", "social class", "income disparity", "social closure", "privilege", "intersectionality"]
+      "hints": [
+        "inequality",
+        "mobility",
+        "caste",
+        "social class",
+        "income disparity",
+        "social closure",
+        "privilege",
+        "intersectionality"
+      ]
     },
     {
       "name": "Socialization",
       "category": "Sociology",
       "domain": "BOND",
-      "mode": "LEARN",
+      "mode": "COGNITION",
       "axis_kind": "social",
       "axis_name": "norm_internalization",
-      "unit": "—",
-      "hints": ["norms", "values", "internalization", "enculturation", "social learning", "role acquisition", "identity formation", "social reproduction"]
+      "unit": "\u2014",
+      "hints": [
+        "norms",
+        "values",
+        "internalization",
+        "enculturation",
+        "social learning",
+        "role acquisition",
+        "identity formation",
+        "social reproduction"
+      ]
     },
     {
       "name": "Deviance & Control",
       "category": "Sociology",
       "domain": "HEAL",
-      "mode": "WALK",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "crime_rate",
       "unit": "per 100k",
-      "hints": ["crime", "punishment", "regulation", "labeling", "stigma", "social control", "anomie", "restorative justice"]
+      "hints": [
+        "crime",
+        "punishment",
+        "regulation",
+        "labeling",
+        "stigma",
+        "social control",
+        "anomie",
+        "restorative justice"
+      ]
     },
     {
       "name": "Collective Behavior",
       "category": "Sociology",
       "domain": "FABRICATE",
-      "mode": "WALK",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "mobilization_rate",
       "unit": "%",
-      "hints": ["crowd", "social movement", "fad", "contagion", "collective action", "emergent norm", "framing", "resource mobilization"]
+      "hints": [
+        "crowd",
+        "social movement",
+        "fad",
+        "contagion",
+        "collective action",
+        "emergent norm",
+        "framing",
+        "resource mobilization"
+      ]
     },
     {
       "name": "Social Networks",
@@ -58,8 +103,17 @@
       "mode": "CREATE",
       "axis_kind": "social",
       "axis_name": "centrality",
-      "unit": "—",
-      "hints": ["ties", "centrality", "homophily", "bridging", "bonding", "density", "clustering", "structural hole"]
+      "unit": "\u2014",
+      "hints": [
+        "ties",
+        "centrality",
+        "homophily",
+        "bridging",
+        "bonding",
+        "density",
+        "clustering",
+        "structural hole"
+      ]
     },
     {
       "name": "Social Identity",
@@ -68,18 +122,36 @@
       "mode": "CREATE",
       "axis_kind": "social",
       "axis_name": "identification_strength",
-      "unit": "—",
-      "hints": ["self", "group", "belonging", "ingroup", "outgroup", "social comparison", "collective identity", "identity salience"]
+      "unit": "\u2014",
+      "hints": [
+        "self",
+        "group",
+        "belonging",
+        "ingroup",
+        "outgroup",
+        "social comparison",
+        "collective identity",
+        "identity salience"
+      ]
     },
     {
       "name": "Social Change",
       "category": "Sociology",
       "domain": "FABRICATE",
-      "mode": "WALK",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "modernization_index",
-      "unit": "—",
-      "hints": ["modernization", "revolution", "secularization", "urbanization", "globalization", "social evolution", "path dependence", "transformation"]
+      "unit": "\u2014",
+      "hints": [
+        "modernization",
+        "revolution",
+        "secularization",
+        "urbanization",
+        "globalization",
+        "social evolution",
+        "path dependence",
+        "transformation"
+      ]
     },
     {
       "name": "Cultural Production",
@@ -89,27 +161,54 @@
       "axis_kind": "social",
       "axis_name": "production_output",
       "unit": "units/yr",
-      "hints": ["art", "media", "meaning", "cultural industry", "symbolic goods", "creativity", "taste", "cultural consecration"]
+      "hints": [
+        "art",
+        "media",
+        "meaning",
+        "cultural industry",
+        "symbolic goods",
+        "creativity",
+        "taste",
+        "cultural consecration"
+      ]
     },
     {
       "name": "Cultural Diffusion",
       "category": "Cultural Studies",
       "domain": "BOND",
-      "mode": "WALK",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "adoption_rate",
       "unit": "%",
-      "hints": ["spread", "adaptation", "hybrid", "transmission", "acculturation", "globalization", "cultural flow", "glocalization"]
+      "hints": [
+        "spread",
+        "adaptation",
+        "hybrid",
+        "transmission",
+        "acculturation",
+        "globalization",
+        "cultural flow",
+        "glocalization"
+      ]
     },
     {
       "name": "Cultural Capital",
       "category": "Cultural Studies",
       "domain": "STUDY",
-      "mode": "LEARN",
+      "mode": "COGNITION",
       "axis_kind": "social",
       "axis_name": "cultural_competence",
-      "unit": "—",
-      "hints": ["knowledge", "taste", "credential", "distinction", "habitus", "cultural reproduction", "legitimate culture", "social reproduction"]
+      "unit": "\u2014",
+      "hints": [
+        "knowledge",
+        "taste",
+        "credential",
+        "distinction",
+        "habitus",
+        "cultural reproduction",
+        "legitimate culture",
+        "social reproduction"
+      ]
     },
     {
       "name": "Ritual & Ceremony",
@@ -119,7 +218,16 @@
       "axis_kind": "social",
       "axis_name": "ritual_frequency",
       "unit": "events/yr",
-      "hints": ["rite", "tradition", "performance", "liminality", "rite of passage", "communitas", "sacred", "symbolic action"]
+      "hints": [
+        "rite",
+        "tradition",
+        "performance",
+        "liminality",
+        "rite of passage",
+        "communitas",
+        "sacred",
+        "symbolic action"
+      ]
     },
     {
       "name": "Folklore & Mythology",
@@ -128,18 +236,36 @@
       "mode": "CREATE",
       "axis_kind": "social",
       "axis_name": "motif_frequency",
-      "unit": "—",
-      "hints": ["story", "legend", "archetype", "mytheme", "oral tradition", "folk tale", "symbolic narrative", "collective unconscious"]
+      "unit": "\u2014",
+      "hints": [
+        "story",
+        "legend",
+        "archetype",
+        "mytheme",
+        "oral tradition",
+        "folk tale",
+        "symbolic narrative",
+        "collective unconscious"
+      ]
     },
     {
       "name": "Cultural Hegemony",
       "category": "Cultural Studies",
       "domain": "BOND",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "ideological_consent",
       "unit": "%",
-      "hints": ["domination", "consent", "ideology", "naturalization", "common sense", "cultural leadership", "counter-hegemony", "organic intellectual"]
+      "hints": [
+        "domination",
+        "consent",
+        "ideology",
+        "naturalization",
+        "common sense",
+        "cultural leadership",
+        "counter-hegemony",
+        "organic intellectual"
+      ]
     },
     {
       "name": "Subculture",
@@ -148,8 +274,17 @@
       "mode": "CREATE",
       "axis_kind": "social",
       "axis_name": "scene_density",
-      "unit": "—",
-      "hints": ["alternative", "scene", "identity", "resistance", "bricolage", "style", "spectacular subculture", "neo-tribe"]
+      "unit": "\u2014",
+      "hints": [
+        "alternative",
+        "scene",
+        "identity",
+        "resistance",
+        "bricolage",
+        "style",
+        "spectacular subculture",
+        "neo-tribe"
+      ]
     },
     {
       "name": "Material Culture",
@@ -159,17 +294,35 @@
       "axis_kind": "social",
       "axis_name": "artifact_count",
       "unit": "count",
-      "hints": ["artifact", "object", "technology", "commodity", "consumption", "materiality", "object biography", "assemblage"]
+      "hints": [
+        "artifact",
+        "object",
+        "technology",
+        "commodity",
+        "consumption",
+        "materiality",
+        "object biography",
+        "assemblage"
+      ]
     },
     {
       "name": "Governance",
       "category": "Political Science",
       "domain": "CONSTRUCT",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "governance_effectiveness",
-      "unit": "—",
-      "hints": ["state", "constitution", "administration", "bureaucracy", "rule of law", "institutional capacity", "accountability", "transparency"]
+      "unit": "\u2014",
+      "hints": [
+        "state",
+        "constitution",
+        "administration",
+        "bureaucracy",
+        "rule of law",
+        "institutional capacity",
+        "accountability",
+        "transparency"
+      ]
     },
     {
       "name": "Democracy",
@@ -178,18 +331,36 @@
       "mode": "CREATE",
       "axis_kind": "social",
       "axis_name": "democracy_index",
-      "unit": "—",
-      "hints": ["participation", "representation", "election", "pluralism", "civic engagement", "deliberation", "franchise", "civil society"]
+      "unit": "\u2014",
+      "hints": [
+        "participation",
+        "representation",
+        "election",
+        "pluralism",
+        "civic engagement",
+        "deliberation",
+        "franchise",
+        "civil society"
+      ]
     },
     {
       "name": "Power & Authority",
       "category": "Political Science",
       "domain": "CONSTRUCT",
-      "mode": "LIFT",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "power_concentration",
-      "unit": "—",
-      "hints": ["legitimacy", "sovereignty", "domination", "charisma", "coercion", "legitimate authority", "elite theory", "pluralism"]
+      "unit": "\u2014",
+      "hints": [
+        "legitimacy",
+        "sovereignty",
+        "domination",
+        "charisma",
+        "coercion",
+        "legitimate authority",
+        "elite theory",
+        "pluralism"
+      ]
     },
     {
       "name": "Policy Making",
@@ -199,167 +370,320 @@
       "axis_kind": "social",
       "axis_name": "policy_adoption_rate",
       "unit": "%",
-      "hints": ["legislation", "regulation", "reform", "agenda setting", "implementation", "evaluation", "policy feedback", "interest group"]
+      "hints": [
+        "legislation",
+        "regulation",
+        "reform",
+        "agenda setting",
+        "implementation",
+        "evaluation",
+        "policy feedback",
+        "interest group"
+      ]
     },
     {
       "name": "International Relations",
       "category": "Political Science",
       "domain": "BOND",
-      "mode": "WALK",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "diplomatic_ties",
       "unit": "count",
-      "hints": ["diplomacy", "treaty", "alliance", "sovereignty", "power balance", "international institution", "regime theory", "geopolitics"]
+      "hints": [
+        "diplomacy",
+        "treaty",
+        "alliance",
+        "sovereignty",
+        "power balance",
+        "international institution",
+        "regime theory",
+        "geopolitics"
+      ]
     },
     {
       "name": "Political Economy",
       "category": "Political Science",
       "domain": "FABRICATE",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "market_regulation_index",
-      "unit": "—",
-      "hints": ["market", "state", "regulation", "capitalism", "welfare state", "privatization", "neoliberalism", "political capitalism"]
+      "unit": "\u2014",
+      "hints": [
+        "market",
+        "state",
+        "regulation",
+        "capitalism",
+        "welfare state",
+        "privatization",
+        "neoliberalism",
+        "political capitalism"
+      ]
     },
     {
       "name": "Conflict & Security",
       "category": "Political Science",
       "domain": "HEAL",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "conflict_intensity",
-      "unit": "—",
-      "hints": ["war", "peace", "defense", "deterrence", "security dilemma", "arms race", "peacekeeping", "conflict resolution"]
+      "unit": "\u2014",
+      "hints": [
+        "war",
+        "peace",
+        "defense",
+        "deterrence",
+        "security dilemma",
+        "arms race",
+        "peacekeeping",
+        "conflict resolution"
+      ]
     },
     {
       "name": "Public Opinion",
       "category": "Political Science",
       "domain": "STUDY",
-      "mode": "WALK",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "approval_rate",
       "unit": "%",
-      "hints": ["poll", "attitude", "persuasion", "framing", "polarization", "spiral of silence", "public mood", "elite cue"]
+      "hints": [
+        "poll",
+        "attitude",
+        "persuasion",
+        "framing",
+        "polarization",
+        "spiral of silence",
+        "public mood",
+        "elite cue"
+      ]
     },
     {
       "name": "Microeconomics",
       "category": "Economics",
       "domain": "STUDY",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "price_elasticity",
-      "unit": "—",
-      "hints": ["supply", "demand", "price", "utility", "market equilibrium", "consumer choice", "production function", "elasticity"]
+      "unit": "\u2014",
+      "hints": [
+        "supply",
+        "demand",
+        "price",
+        "utility",
+        "market equilibrium",
+        "consumer choice",
+        "production function",
+        "elasticity"
+      ]
     },
     {
       "name": "Macroeconomics",
       "category": "Economics",
       "domain": "STUDY",
-      "mode": "LEARN",
+      "mode": "COGNITION",
       "axis_kind": "social",
       "axis_name": "gdp_growth_rate",
       "unit": "%",
-      "hints": ["GDP", "inflation", "employment", "aggregate demand", "fiscal policy", "business cycle", "productivity", "national income"]
+      "hints": [
+        "GDP",
+        "inflation",
+        "employment",
+        "aggregate demand",
+        "fiscal policy",
+        "business cycle",
+        "productivity",
+        "national income"
+      ]
     },
     {
       "name": "Labor Economics",
       "category": "Economics",
       "domain": "FABRICATE",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "wage_level",
       "unit": "USD/hr",
-      "hints": ["wage", "productivity", "labor market", "human capital", "minimum wage", "union", "discrimination", "labor supply"]
+      "hints": [
+        "wage",
+        "productivity",
+        "labor market",
+        "human capital",
+        "minimum wage",
+        "union",
+        "discrimination",
+        "labor supply"
+      ]
     },
     {
       "name": "Development Economics",
       "category": "Economics",
       "domain": "CONSTRUCT",
-      "mode": "WALK",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "hdi",
-      "unit": "—",
-      "hints": ["growth", "poverty", "aid", "structural transformation", "inequality", "institutional development", "sustainable development", "capability approach"]
+      "unit": "\u2014",
+      "hints": [
+        "growth",
+        "poverty",
+        "aid",
+        "structural transformation",
+        "inequality",
+        "institutional development",
+        "sustainable development",
+        "capability approach"
+      ]
     },
     {
       "name": "Behavioral Economics",
       "category": "Economics",
       "domain": "BOND",
-      "mode": "LEARN",
+      "mode": "COGNITION",
       "axis_kind": "social",
       "axis_name": "discount_rate",
-      "unit": "—",
-      "hints": ["bias", "nudge", "prospect theory", "heuristic", "framing effect", "loss aversion", "hyperbolic discounting", "bounded rationality"]
+      "unit": "\u2014",
+      "hints": [
+        "bias",
+        "nudge",
+        "prospect theory",
+        "heuristic",
+        "framing effect",
+        "loss aversion",
+        "hyperbolic discounting",
+        "bounded rationality"
+      ]
     },
     {
       "name": "Public Finance",
       "category": "Economics",
       "domain": "CONSTRUCT",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "tax_burden",
       "unit": "% GDP",
-      "hints": ["tax", "spending", "budget", "fiscal policy", "public good", "externalities", "redistribution", "debt sustainability"]
+      "hints": [
+        "tax",
+        "spending",
+        "budget",
+        "fiscal policy",
+        "public good",
+        "externalities",
+        "redistribution",
+        "debt sustainability"
+      ]
     },
     {
       "name": "International Trade",
       "category": "Economics",
       "domain": "BOND",
-      "mode": "WALK",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "trade_balance",
       "unit": "USD",
-      "hints": ["tariff", "export", "globalization", "comparative advantage", "trade agreement", "protectionism", "supply chain", "trade deficit"]
+      "hints": [
+        "tariff",
+        "export",
+        "globalization",
+        "comparative advantage",
+        "trade agreement",
+        "protectionism",
+        "supply chain",
+        "trade deficit"
+      ]
     },
     {
       "name": "Monetary Economics",
       "category": "Economics",
       "domain": "HEAL",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "interest_rate",
       "unit": "%",
-      "hints": ["central bank", "interest", "money", "inflation targeting", "monetary policy", "money supply", "quantitative easing", "seigniorage"]
+      "hints": [
+        "central bank",
+        "interest",
+        "money",
+        "inflation targeting",
+        "monetary policy",
+        "money supply",
+        "quantitative easing",
+        "seigniorage"
+      ]
     },
     {
       "name": "Common Law",
       "category": "Law & Jurisprudence",
       "domain": "CONSTRUCT",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "precedent_weight",
-      "unit": "—",
-      "hints": ["precedent", "case", "doctrine", "stare decisis", "ratio decidendi", "obiter dictum", "common law reasoning", "equity"]
+      "unit": "\u2014",
+      "hints": [
+        "precedent",
+        "case",
+        "doctrine",
+        "stare decisis",
+        "ratio decidendi",
+        "obiter dictum",
+        "common law reasoning",
+        "equity"
+      ]
     },
     {
       "name": "Constitutional Law",
       "category": "Law & Jurisprudence",
       "domain": "CONSTRUCT",
-      "mode": "LIFT",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "rights_coverage",
-      "unit": "—",
-      "hints": ["rights", "framework", "review", "separation of powers", "federalism", "judicial review", "due process", "constitutional interpretation"]
+      "unit": "\u2014",
+      "hints": [
+        "rights",
+        "framework",
+        "review",
+        "separation of powers",
+        "federalism",
+        "judicial review",
+        "due process",
+        "constitutional interpretation"
+      ]
     },
     {
       "name": "Criminal Justice",
       "category": "Law & Jurisprudence",
       "domain": "HEAL",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "recidivism_rate",
       "unit": "%",
-      "hints": ["crime", "procedure", "punishment", "due process", "sentencing", "rehabilitation", "deterrence", "prosecutorial discretion"]
+      "hints": [
+        "crime",
+        "procedure",
+        "punishment",
+        "due process",
+        "sentencing",
+        "rehabilitation",
+        "deterrence",
+        "prosecutorial discretion"
+      ]
     },
     {
       "name": "Contract Law",
       "category": "Law & Jurisprudence",
       "domain": "BOND",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "enforcement_index",
-      "unit": "—",
-      "hints": ["agreement", "obligation", "breach", "consideration", "offer and acceptance", "remedy", "good faith", "privity"]
+      "unit": "\u2014",
+      "hints": [
+        "agreement",
+        "obligation",
+        "breach",
+        "consideration",
+        "offer and acceptance",
+        "remedy",
+        "good faith",
+        "privity"
+      ]
     },
     {
       "name": "Property Law",
@@ -368,78 +692,150 @@
       "mode": "REST",
       "axis_kind": "social",
       "axis_name": "property_rights_index",
-      "unit": "—",
-      "hints": ["ownership", "title", "transfer", "estate", "intellectual property", "easement", "trust", "possession"]
+      "unit": "\u2014",
+      "hints": [
+        "ownership",
+        "title",
+        "transfer",
+        "estate",
+        "intellectual property",
+        "easement",
+        "trust",
+        "possession"
+      ]
     },
     {
       "name": "Human Rights",
       "category": "Law & Jurisprudence",
       "domain": "HEAL",
-      "mode": "LIFT",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "rights_protection_score",
-      "unit": "—",
-      "hints": ["dignity", "freedom", "protection", "universal declaration", "civil liberties", "non-discrimination", "remedy", "proportionality"]
+      "unit": "\u2014",
+      "hints": [
+        "dignity",
+        "freedom",
+        "protection",
+        "universal declaration",
+        "civil liberties",
+        "non-discrimination",
+        "remedy",
+        "proportionality"
+      ]
     },
     {
       "name": "Social Anthropology",
       "category": "Anthropology",
       "domain": "STUDY",
-      "mode": "WALK",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "kinship_depth",
-      "unit": "—",
-      "hints": ["kinship", "marriage", "community", "descent", "affinity", "lineage", "residence pattern", "social organization"]
+      "unit": "\u2014",
+      "hints": [
+        "kinship",
+        "marriage",
+        "community",
+        "descent",
+        "affinity",
+        "lineage",
+        "residence pattern",
+        "social organization"
+      ]
     },
     {
       "name": "Cultural Anthropology",
       "category": "Anthropology",
       "domain": "STUDY",
-      "mode": "LEARN",
+      "mode": "COGNITION",
       "axis_kind": "social",
       "axis_name": "cultural_distance",
-      "unit": "—",
-      "hints": ["belief", "practice", "world view", "ethnography", "participant observation", "cultural relativism", "thick description", "emic etic"]
+      "unit": "\u2014",
+      "hints": [
+        "belief",
+        "practice",
+        "world view",
+        "ethnography",
+        "participant observation",
+        "cultural relativism",
+        "thick description",
+        "emic etic"
+      ]
     },
     {
       "name": "Archaeology",
       "category": "Anthropology",
       "domain": "STUDY",
-      "mode": "WALK",
+      "mode": "MOTION",
       "axis_kind": "social",
       "axis_name": "chronological_depth",
       "unit": "yr BP",
-      "hints": ["artifact", "excavation", "chronology", "stratigraphy", "typology", "radiocarbon dating", "settlement pattern", "material remains"]
+      "hints": [
+        "artifact",
+        "excavation",
+        "chronology",
+        "stratigraphy",
+        "typology",
+        "radiocarbon dating",
+        "settlement pattern",
+        "material remains"
+      ]
     },
     {
       "name": "Linguistic Anthropology",
       "category": "Anthropology",
       "domain": "STUDY",
-      "mode": "LEARN",
+      "mode": "COGNITION",
       "axis_kind": "social",
       "axis_name": "linguistic_diversity",
-      "unit": "—",
-      "hints": ["language", "thought", "culture", "Sapir-Whorf", "discourse", "language ideology", "code-switching", "language change"]
+      "unit": "\u2014",
+      "hints": [
+        "language",
+        "thought",
+        "culture",
+        "Sapir-Whorf",
+        "discourse",
+        "language ideology",
+        "code-switching",
+        "language change"
+      ]
     },
     {
       "name": "Medical Anthropology",
       "category": "Anthropology",
       "domain": "HEAL",
-      "mode": "LEARN",
+      "mode": "COGNITION",
       "axis_kind": "social",
       "axis_name": "healing_efficacy",
-      "unit": "—",
-      "hints": ["healing", "illness", "body", "ethnomedicine", "medical pluralism", "biocultural", "structural violence", "sickness narrative"]
+      "unit": "\u2014",
+      "hints": [
+        "healing",
+        "illness",
+        "body",
+        "ethnomedicine",
+        "medical pluralism",
+        "biocultural",
+        "structural violence",
+        "sickness narrative"
+      ]
     },
     {
       "name": "Economic Anthropology",
       "category": "Anthropology",
       "domain": "FABRICATE",
-      "mode": "WORK",
+      "mode": "COMMUNICATION",
       "axis_kind": "social",
       "axis_name": "exchange_rate",
-      "unit": "—",
-      "hints": ["exchange", "gift", "trade", "reciprocity", "redistribution", "market", "substantivism", "formalist"]
+      "unit": "\u2014",
+      "hints": [
+        "exchange",
+        "gift",
+        "trade",
+        "reciprocity",
+        "redistribution",
+        "market",
+        "substantivism",
+        "formalist"
+      ]
     },
     {
       "name": "Historiography",
@@ -448,18 +844,36 @@
       "mode": "CREATE",
       "axis_kind": "social",
       "axis_name": "narrative_coherence",
-      "unit": "—",
-      "hints": ["method", "narrative", "source", "historical interpretation", "archive", "periodization", "historicism", "counterfactual"]
+      "unit": "\u2014",
+      "hints": [
+        "method",
+        "narrative",
+        "source",
+        "historical interpretation",
+        "archive",
+        "periodization",
+        "historicism",
+        "counterfactual"
+      ]
     },
     {
       "name": "Ethics & Morality",
       "category": "History & Philosophy",
       "domain": "STUDY",
-      "mode": "LEARN",
+      "mode": "COGNITION",
       "axis_kind": "social",
       "axis_name": "moral_judgment",
-      "unit": "—",
-      "hints": ["right", "good", "virtue", "deontology", "consequentialism", "moral particularism", "ethical intuition", "value pluralism"]
+      "unit": "\u2014",
+      "hints": [
+        "right",
+        "good",
+        "virtue",
+        "deontology",
+        "consequentialism",
+        "moral particularism",
+        "ethical intuition",
+        "value pluralism"
+      ]
     },
     {
       "name": "Aesthetics",
@@ -468,18 +882,36 @@
       "mode": "CREATE",
       "axis_kind": "social",
       "axis_name": "aesthetic_value",
-      "unit": "—",
-      "hints": ["beauty", "taste", "judgment", "sublime", "aesthetic experience", "formalism", "expression theory", "institutional theory"]
+      "unit": "\u2014",
+      "hints": [
+        "beauty",
+        "taste",
+        "judgment",
+        "sublime",
+        "aesthetic experience",
+        "formalism",
+        "expression theory",
+        "institutional theory"
+      ]
     },
     {
       "name": "Epistemology",
       "category": "History & Philosophy",
       "domain": "STUDY",
-      "mode": "LEARN",
+      "mode": "COGNITION",
       "axis_kind": "social",
       "axis_name": "justification_strength",
-      "unit": "—",
-      "hints": ["knowledge", "truth", "belief", "justification", "skepticism", "rationalism", "empiricism", "reliabilism"]
+      "unit": "\u2014",
+      "hints": [
+        "knowledge",
+        "truth",
+        "belief",
+        "justification",
+        "skepticism",
+        "rationalism",
+        "empiricism",
+        "reliabilism"
+      ]
     },
     {
       "name": "Metaphysics",
@@ -488,8 +920,17 @@
       "mode": "REST",
       "axis_kind": "social",
       "axis_name": "ontological_commitment",
-      "unit": "—",
-      "hints": ["being", "reality", "substance", "causation", "necessity", "possible world", "identity", "universal"]
+      "unit": "\u2014",
+      "hints": [
+        "being",
+        "reality",
+        "substance",
+        "causation",
+        "necessity",
+        "possible world",
+        "identity",
+        "universal"
+      ]
     },
     {
       "name": "Logic & Argument",
@@ -498,8 +939,17 @@
       "mode": "CREATE",
       "axis_kind": "social",
       "axis_name": "validity_score",
-      "unit": "—",
-      "hints": ["reason", "inference", "fallacy", "deduction", "induction", "abduction", "formal logic", "argumentation theory"]
+      "unit": "\u2014",
+      "hints": [
+        "reason",
+        "inference",
+        "fallacy",
+        "deduction",
+        "induction",
+        "abduction",
+        "formal logic",
+        "argumentation theory"
+      ]
     }
   ]
 }
