@@ -201,6 +201,104 @@ pub fn least_squares_slope(points: &[(f64, f64)]) -> Option<f64> {
     Some((n * sxy - sx * sy) / denom)
 }
 
+/// One graded proposition from an impossible-machine run.
+///
+/// Mirrors the `Proposition` record in
+/// `examples/impossible_machine_experiment.rs` (same field names, same
+/// [`ProofStatus`] grades) so a run artifact deserializes here directly.
+/// Claim and grade travel together — a proposition without a grade is the
+/// shape most numeric pipelines ship and the reason their results cannot
+/// be audited afterwards.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PropositionView {
+    pub id: String,
+    #[serde(default)]
+    pub machines: Vec<String>,
+    pub claim: String,
+    pub status: ProofStatus,
+    #[serde(default)]
+    pub witness: String,
+    #[serde(default)]
+    pub quarantined: bool,
+}
+
+impl PropositionView {
+    /// Does this proposition carry weight? Same rule as [`ProofStatus`]:
+    /// `Heuristic` and `Conjectural` are compatibility and candidacy,
+    /// never certification.
+    pub fn certifies(&self) -> bool {
+        self.status.certifies()
+    }
+}
+
+/// One structural operator's digest from a run artifact: what stance it
+/// took, what it saw (graded), and how it can fail.
+///
+/// Hypotheses and dreams are intentionally not carried: this run's
+/// machine hypothesis lists are empty and dreams live under their own
+/// top-level key. A view that silently re-grades them would be the
+/// duplication trap, not a reader.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MachineDigest {
+    pub name: String,
+    #[serde(default)]
+    pub operation: String,
+    #[serde(default)]
+    pub failure_mode: String,
+    #[serde(default)]
+    pub physis_equivalent: String,
+    #[serde(default)]
+    pub observations: Vec<Observation>,
+}
+
+/// A recorded disagreement between two machines. Their disagreement is
+/// data (mission first principle), so it is carried, never merged.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DisagreementView {
+    pub a: String,
+    pub b: String,
+    pub subject: String,
+    pub a_claim: String,
+    pub b_claim: String,
+}
+
+/// The display subset of a `results.json` run artifact: graded machines,
+/// propositions, disagreements, and the verdict. Field renames match the
+/// artifact keys (`machine_reports`, not `machines`); everything has a
+/// default so a partial artifact still loads what it has.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ImpossibleReport {
+    #[serde(default, rename = "machine_reports")]
+    pub machines: Vec<MachineDigest>,
+    #[serde(default)]
+    pub propositions: Vec<PropositionView>,
+    #[serde(default)]
+    pub disagreements: Vec<DisagreementView>,
+    #[serde(default)]
+    pub verdict: String,
+    #[serde(default)]
+    pub verdict_witness: String,
+}
+
+impl ImpossibleReport {
+    /// Load a run artifact. `Err` is a plain string: a missing or broken
+    /// artifact is a display gap, never a reason to invent numbers.
+    pub fn load(path: &std::path::Path) -> Result<Self, String> {
+        let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        serde_json::from_slice(&bytes).map_err(|e| format!("{}: {e}", path.display()))
+    }
+
+    /// Graded observations across all machines (quantity + status together).
+    pub fn observations(&self) -> impl Iterator<Item = &Observation> {
+        self.machines.iter().flat_map(|m| m.observations.iter())
+    }
+
+    /// Observations that carry weight (see [`ProofStatus::certifies`]).
+    pub fn certified_observations(&self) -> impl Iterator<Item = &Observation> {
+        self.observations().filter(|o| o.certifies())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,5 +416,60 @@ mod tests {
 
         let refused = Kairos.inspect(&Series(vec![]));
         assert_eq!(refused[0].status, ProofStatus::InsufficientData);
+    }
+
+    /// A run artifact deserializes into the report views with grades intact.
+    #[test]
+    fn a_report_loads_graded_machines_and_propositions() {
+        let doc = serde_json::json!({
+            "machine_reports": [{
+                "name": "euclid",
+                "operation": "sieve",
+                "failure_mode": "RH invisible to construction",
+                "physis_equivalent": "EXACT layer",
+                "observations": [
+                    {"machine": "euclid", "target": "t", "claim": "c",
+                     "quantity": 0.0, "status": "EstablishedFinite"},
+                    {"machine": "euclid", "target": "u", "claim": "d",
+                     "quantity": 0.0, "status": "Heuristic"},
+                ],
+            }],
+            "propositions": [
+                {"id": "P1", "machines": ["euclid"], "claim": "c",
+                 "status": "Contradicted", "witness": "w", "quarantined": false},
+            ],
+            "disagreements": [
+                {"a": "euclid", "b": "nous", "subject": "s",
+                 "a_claim": "invisible", "b_claim": "visible"},
+            ],
+            "verdict": "REDUCED",
+            "verdict_witness": "seven stances",
+        });
+        let rep: ImpossibleReport = serde_json::from_value(doc).unwrap();
+        assert_eq!(rep.machines.len(), 1);
+        assert_eq!(rep.observations().count(), 2);
+        assert_eq!(rep.certified_observations().count(), 1);
+        assert!(!rep.propositions[0].certifies());
+        assert_eq!(rep.disagreements.len(), 1);
+        assert_eq!(rep.verdict, "REDUCED");
+    }
+
+    /// A partial artifact loads what it has; a missing file reports its path.
+    #[test]
+    fn a_partial_report_loads_and_a_missing_file_names_itself() {
+        let rep: ImpossibleReport = serde_json::from_str(r#"{"verdict": "V"}"#).unwrap();
+        assert!(rep.machines.is_empty());
+        assert_eq!(rep.verdict, "V");
+        let err = ImpossibleReport::load(std::path::Path::new("/no/such/results.json"))
+            .unwrap_err();
+        assert!(err.contains("/no/such/results.json"), "{err}");
+    }
+
+    /// An ungraded status is rejected, not guessed: a typo in a grade must
+    /// fail the load rather than certify under a wrong name.
+    #[test]
+    fn an_unknown_grade_fails_the_load() {
+        let bad = r#"{"propositions": [{"id": "P", "claim": "c", "status": "Proven"}]}"#;
+        assert!(serde_json::from_str::<ImpossibleReport>(bad).is_err());
     }
 }
