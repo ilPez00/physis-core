@@ -38,10 +38,18 @@ CI covers target — estimator noisy, not theory refuted.
 No 1/2 in generation, scoring, gates. Fitted values 1.470/1.487.
 Recorded coincidence only, never for/against RH.
 
-## Next
+## Next (superseded — see SERIES_SUMMARY.md)
 
-E61: weighted fit (inverse-variance per k-bin) at N=1e6 + N=1e7 before
-any new claim. Do not move G3 band post-hoc.
+E61 ran the same estimator at N=1e7: the fit moved **away** from 2C2
+(1.470 → 1.498, Δ-to-target +0.028), so the miss was not a
+finite-range artifact. E62 then isolated the estimator as the cause:
+the unweighted mean over 20 fixed k-bins is dominated by the erratic
+multiples-of-6 bins (R(6)=3.34, R(12)=3.21 vs R(2)=1.43). Replacing
+the mean with the **median of R(k)/S_unit(k)** recovers 2C2 at both
+N=1e6 (1.395/1.451) and N=1e7 (1.459/1.470), G1+G2+G3 all pass.
+E64/E65 show the estimator is kmax-bounded at 40 and must not be
+widened. The series is closed — E60's PARTIAL stands as the
+unweighted-mean result it was always recorded as.
 
 ## Artifacts
 
