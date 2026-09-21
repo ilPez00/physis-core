@@ -1,0 +1,39 @@
+{
+  "title": "Singular-series fit convergence (2C2) — N=1e6 vs N=1e7",
+  "context": "E60 PARTIAL at N=1e6 (fit 1.470/1.487 vs 1.32032±0.15). E61 same estimator at N=1e7: is the miss a finite-N artifact or estimator bias?",
+  "n_max": 10000000,
+  "kmax": 40,
+  "seed": 20260912,
+  "e60_fit_disc": 1.4701501691364305,
+  "e60_fit_hold": 1.4865567864996678,
+  "d_disc": 1.318794279362255,
+  "d_hold": 1.3387217272392327,
+  "r2_disc": 1.427502026908808,
+  "r2_hold": 1.4156815174719657,
+  "nulls": [
+    0.013999375594335282,
+    0.022579215035860342
+  ],
+  "fit_disc": 1.4984048246218262,
+  "fit_hold": 1.5086161177860968,
+  "ci_disc": [
+    1.3338929346617465,
+    1.677908025277927
+  ],
+  "ci_hold": [
+    1.3788561909072796,
+    1.6818971782174201
+  ],
+  "eff_disc": 2.8975753576920797,
+  "g1": true,
+  "g2": true,
+  "g3": false,
+  "survives": false,
+  "rel_half": "no 1/2 in gen/score; fit 1.498/1.509 at N=1e7 (E60 1.470/1.487); Δ-to-target +0.028; D 1.319/1.339",
+  "verdict": "PARTIAL — G3 miss: 1.498/1.509 vs 1.32032±0.15 (E60 1.470/1.487, Δ-to-target +0.028). DIVERGING from 1.32032 with N; estimator biased high, not a finite-N artifact.",
+  "artifacts": [
+    "physis-core/examples/experiment61_convergence.rs",
+    "physis-core/research/impossible_machine/experiments/experiment61_results.json",
+    "physis-core/research/impossible_machine/EXPERIMENT61_RESULTS.md"
+  ]
+}

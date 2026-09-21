@@ -1,0 +1,46 @@
+{
+  "title": "Tail-excluded median-of-R(k)/S_unit(k) singular-series fit (2C2) — kmax=80",
+  "context": "E62 (kmax=40) AGREEMENT 1.395/1.451 and E63 (N=1e7) 1.459/1.470. E64 (kmax=80, all bins) MISS at 0.933/1.075: the sparse large-k bins hold N(k)=0 or 1, so R(k) is 0 or a very large number, and half of them sit at 0, dragging the median down. E65 excludes bins with N(k)=0 (a measurement decision — a bin with no observed events cannot estimate R(k)) and takes the median over the rest at kmax=80. Reports both baselines and the exclusion rate.",
+  "n_max": 1000000,
+  "kmax": 80,
+  "seed": 20260912,
+  "e62_fit_disc": 1.3954335335712698,
+  "e62_fit_hold": 1.4511018327787424,
+  "e64_fit_disc": 0.9326238935169715,
+  "e64_fit_hold": 1.0748101691364305,
+  "d_disc": 0.9750977937285232,
+  "d_hold": 1.0094144944232872,
+  "r2_disc": 1.427761546800135,
+  "r2_hold": 1.422028307873236,
+  "nulls": [
+    0.2025407774742033,
+    0.14860673403713193
+  ],
+  "fit_disc": 0.9339149818035184,
+  "fit_hold": 1.0753407461328917,
+  "ci_disc": [
+    0.8680140632129173,
+    1.2220307642971593
+  ],
+  "ci_hold": [
+    0.9694829002467493,
+    1.282314743784143
+  ],
+  "eff_disc": -0.37334407102311246,
+  "bins_used_disc": 39,
+  "bins_used_hold": 40,
+  "bins_total": 40,
+  "delta_vs_e62": -0.3112914846252117,
+  "delta_vs_e64": 0.0012910882865468931,
+  "g1": true,
+  "g2": true,
+  "g3": false,
+  "survives": false,
+  "rel_half": "no 1/2 in gen/score; tail-excluded median fit 0.934/1.075 at kmax=80 (E62 kmax=40 1.395/1.451, Δ -0.311; E64 raw 0.933/1.075, Δ +0.001); bins used 39/40; D 0.975/1.009",
+  "verdict": "MISS — G3 miss: 0.934/1.075 vs 1.32032±0.15 (E62 kmax=40 1.395/1.451, Δ -0.311; E64 raw 0.933/1.075, Δ +0.001). Tail exclusion did not recover E62; N(k)=0 is not the only pathology.",
+  "artifacts": [
+    "physis-core/examples/experiment65_tail_excluded_median.rs",
+    "physis-core/research/impossible_machine/experiments/experiment65_results.json",
+    "physis-core/research/impossible_machine/EXPERIMENT65_RESULTS.md"
+  ]
+}

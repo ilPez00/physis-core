@@ -1,0 +1,40 @@
+{
+  "title": "Median-of-R(k)/S_unit(k) singular-series fit (2C2) — AGREEMENT",
+  "context": "E60/E61 unweighted mean over 20 fixed k-bins diverged from 2C2 with N (1.470 -> 1.498). E62b replaces the mean with the median of R(k)/S_unit(k), which is immune to the erratic multiples-of-6 bins (R(6), R(12) inflated by primes congruent to ±1 mod 6) and needs no variance model. Same N=1e6, same nulls, same gates. E62a (E(k)-weighted pooled) is recorded separately at 1.609 — it amplifies the noisy bins because the geometric E(k) under-predicts even-k counts ~2x.",
+  "n_max": 1000000,
+  "kmax": 40,
+  "seed": 20260912,
+  "unweighted_fit_disc": 1.4701501691364305,
+  "unweighted_fit_hold": 1.4865567864996678,
+  "d_disc": 1.2575170557068507,
+  "d_hold": 1.3210333944221393,
+  "r2_disc": 1.427761546800135,
+  "r2_hold": 1.422028307873236,
+  "nulls": [
+    0.03612780476521906,
+    0.05282101798443556
+  ],
+  "fit_disc": 1.3950754500032998,
+  "fit_hold": 1.4513221972638617,
+  "ci_disc": [
+    1.2794239547918946,
+    1.66044024856666
+  ],
+  "ci_hold": [
+    1.3412305098190687,
+    1.7051088056474284
+  ],
+  "eff_disc": 2.0737981889921238,
+  "delta_improvement": 0.07507471913313069,
+  "g1": true,
+  "g2": true,
+  "g3": true,
+  "survives": true,
+  "rel_half": "no 1/2 in gen/score; median fit 1.395/1.451 (unweighted mean 1.470/1.487); Δ +0.075; D 1.258/1.321",
+  "verdict": "AGREEMENT — 2C2 disc=1.395 hold=1.451 in 1.32032±0.15 at N=1e6 with the median-of-R(k)/S_unit(k) estimator (unweighted mean was 1.470/1.487, improved 0.075); G1 D=1.258 vs nulls 0.053; G2 stable.",
+  "artifacts": [
+    "physis-core/examples/experiment62_weighted_fit.rs",
+    "physis-core/research/impossible_machine/experiments/experiment62_results.json",
+    "physis-core/research/impossible_machine/EXPERIMENT62_RESULTS.md"
+  ]
+}

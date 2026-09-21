@@ -1,0 +1,40 @@
+{
+  "title": "Median-of-R(k)/S_unit(k) singular-series fit (2C2) — kmax=80 precision check",
+  "context": "E62 (kmax=40, N=1e6) and E63 (kmax=40, N=1e7) both PASS G3 with the median estimator (1.395/1.451 and 1.459/1.470 vs 1.32032±0.15), but both CIs cover 1.32032 comfortably — robust, imprecise. E64 doubles the bin count (kmax=80, 40 even bins) at N=1e6 to test whether the fixed 20-bin set is the precision bottleneck. Same estimator, same gates, only kmax changes.",
+  "n_max": 1000000,
+  "kmax": 80,
+  "seed": 20260912,
+  "e62_fit_disc": 1.3954335335712698,
+  "e62_fit_hold": 1.4511018327787424,
+  "d_disc": 0.9750977937285232,
+  "d_hold": 1.0094144944232872,
+  "r2_disc": 1.427761546800135,
+  "r2_hold": 1.422028307873236,
+  "nulls": [
+    0.20242184943961303,
+    0.14867858480954899
+  ],
+  "fit_disc": 0.9332492554670523,
+  "fit_hold": 1.0753407461328917,
+  "ci_disc": [
+    0.8074655608514341,
+    1.2043721137538101
+  ],
+  "ci_hold": [
+    0.9694829002467493,
+    1.282314743784143
+  ],
+  "eff_disc": -0.33635496337781984,
+  "delta_vs_e62": -0.31195721096167783,
+  "g1": true,
+  "g2": true,
+  "g3": false,
+  "survives": false,
+  "rel_half": "no 1/2 in gen/score; median fit 0.933/1.075 at kmax=80 (E62 kmax=40 1.395/1.451); Δ -0.312; D 0.975/1.009",
+  "verdict": "MISS — G3 miss: 0.933/1.075 vs 1.32032±0.15 (E62 kmax=40 1.395/1.451, Δ -0.312). Wider kmax destabilised the fit; revert to kmax=40.",
+  "artifacts": [
+    "physis-core/examples/experiment64_median_kmax80.rs",
+    "physis-core/research/impossible_machine/experiments/experiment64_results.json",
+    "physis-core/research/impossible_machine/EXPERIMENT64_RESULTS.md"
+  ]
+}

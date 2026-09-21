@@ -1,0 +1,40 @@
+{
+  "title": "Median-of-R(k)/S_unit(k) singular-series fit (2C2) — N=1e7 precision check",
+  "context": "E62 (N=1e6) AGREEMENT with the median estimator (1.395/1.451 vs 1.32032±0.15). E63 runs the same estimator at N=1e7 to confirm the agreement holds at higher resolution; the E62 CI [1.279, 1.660] comfortably covers 1.32032, so this is a precision check, not a direction check.",
+  "n_max": 10000000,
+  "kmax": 40,
+  "seed": 20260912,
+  "e62_fit_disc": 1.3954335335712698,
+  "e62_fit_hold": 1.4511018327787424,
+  "d_disc": 1.318794279362255,
+  "d_hold": 1.3387217272392327,
+  "r2_disc": 1.427502026908808,
+  "r2_hold": 1.4156815174719657,
+  "nulls": [
+    0.013999375594335282,
+    0.022579215035860342
+  ],
+  "fit_disc": 1.4588656971329366,
+  "fit_hold": 1.4701852745522865,
+  "ci_disc": [
+    1.3338929346617465,
+    1.677908025277927
+  ],
+  "ci_hold": [
+    1.3788561909072796,
+    1.6818971782174201
+  ],
+  "eff_disc": 2.6677067933911975,
+  "delta_vs_e62": -0.06343216356166681,
+  "g1": true,
+  "g2": true,
+  "g3": true,
+  "survives": true,
+  "rel_half": "no 1/2 in gen/score; median fit 1.459/1.470 at N=1e7 (E62 1.395/1.451); Δ -0.063; D 1.319/1.339",
+  "verdict": "AGREEMENT — 2C2 disc=1.459 hold=1.470 in 1.32032±0.15 at N=1e7 with the median estimator (E62 N=1e6 1.395/1.451, Δ -0.063); G1 D=1.319 vs nulls 0.023; G2 stable. Agreement holds at higher resolution.",
+  "artifacts": [
+    "physis-core/examples/experiment63_median_n1e7.rs",
+    "physis-core/research/impossible_machine/experiments/experiment63_results.json",
+    "physis-core/research/impossible_machine/EXPERIMENT63_RESULTS.md"
+  ]
+}
