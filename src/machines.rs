@@ -472,4 +472,37 @@ mod tests {
         let bad = r#"{"propositions": [{"id": "P", "claim": "c", "status": "Proven"}]}"#;
         assert!(serde_json::from_str::<ImpossibleReport>(bad).is_err());
     }
+
+    /// The shipped run artifact loads with its full contents: seven
+    /// machines, eleven propositions, three disagreements, and the verdict.
+    /// This pins the reader to the artifact it serves — if the artifact
+    /// grows a new shape, this test names the drift instead of silently
+    /// dropping it.
+    #[test]
+    fn the_shipped_results_artifact_loads_whole() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "research/impossible_machine/experiments/results.json",
+        );
+        let rep = ImpossibleReport::load(&path).expect("shipped results.json must load");
+        assert_eq!(rep.machines.len(), 7, "seven stances");
+        assert_eq!(rep.propositions.len(), 11, "P1..P11");
+        assert_eq!(rep.disagreements.len(), 3, "disagreement is data");
+        assert!(
+            rep.verdict.starts_with("RH REDUCED"),
+            "verdict: {}",
+            short_verdict(&rep.verdict)
+        );
+        assert!(
+            rep.observations().count() >= 18,
+            "every machine saw something"
+        );
+        assert!(
+            rep.certified_observations().count() < rep.observations().count(),
+            "not everything certifies — Heuristic/Contradicted/refusals ride along"
+        );
+    }
+
+    fn short_verdict(v: &str) -> String {
+        v.chars().take(60).collect()
+    }
 }
