@@ -165,15 +165,20 @@
 //! - [`contradiction`]: Tension tracking, polarity detection, and contextual preferencing without information loss.
 //! - [`core`]: The main [`PhysisCore`] knowledge graph containing coherence nodes, hypotheses, edges, and dreaming loops.
 //! - [`discovery`]: Unsupervised ontology gap analysis and proposal clustering for novel domains.
+//! - [`diffusion`]: Deterministic score diffusion over the projected world graph.
 //! - [`embed`]: Vector embedding trait [`VectorEmbed`] and lightweight deterministic [`RandomProjectionEmbedder`].
 //! - [`embed_onnx`]: Optional high-fidelity ONNX embedding runtime (MiniLM / BERT) via `ort`.
 //! - [`epistemic`]: Append-only audit stream and time-machine historical replay.
+//! - [`experience`]: Cross-run memory of executed transitions with exact/kind recall.
+//! - [`intuition`]: Fallible transition proposals, kept outside deterministic evaluation.
+//! - [`query`]: Atomic observation facts, world-graph projection, multi-strategy retrieval.
 //! - [`explanation`]: Structured explanation report generation with provenance chains and causal grounding.
 //! - [`hypothesis`]: Hypotheses, evidence polarity, predictions, revisions, and composite fitness breakdowns.
 //! - [`ontology`]: Multi-domain ontology loaders (Praxis, Machine Process, Agent Workflow, Office Operations).
 //! - [`process`]: Industrial process cycles, tasks, state machines, and temporal deviations.
 //! - [`provenance`]: Cryptographic hash chains and provenance tracking for epistemological traceability.
 //! - [`rag`]: Token-budget bounded retrieval-augmented generation with MMR diversity filtering.
+//! - [`transition`]: State transitions as the universal action primitive with predicted/observed deltas.
 
 pub mod becoming;
 pub mod bench;
@@ -187,15 +192,18 @@ pub mod contradiction;
 pub mod core;
 pub mod coverage;
 pub mod delta_engine;
+pub mod diffusion;
 pub mod direction;
 pub mod discovery;
 pub mod dream;
 pub mod embed;
 pub mod embed_ngram;
 pub mod epistemic;
+pub mod experience;
 pub mod explanation;
 pub mod grid_fitness;
 pub mod hypothesis;
+pub mod intuition;
 pub mod linkage;
 pub mod machines;
 pub mod map;
@@ -208,6 +216,7 @@ pub mod oracle;
 pub mod process;
 pub mod propose;
 pub mod provenance;
+pub mod query;
 pub mod rag;
 pub mod relation;
 pub mod store;
@@ -215,6 +224,7 @@ pub mod temporal;
 pub mod tokenizer;
 pub mod transform;
 pub mod transplant;
+pub mod transition;
 pub mod worldstate;
 
 /// Restore the default `SIGPIPE` behaviour for a command-line program.
@@ -248,6 +258,7 @@ pub use delta_engine::{
     OntologyMutation, RevisionWalk, WalkStep, ADJUDICATION_STRATEGIC_FLOOR, DEGRADATION_THRESHOLD,
     GAMMA, MAX_PROPAGATION_DEPTH, MAX_REVISION_WALK_NODES, MIN_IMPACT,
 };
+pub use diffusion::{diffuse, ranked};
 pub use discovery::{discover, DiscoveryConfig, DiscoveryReport, ProposedDomain};
 pub use dream::{
     dream_over_history, ProposalKind, RetrospectiveProposal, RETIRE_AFTER_CONTRADICTIONS,
@@ -256,6 +267,7 @@ pub use embed::{RandomProjectionEmbedder, VectorEmbed};
 pub use epistemic::{
     EpistemicAuditTrail, EpistemicEvent, EpistemicEventType, HighWaterMark, IntakeReceipt,
 };
+pub use experience::{Experience, ExperienceStore, action_kind};
 pub use explanation::{ExplanationReport, HistoricalPrecedent};
 pub use hypothesis::{
     Evidence, EvidencePolarity, FitnessBreakdown, Hypothesis, HypothesisStatus, Prediction,
@@ -264,6 +276,7 @@ pub use hypothesis::{
     FITNESS_WEIGHT_EMPIRICAL_SUPPORT, FITNESS_WEIGHT_LOGICAL_CONSISTENCY,
     FITNESS_WEIGHT_ONTOLOGICAL_FIT, FITNESS_WEIGHT_PREDICTIVE_SUCCESS, FITNESS_WEIGHT_SEMANTIC_FIT,
 };
+pub use intuition::{Intuition, Proposal};
 pub use models::*;
 pub use ontology::OntologyLoader;
 pub use process::{
@@ -278,6 +291,14 @@ pub use temporal::TemporalValidity;
 pub use transform::{
     apply, find_homomorphisms, Constraint, ConstraintKind, PatElem, Predicate, PropKind,
     Proposition, TraceStep, Transform, Triple, TriplePattern, WorldState, ACCEPT_FLOOR,
+};
+pub use transition::{
+    Action, EvidenceRequirement, ExecutedTrace, ExecutedTransition, FsAction, GraphAction,
+    NoteAction, PraxisAction, StateDelta, TelemetryAction, Transition,
+};
+pub use query::{
+    AtomicFact, Bm25Index, QueryPlanner, QueryPlan, QueryResult, RetrievalStrategy,
+    TemporalWindow, WorldGraph, CausalDirection, observations_to_facts,
 };
 
 #[cfg(feature = "embed-onnx")]
