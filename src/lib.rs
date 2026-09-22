@@ -259,6 +259,7 @@ pub use core::PhysisCore;
 pub use cortex::encoder::{CortexOutput, NeuralRole, ProbeHead, SharedEncoder};
 pub use cortex::latent::{LatentProjections, PhysisLatent, Projection, ProjectionKind};
 pub use cortex::retrieval::{RefinedResult, RefinementLadder, StageHits};
+pub use cortex::router::{route, Intent, RoutingContext, RoutingDecision};
 pub use backend::{BackendKind, ComputeBackend, CpuBackend, ResolvedBackend, select_backend};
 pub use delta_engine::{
     evaluate_mutation, route_transition, AdjudicationDecision, AdjudicationRoute,

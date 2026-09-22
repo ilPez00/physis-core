@@ -11,6 +11,8 @@
 //! - [`retrieval`]: the progressive refinement ladder over the existing
 //!   [`crate::query`] primitives. ColBERT is a named rung that reports
 //!   unavailable until weights exist on the machine.
+//! - [`router`]: deterministic-first routing — intent from the verb, capable
+//!   first, preferred second, scan-best third, CPU last, rationale always.
 //!
 //! No `#[cfg(rocm)]` / `#[cfg(cuda)]` anywhere: compute placement is the
 //! [`crate::backend`] decision, not the semantic layer's.
@@ -18,3 +20,4 @@
 pub mod encoder;
 pub mod latent;
 pub mod retrieval;
+pub mod router;

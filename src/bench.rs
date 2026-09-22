@@ -532,3 +532,50 @@ pub fn ground_truth() -> (Vec<Doc>, Truth) {
     docs.sort_by(|a, b| a.0.cmp(&b.0));
     (docs, truth)
 }
+
+/// One row of the per-backend table (PH-101 Task 7).
+///
+/// Measures what actually differs between backends today — the embed path —
+/// over caller-supplied probe texts. There is no model × quantization axis
+/// yet because no quantized device backend exists; adding that axis before
+/// the backends would be a table of one repeated row.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackendBenchRow {
+    pub requested: String,
+    pub resolved_label: String,
+    pub fallback_note: Option<String>,
+    pub texts: usize,
+    pub elapsed_ms: f64,
+    pub texts_per_sec: f64,
+    pub embedding_dim: usize,
+}
+
+/// Embed `texts` once per requested backend kind and time it.
+pub fn run_backend_table(
+    kinds: &[crate::backend::BackendKind],
+    texts: &[&str],
+) -> Vec<BackendBenchRow> {
+    kinds
+        .iter()
+        .map(|kind| {
+            let resolved = crate::backend::select_backend(Some(*kind));
+            let t0 = Instant::now();
+            let mut dim = 0;
+            for text in texts {
+                if let Some(vec) = resolved.backend.embed_text(text) {
+                    dim = vec.len();
+                }
+            }
+            let elapsed_ms = t0.elapsed().as_secs_f64() * 1000.0;
+            BackendBenchRow {
+                requested: kind.as_str().to_string(),
+                resolved_label: resolved.backend.label(),
+                fallback_note: resolved.fallback_note,
+                texts: texts.len(),
+                elapsed_ms,
+                texts_per_sec: texts.len() as f64 / (elapsed_ms / 1000.0).max(1e-9),
+                embedding_dim: dim,
+            }
+        })
+        .collect()
+}
