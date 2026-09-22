@@ -164,6 +164,7 @@
 //! - [`coherence_query`]: Query builder for filtering nodes and hypotheses by coherence bounds and verdict states.
 //! - [`contradiction`]: Tension tracking, polarity detection, and contextual preferencing without information loss.
 //! - [`core`]: The main [`PhysisCore`] knowledge graph containing coherence nodes, hypotheses, edges, and dreaming loops.
+//! - [`cortex`]: The semantic perception layer — shared encoder with probe heads, canonical latent projections, progressive refinement retrieval.
 //! - [`discovery`]: Unsupervised ontology gap analysis and proposal clustering for novel domains.
 //! - [`diffusion`]: Deterministic score diffusion over the projected world graph.
 //! - [`embed`]: Vector embedding trait [`VectorEmbed`] and lightweight deterministic [`RandomProjectionEmbedder`].
@@ -191,6 +192,7 @@ pub mod coherence_query;
 pub mod config_run;
 pub mod contradiction;
 pub mod core;
+pub mod cortex;
 pub mod coverage;
 pub mod delta_engine;
 pub mod devices;
@@ -254,6 +256,9 @@ pub use coherence_query::{
 };
 pub use contradiction::{Contradiction, ContradictionParty, ResolutionStatus};
 pub use core::PhysisCore;
+pub use cortex::encoder::{CortexOutput, NeuralRole, ProbeHead, SharedEncoder};
+pub use cortex::latent::{LatentProjections, PhysisLatent, Projection, ProjectionKind};
+pub use cortex::retrieval::{RefinedResult, RefinementLadder, StageHits};
 pub use backend::{BackendKind, ComputeBackend, CpuBackend, ResolvedBackend, select_backend};
 pub use delta_engine::{
     evaluate_mutation, route_transition, AdjudicationDecision, AdjudicationRoute,
