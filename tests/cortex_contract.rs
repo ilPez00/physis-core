@@ -89,6 +89,27 @@ fn latent_projections_round_trip_shapes() {
 }
 
 #[test]
+fn backend_bench_table_measures_the_embed_path() {
+    use physis_core::bench::run_backend_table;
+    let rows = run_backend_table(
+        &[BackendKind::Cpu, BackendKind::Rocm, BackendKind::Cuda],
+        &["the pump overheated", "scheduled maintenance complete"],
+    );
+    assert_eq!(rows.len(), 3);
+    let cpu = &rows[0];
+    assert!(cpu.fallback_note.is_none());
+    assert!(cpu.embedding_dim > 0);
+    assert!(cpu.texts_per_sec > 0.0);
+    for row in &rows[1..] {
+        assert!(
+            row.fallback_note.is_some(),
+            "unwired backend rows must say so: {}",
+            row.requested
+        );
+    }
+}
+
+#[test]
 fn refinement_ladder_runs_rungs_in_order() {
     use physis_core::cortex::retrieval::RefinementLadder;
     use physis_core::query::{AtomicFact, Bm25Index, QueryPlanner, WorldGraph};
