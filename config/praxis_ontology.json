@@ -355,7 +355,11 @@
         "saw",
         "measure",
         "bench",
-        "garage"
+        "garage",
+        "using a drill",
+        "workshop tools",
+        "saw and bench",
+        "measuring in the garage"
       ]
     },
     {
@@ -424,7 +428,11 @@
         "cuisine",
         "flavor",
         "dish",
-        "gourmet"
+        "gourmet",
+        "chef cooking",
+        "restaurant dish",
+        "cuisine artistry",
+        "flavor design"
       ]
     },
     {
@@ -550,7 +558,10 @@
         "tutor",
         "guide",
         "student",
-        "lesson"
+        "lesson",
+        "coaching career growth",
+        "development conversation",
+        "junior engineer mentorship"
       ]
     },
     {
@@ -929,7 +940,11 @@
         "kitchen",
         "bake",
         "ingredient",
-        "nutrition"
+        "nutrition",
+        "kitchen meal prep",
+        "making a recipe",
+        "cooking at home",
+        "prepping ingredients"
       ]
     }
   ]
