@@ -180,6 +180,7 @@
 //! - [`rag`]: Token-budget bounded retrieval-augmented generation with MMR diversity filtering.
 //! - [`transition`]: State transitions as the universal action primitive with predicted/observed deltas.
 
+pub mod backend;
 pub mod becoming;
 pub mod bench;
 pub mod chain;
@@ -192,6 +193,7 @@ pub mod contradiction;
 pub mod core;
 pub mod coverage;
 pub mod delta_engine;
+pub mod devices;
 pub mod diffusion;
 pub mod direction;
 pub mod discovery;
@@ -252,12 +254,14 @@ pub use coherence_query::{
 };
 pub use contradiction::{Contradiction, ContradictionParty, ResolutionStatus};
 pub use core::PhysisCore;
+pub use backend::{BackendKind, ComputeBackend, CpuBackend, ResolvedBackend, select_backend};
 pub use delta_engine::{
     evaluate_mutation, route_transition, AdjudicationDecision, AdjudicationRoute,
     EvaluationContext, HypothesisTransition, MutationOp, NodeDelta, OntologyDeltaReport,
     OntologyMutation, RevisionWalk, WalkStep, ADJUDICATION_STRATEGIC_FLOOR, DEGRADATION_THRESHOLD,
     GAMMA, MAX_PROPAGATION_DEPTH, MAX_REVISION_WALK_NODES, MIN_IMPACT,
 };
+pub use devices::{DeviceInfo, HardwareDiscovery, parse_nvidia_smi_csv};
 pub use diffusion::{diffuse, ranked};
 pub use discovery::{discover, DiscoveryConfig, DiscoveryReport, ProposedDomain};
 pub use dream::{

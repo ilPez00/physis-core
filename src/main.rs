@@ -159,6 +159,13 @@ enum Command {
         #[arg(long)]
         big_model: Option<String>,
     },
+    /// Show this machine's compute devices (CPU always; NVIDIA via nvidia-smi;
+    /// AMD via sysfs) and the selected compute backend.
+    Hardware {
+        /// Machine-readable output.
+        #[arg(long)]
+        json: bool,
+    },
     /// List observations from the shared log — the sequence numbers `claim
     /// --from` cites. Reads the same append-only log any product-side
     /// observer (watchers, workspace `remember`) writes to.
@@ -479,6 +486,7 @@ fn main() -> anyhow::Result<()> {
             budget,
             big_model,
         } => cmd_benchmark(order, budget, big_model),
+        Command::Hardware { json } => cmd_hardware(json),
         Command::Run {
             config,
             model,
@@ -1817,6 +1825,43 @@ fn cmd_observed(source: Option<&str>, json: bool) -> anyhow::Result<()> {
     } else {
         for o in &records {
             println!("obs:{} [{}] {} — {}", o.seq, o.source, o.subject, o.body);
+        }
+    }
+    Ok(())
+}
+
+fn cmd_hardware(json: bool) -> anyhow::Result<()> {
+    use physis_core::backend::select_backend;
+    use physis_core::devices::HardwareDiscovery;
+    let devices = HardwareDiscovery::scan();
+    // The scan's best kind is the default; an explicit PHYSIS_BACKEND still
+    // wins inside select_backend. Non-CPU kinds fall back loudly until a
+    // device backend lands (see backend.rs).
+    let resolved = select_backend(Some(
+        physis_core::backend::BackendKind::from_env()
+            .unwrap_or_else(|| HardwareDiscovery::best_kind(&devices)),
+    ));
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "devices": devices,
+                "best_kind": HardwareDiscovery::best_kind(&devices).as_str(),
+                "selected_backend": resolved.backend.label(),
+                "fallback_note": resolved.fallback_note,
+            })
+        );
+    } else {
+        for d in &devices {
+            let mem = d
+                .memory_bytes
+                .map(|b| format!(" {} MiB", b / 1024 / 1024))
+                .unwrap_or_default();
+            println!("{} [{}]{mem} (via {})", d.name, d.kind, d.source);
+        }
+        println!("selected backend: {}", resolved.backend.label());
+        if let Some(note) = &resolved.fallback_note {
+            println!("note: {note}");
         }
     }
     Ok(())
