@@ -563,3 +563,36 @@ vocabulary these invariants need to be honest):**
   `dream_never_writes`. Interaction evidence + the timelessness constraint
   (clocks live only in the trail/replay layer) recorded in `../PLAN.md`
   §23.5, from `../mindalogue.md`.
+
+
+## §8 — Physis Cortex: backend abstraction + semantic layer (2026-09-20)
+
+Docs-only proposal. Plan: `docs/plans/2026-09-20-cortex-core.md`. Packet:
+`../packets/PH-101`. No code committed.
+
+Adds a common compute layer over the existing `ort` runtime:
+
+- `src/backend.rs` — `ComputeBackend` trait + `BackendKind{Cpu,Rocm,Cuda}`. No
+  `#[cfg(rocm)]`/`#[cfg(cuda)]` in semantic code; hardware differences live in
+  the backend layer only.
+- `src/devices.rs` — `DeviceInfo` + `HardwareDiscovery::scan()`, exposed as
+  `physis-core hardware`. NVIDIA via `nvidia-smi` + `ort` CUDA EP probe; AMD via
+  `rocm-smi`/sysfs; CPU always.
+- `src/cortex/encoder.rs` — `NeuralRole`, `CortexOutput`, one shared encoder
+  invocation feeding intent/NER/relation heads as adapters/probes.
+- `src/cortex/latent.rs` — canonical Physis latent with `W_e/W_d/W_c/W_g`
+  projections (identity/linear/MLP), benchmarked not assumed.
+- `src/cortex/retrieval.rs` — progressive refinement: exact -> structural ->
+  sparse -> dense ANN -> ColBERT -> graph constraints.
+- `src/cortex/router.rs` — `Intent` enum, `RoutingDecision`, deterministic-first
+  ladder with hardware-aware placement.
+- `bench.rs` extended for CPU/ROCm/CUDA per model x quantization, primary metric
+  validated task success / compute cost.
+
+Reuse: `embed.rs` `VectorEmbed` + `RandomProjectionEmbedder` (the deterministic
+CPU backend), `embed_onnx.rs` (ort inference), `model_provider.rs` `Capability`
+(the escalation ladder), `bench.rs`. ROCm is preserved; the ONNX ROCm EP dead end
+is not re-tried.
+
+Priority: P4 in the parent PLAN.md ordering — waits on its own plan entry,
+reviewer release and frozen manifest before any holdout.
