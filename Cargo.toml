@@ -45,6 +45,10 @@ cli = ["dep:clap"]
 # ONNX MiniLM embedder via the `ort` runtime. Requires model.onnx +
 # tokenizer.json in the model dir at runtime; falls back to random projection.
 embed-onnx = ["dep:ort", "dep:tokenizers"]
+# PH-037 / substrate research: reservoir, spiking, recorded-data, FlyWire,
+# cortical-simulator backends. Default-off — the core (trait + Deterministic
+# backend) builds without any biological dependency.
+neural = []
 
 [dev-dependencies]
 tempfile = "3"

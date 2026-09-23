@@ -229,7 +229,9 @@ pub mod tokenizer;
 pub mod transform;
 pub mod transplant;
 pub mod transition;
-pub mod worldstate;
+ pub mod worldstate;
+
+pub mod neural;
 
 /// Restore the default `SIGPIPE` behaviour for a command-line program.
 ///
