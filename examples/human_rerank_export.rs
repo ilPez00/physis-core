@@ -159,24 +159,49 @@ fn main() {
         use physis_core::embed::VectorEmbed;
         use physis_core::embed_onnx::{OnnxConfig, OnnxEmbedder, PoolingStrategy};
 
-        let Some(wn) = ["models/wordnet", "../models/wordnet"]
+        let wn_root = || {
+            let extra: Vec<String> = std::env::var("PHYSIS_MODELS_DIR")
+                .ok().into_iter().flat_map(|v| {
+                    // allow multiple dirs separated by ':' (unix) or ';' (win)
+                    v.split([':', ';']).map(|s| format!("{s}/wordnet")).collect::<Vec<_>>()
+                }).collect();
+            let mut cands: Vec<String> = vec!["models/wordnet".into(), "../models/wordnet".into()];
+            cands.extend(extra);
+            cands
+        };
+        let wn_candidates = wn_root();
+        let Some(wn) = wn_candidates
             .iter()
             .map(std::path::Path::new)
-            .find(|d| d.join("data.noun").exists())
+            .find(|d| d.join("data.noun").exists() || d.join("dict/data.noun").exists())
         else {
-            println!("WARNING: WordNet not found — aborting.");
+            println!("WARNING: WordNet not found (set PHYSIS_MODELS_DIR for remote asset dirs) — aborting.");
             return;
         };
-        let (lemma, hyper) = load_wordnet(&wn.join("data.noun"));
+        let wn_file = if wn.join("data.noun").exists() { wn.join("data.noun") } else { wn.join("dict/data.noun") };
+        let (lemma, hyper) = load_wordnet(&wn_file);
 
-        let Some(m1dir) = ["models", "../models"]
+        let model_roots = |sub: &str| {
+            let mut cands: Vec<String> = vec![
+                format!("models/{sub}"), format!("../models/{sub}"),
+            ];
+            if let Ok(v) = std::env::var("PHYSIS_MODELS_DIR") {
+                for d in v.split([':', ';']) {
+                    cands.push(format!("{d}/{sub}"));
+                }
+            }
+            cands
+        };
+        let m1_candidates = model_roots("");
+        let Some(m1dir) = m1_candidates
             .iter()
             .find(|d| std::path::Path::new(d).join("model.onnx").exists())
         else {
-            println!("WARNING: MiniLM not available — aborting.");
+            println!("WARNING: MiniLM (flat model.onnx) not available — aborting.");
             return;
         };
-        let Some(m2dir) = ["models/bge-base-en-v1.5", "../models/bge-base-en-v1.5"]
+        let m2_candidates = model_roots("bge-base-en-v1.5");
+        let Some(m2dir) = m2_candidates
             .iter()
             .find(|d| std::path::Path::new(d).join("onnx/model.onnx").exists())
         else {
