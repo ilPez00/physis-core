@@ -30,10 +30,12 @@ impl ArtificialSpikingBackend {
     }
 }
 
-// Biological LIF parameters are NOT modeled here — α = 0.1 is a toy decay.
+// Toy LIF dynamics (NOT biological). DECAY = 0.1 is a cheap membrane leak;
+// THRESHOLD = 0.3 so a unit-magnitude stimulus on the reference task fires at
+// least one neuron — a calibration knob, not a neuron model.
 // See docs/research/wetware/LIMITATIONS.md.
 const DECAY: f32 = 0.1;
-const THRESHOLD: f32 = 1.0;
+const THRESHOLD: f32 = 0.3;
 
 impl NeuralSubstrate for ArtificialSpikingBackend {
     fn capabilities(&self) -> SubstrateCapabilities {
@@ -79,8 +81,11 @@ impl NeuralSubstrate for ArtificialSpikingBackend {
 
     fn observe(&mut self, _window: ObservationWindow) -> SubstrateResult<NeuralObservation> {
         let mut pops = std::collections::HashMap::new();
-        // Read out membrane + spike raster (boolean → 0/1).
+        // Read out membrane + spike raster (boolean → 0/1). The decoder uses
+        // `readout`; for spiking, the membrane post-reset is the canonical
+        // read-out (a fired neuron reads 0.0 — its activity is in `raster`).
         let raster: Vec<f32> = self.fired.iter().map(|f| if *f { 1.0 } else { 0.0 }).collect();
+        pops.insert("readout".to_string(), PopulationState { values: self.membrane.clone(), trace: vec![] });
         pops.insert("membrane".to_string(), PopulationState { values: self.membrane.clone(), trace: vec![] });
         pops.insert("raster".to_string(), PopulationState { values: raster, trace: vec![] });
         Ok(NeuralObservation { t: self.t, populations: pops, window: ObservationWindow::default() })
@@ -95,5 +100,36 @@ impl NeuralSubstrate for ArtificialSpikingBackend {
 
     fn health(&self) -> SubstrateHealth {
         SubstrateHealth { online: !self.membrane.is_empty(), occupancy: 0.0, error: None }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::neural::substrate::{ObservationWindow, PopulationState, StimulusPattern};
+
+    #[test]
+    fn unit_stimulus_fires_neuron() {
+        // PH-106: a unit-magnitude dense stimulus must cross the toy threshold.
+        let mut b = ArtificialSpikingBackend::new(4);
+        b.configure(SubstrateConfig::default()).unwrap();
+        b.stimulate(StimulusPattern {
+            channels: vec![],
+            dense: vec![0.0, 1.0, 0.0, 0.0],
+            hint: None,
+        }).unwrap();
+        assert!(b.fired[1], "neuron 1 should fire on unit stimulus");
+        let obs = b.observe(ObservationWindow::default()).unwrap();
+        let raster = &obs.populations["raster"];
+        assert!(raster.values[1] > 0.0, "raster must reflect the spike");
+    }
+
+    #[test]
+    fn reset_clears_membrane_and_fired() {
+        let mut b = ArtificialSpikingBackend::new(2);
+        b.stimulate(StimulusPattern { channels: vec![], dense: vec![0.0, 1.0], hint: None }).unwrap();
+        b.reset().unwrap();
+        assert!(b.membrane.iter().all(|v| *v == 0.0));
+        assert!(b.fired.iter().all(|f| !*f));
     }
 }
