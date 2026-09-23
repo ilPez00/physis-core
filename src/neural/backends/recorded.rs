@@ -99,3 +99,44 @@ impl NeuralSubstrate for RecordedNeuralBackend {
         SubstrateHealth { online: !self.trace.is_empty(), occupancy: 0.0, error: None }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_csv_parses_sample() {
+        let b = RecordedNeuralBackend::load_csv("data/neural/sample.csv")
+            .expect("sample recording loads");
+        assert_eq!(b.trace.len(), 4, "sample.csv has 4 timesteps");
+        assert_eq!(b.trace[0], vec![0.0, 0.0, 0.0, 0.0]);
+        assert_eq!(b.trace[1], vec![0.5, 0.2, -0.1, 0.3]);
+    }
+
+    #[test]
+    fn observe_replays_in_order() {
+        let mut b = RecordedNeuralBackend::load_csv("data/neural/sample.csv")
+            .expect("sample loads");
+        let o0 = b.observe(ObservationWindow::default()).unwrap();
+        let o1 = b.observe(ObservationWindow::default()).unwrap();
+        assert_eq!(o0.populations["readout"].values, vec![0.0, 0.0, 0.0, 0.0]);
+        assert_eq!(o1.populations["readout"].values, vec![0.5, 0.2, -0.1, 0.3],
+            "cursor advances: second observe = timestep 2");
+    }
+
+    #[test]
+    fn reset_loops_back_to_first_frame() {
+        let mut b = RecordedNeuralBackend::load_csv("data/neural/sample.csv")
+            .expect("sample loads");
+        let _ = b.observe(ObservationWindow::default()).unwrap();
+        b.reset().unwrap();
+        let o = b.observe(ObservationWindow::default()).unwrap();
+        assert_eq!(o.populations["readout"].values, vec![0.0, 0.0, 0.0, 0.0],
+            "reset restores frame 0");
+    }
+
+    #[test]
+    fn missing_file_errors() {
+        assert!(RecordedNeuralBackend::load_csv("data/neural/does_not_exist.csv").is_err());
+    }
+}
