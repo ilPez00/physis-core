@@ -4,3 +4,8 @@
 # .claude/ is agent scratch. Neither is source.
 .physis/
 .claude/
+
+# Compiled Python caches. Byte-build artefacts, not source: they regenerate, and
+# on the NTFS-class volume this checkout lives on their modes are meaningless.
+__pycache__/
+*.pyc
