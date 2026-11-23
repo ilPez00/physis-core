@@ -4,8 +4,9 @@
 > and is **no longer the product** — the only Physis engine is
 > [`physis-next`](https://github.com/ilPez00/physis-next). The live `physis-core`
 > source is maintained in the `hermes-physis` tree (`vendor/physis-core`); the
-> latest prepared crate version is **0.4.0** (tag `physis-core-v0.4.0`, release
-> gate green, **not yet published to crates.io**). Apache-2.0.
+> latest **published** crate version is **0.4.0** on
+> [crates.io](https://crates.io/crates/physis-core) (tag `physis-core-v0.4.0`,
+> release gate green). Apache-2.0.
 
 
 > **Compression numbers restated 2026-09-12.** Earlier figures (220 → 165, 25%)
